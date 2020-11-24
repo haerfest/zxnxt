@@ -1,5 +1,5 @@
-wasbeer: main.o clock.o cpu.o
-	cc -Wall -o wasbeer main.o clock.o cpu.o
+twatwa: main.o clock.o cpu.o
+	cc -Wall -o twatwa main.o clock.o cpu.o
 
 main.o: main.c clock.c copper.h cpu.h defs.h
 	cc -c main.c
@@ -15,4 +15,4 @@ cpu.o: cpu.c clock.h defs.h
 
 clean:
 	rm *.o
-	rm wasbeer
+	rm twatwa

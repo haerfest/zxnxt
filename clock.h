@@ -4,7 +4,7 @@
 
 void clock_init(void);
 void clock_finit(void);
-void clock_tick(unsigned ticks);
+void clock_tick(unsigned cpu_ticks);
 
 
 #endif  /* __CLOCK_H */
