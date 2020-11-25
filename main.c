@@ -4,14 +4,17 @@
 #include "cpu.h"
 
 
-static int main_init(SDL_Window** window) {
+static SDL_Window* window;
+
+
+static int main_init(void) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     SDL_Log("SDL_Init: %s\n", SDL_GetError());
     return -1;
   }
 
-  *window = SDL_CreateWindow("twatwa", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
-  if (*window == NULL) {
+  window = SDL_CreateWindow("twatwa", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
+  if (window == NULL) {
     SDL_Log("SDL_CreateWindow: %s\n", SDL_GetError());
     return -1;
   }
@@ -23,10 +26,10 @@ static int main_init(SDL_Window** window) {
 }
 
 
-static void main_eventloop(SDL_Window* window) {
-  for (;;) {
-    SDL_Event event;
+static void main_eventloop(void) {
+  SDL_Event event;
   
+  for (;;) {
     if (SDL_WaitEvent(&event) == 0) {
       SDL_Log("SDL_WaitEvent: %s\n", SDL_GetError());
       break;
@@ -39,21 +42,19 @@ static void main_eventloop(SDL_Window* window) {
 }
 
 
-static void main_finit(SDL_Window* window) {
+static void main_finit(void) {
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
 
 
 int main(int argc, char* argv[]) {
-  SDL_Window* window;
-
-  if (main_init(&window) != 0) {
+  if (main_init() != 0) {
     return 1;
   }
 
-  main_eventloop(window);
-  main_finit(window);
+  main_eventloop();
+  main_finit();
 
   return 0;
 }
