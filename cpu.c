@@ -45,8 +45,9 @@ typedef struct {
 static cpu_t cpu;
 
 
-void cpu_init(void) {
+int cpu_init(void) {
   cpu_reset();
+  return 0;
 }
 
 
@@ -63,5 +64,5 @@ void cpu_reset(void) {
 }
 
 
-void cpu_step(void) {
+void cpu_run(u32_t ticks) {
 }

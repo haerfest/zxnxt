@@ -32,10 +32,12 @@ typedef struct {
 static clock_t clock;
 
 
-void clock_init(void) {
+int clock_init(void) {
   clock.timing  = E_CLOCK_TIMING_VGA_50HZ_128;
   clock.divider = E_CLOCK_DIVIDER_3500KHZ;
   clock.ticks   = 0;
+
+  return 0;
 }
 
 

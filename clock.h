@@ -21,7 +21,7 @@ typedef enum {
 } clock_timing_t;
 
 
-void clock_init(void);
+int  clock_init(void);
 void clock_finit(void);
 void clock_tick(unsigned cpu_ticks);
 
