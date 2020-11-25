@@ -57,7 +57,9 @@ static void main_eventloop(void) {
   u32_t     t0;
   u32_t     t1;
   u32_t     consumed;
-  
+  s32_t     ticks_left;
+
+  ticks_left = 0;
   for (;;) {
     if (SDL_PollEvent(&event) == 1) {
       if (event.type == SDL_QUIT) {
@@ -66,12 +68,14 @@ static void main_eventloop(void) {
     }
 
     t0 = SDL_GetTicks();
-    cpu_run(100000);
+    if (cpu_run(1000000 + ticks_left, &ticks_left) != 0) {
+      break;
+    }
     t1 = SDL_GetTicks();
 
-    /* Assuming 3.5 MHz, 100,000 ticks take 28.6 milliseconds. */
+    /* Assuming 3.5 MHz, 1,000,000 ticks take 286 milliseconds. */
     consumed = t1 - t0;
-    SDL_Delay(28 - consumed);
+    SDL_Delay(286 - consumed);
   }
 }
 

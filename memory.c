@@ -96,3 +96,8 @@ void memory_finit(void) {
     free(memory.rom);
   }
 }
+
+
+u8_t memory_read(u16_t address) {
+  return memory.memory[address];
+}

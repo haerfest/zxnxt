@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include "clock.h"
 #include "defs.h"
+#include "memory.h"
 
 #include "cpu.h"
 
@@ -64,5 +66,19 @@ void cpu_reset(void) {
 }
 
 
-void cpu_run(u32_t ticks) {
+int cpu_run(u32_t ticks, s32_t* ticks_left) {
+  /* M1 cycle. */
+  const u8_t opcode = memory_read(cpu.pc);
+  cpu.pc++;
+  clock_tick(3);
+
+  switch (opcode) {
+    #include "opcodes.c"
+
+    default:
+      fprintf(stderr, "Unknown opcode %02Xh at %04Xh\n", opcode, cpu.pc - 1);
+      return -1;
+  }
+
+  return 0;
 }
