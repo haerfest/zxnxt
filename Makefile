@@ -1,17 +1,20 @@
+INCS=-I/usr/local/include
+LIBS=-lsdl2
+
 twatwa: main.o clock.o cpu.o
-	cc -Wall -o twatwa main.o clock.o cpu.o
+	cc -Wall $(INCS) $(LIBS) -o twatwa main.o clock.o cpu.o
 
 main.o: main.c clock.c copper.h cpu.h defs.h
-	cc -c main.c
+	cc $(INCS) -c main.c
 
 clock.o: clock.c defs.h
-	cc -c clock.c
+	cc $(INCS) -c clock.c
 
 copper.o: copper.c clock.h defs.h
-	cc -c copper.c
+	cc $(INCS) -c copper.c
 
 cpu.o: cpu.c clock.h defs.h
-	cc -c cpu.c
+	cc $(INCS) -c cpu.c
 
 clean:
 	rm *.o
