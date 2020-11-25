@@ -61,10 +61,8 @@ static void main_eventloop(void) {
 
   ticks_left = 0;
   for (;;) {
-    if (SDL_PollEvent(&event) == 1) {
-      if (event.type == SDL_QUIT) {
-        break;
-      }
+    if (SDL_QuitRequested() == SDL_TRUE) {
+      break;
     }
 
     t0 = SDL_GetTicks();
