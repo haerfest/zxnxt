@@ -15,29 +15,28 @@ Table       = Dict[Opcode, Union[Instruction, 'Table']]
 
 instructions: Table = {
     0x3E: ('LD A,n', [
-        'cpu.a = memory_read(cpu.pc)',      4,
-        'cpu.pc++',                         3,
+        'cpu.a = memory_read(cpu.pc++)',    3
     ]),
     0xC3: ('JP nn', [
-        'cpu.z  = memory_read(cpu.pc)',     4,
+        'cpu.z  = memory_read(cpu.pc)',     3,
         'cpu.w  = memory_read(cpu.pc + 1)', 3,
-        'cpu.pc = cpu.w << 8 | cpu.z',      3,
+        'cpu.pc = cpu.w << 8 | cpu.z',
     ]),
     0xED: {
         0x91: ('NEXTREG reg,value', [
             'io_write(0x243B, memory_read(cpu.pc++))',
             'io_write(0x253B, memory_read(cpu.pc++))',
-            16,
+            8,
 
         ]),
         0x92: ('NEXTREG reg,A', [
             'io_write(0x243B, memory_read(cpu.pc++))',
             'io_write(0x253B, cpu.a)',
-            12
+            4
         ]),
     },
     0xF3: ('DI', [
-        'cpu.iff1 = cpu.iff2 = 0', 4
+        'cpu.iff1 = cpu.iff2 = 0', 0
     ]),
 }
 
@@ -47,6 +46,7 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
     spaces = ' ' * level * 4
 
     f.write(f'''{spaces}opcode = memory_read(cpu.pc++);
+{spaces}clock_ticks(4);
 {spaces}switch (opcode) {{
 ''')
 
@@ -55,11 +55,12 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
         if isinstance(item, tuple):
             mnemonic, statements = item
             f.write(f'{spaces}  case 0x{opcode:02X}:  /* {mnemonic} */\n')
-            for statement in statements:
-                if isinstance(statement, int):
-                    f.write(f'{spaces}    clock_ticks({statement});\n')
+            for item in statements:
+                if isinstance(item, int):
+                    if item > 0:
+                        f.write(f'{spaces}    clock_ticks({item});\n')
                 else:
-                    f.write(f'{spaces}    {statement};\n')
+                    f.write(f'{spaces}    {item};\n')
             f.write(f'{spaces}    break;\n\n')
         else:
             f.write(f'{spaces}  case 0x{opcode:02X}:\n')
