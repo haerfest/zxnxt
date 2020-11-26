@@ -23,7 +23,7 @@ typedef enum {
 
 int  clock_init(void);
 void clock_finit(void);
-void clock_tick(unsigned cpu_ticks);
+void clock_ticks(unsigned cpu_ticks);
 
 
 #endif  /* __CLOCK_H */

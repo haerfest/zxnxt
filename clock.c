@@ -46,7 +46,7 @@ void clock_finit(void) {
 
 
 /* Called by the CPU. */
-void clock_tick(unsigned cpu_ticks) {
+void clock_ticks(unsigned cpu_ticks) {
   const unsigned ticks = cpu_ticks * timing_spec[clock.timing].divider;
   clock.ticks += ticks;
 

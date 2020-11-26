@@ -16,9 +16,13 @@ copper.o: copper.c clock.h defs.h
 cpu.o: cpu.c opcodes.c clock.h defs.h
 	cc $(INCS) -c cpu.c
 
+opcodes.c: opcodes.py
+	python3 opcodes.py
+
 memory.o: memory.c memory.h defs.h
 	cc $(INCS) -c memory.c
 
 clean:
 	rm *.o
+	rm opcodes.c
 	rm twatwa
