@@ -13,7 +13,7 @@ clock.o: clock.c defs.h
 copper.o: copper.c clock.h defs.h
 	cc $(INCS) -c copper.c
 
-cpu.o: cpu.c clock.h defs.h
+cpu.o: cpu.c opcodes.c clock.h defs.h
 	cc $(INCS) -c cpu.c
 
 memory.o: memory.c memory.h defs.h
