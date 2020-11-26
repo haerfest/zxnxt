@@ -14,6 +14,10 @@ Table       = Dict[Opcode, Union[Instruction, 'Table']]
 
 
 instructions: Table = {
+    0x3E: ('LD A,n', [
+        'cpu.a = memory_read(cpu.pc)',      4,
+        'cpu.pc++',                         3,
+    ]),
     0xC3: ('JP nn', [
         'cpu.z  = memory_read(cpu.pc)',     4,
         'cpu.w  = memory_read(cpu.pc + 1)', 3,
@@ -21,10 +25,9 @@ instructions: Table = {
     ]),
     0xED: {
         0x91: ('NEXTREG reg,value', [
-            'cpu.z = memory_read(cpu.pc++)',
-            'cpu.w = memory_read(cpu.pc++)',
-            'io_write(0x243B, cpu.z)',
-            'io_write(0x253B, cpu.w)',     16,
+            'io_write(0x243B, memory_read(cpu.pc++))',
+            'io_write(0x253B, memory_read(cpu.pc++))',
+            16,
 
         ]),
     },
