@@ -30,6 +30,11 @@ instructions: Table = {
             16,
 
         ]),
+        0x92: ('NEXTREG reg,A', [
+            'io_write(0x243B, memory_read(cpu.pc++))',
+            'io_write(0x253B, cpu.a)',
+            12
+        ]),
     },
     0xF3: ('DI', [
         'cpu.iff1 = cpu.iff2 = 0', 4
@@ -37,7 +42,8 @@ instructions: Table = {
 }
 
 
-def generate(instructions: Table, f: io.TextIOBase, level: int = 0) -> None:
+def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Optional[List[Opcode]] = None) -> None:
+    prefix = prefix or []
     spaces = ' ' * level * 4
 
     f.write(f'''{spaces}opcode = memory_read(cpu.pc++);
@@ -57,11 +63,13 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0) -> None:
             f.write(f'{spaces}    break;\n\n')
         else:
             f.write(f'{spaces}  case 0x{opcode:02X}:\n')
-            generate(item, f, level + 1)
+            generate(item, f, level + 1, prefix + [opcode])
             f.write(f'{spaces}    break;\n\n')
 
+    s = ''.join(f'{opcode:02X}h ' for opcode in prefix)
+    n = len(prefix) + 1
     f.write(f'''{spaces}  default:
-{spaces}    fprintf(stderr, "Invalid opcode %02Xh at %04Xh\\n", opcode, cpu.pc - 1);
+{spaces}    fprintf(stderr, "Invalid opcode {s}%02Xh at %04Xh\\n", opcode, cpu.pc - {n});
 {spaces}    return -1;
 {spaces}}}
 ''')
