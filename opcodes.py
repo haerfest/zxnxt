@@ -9,46 +9,59 @@ Opcode      = int
 Mnemonic    = str
 Ticks       = int
 Statement   = str
-Instruction = Tuple[Mnemonic, Optional[Ticks], List[Statement]]
+Instruction = Tuple[Mnemonic, List[Union[Statement, Ticks]]]
 Table       = Dict[Opcode, Union[Instruction, 'Table']]
 
 
 instructions: Table = {
-    0xF3: ('DI', 4, [
-        'cpu.iff1 = 0',
-        'cpu.iff2 = 0'
+    0xC3: ('JP nn', [
+        'cpu.z  = memory_read(cpu.pc)',     4,
+        'cpu.w  = memory_read(cpu.pc + 1)', 3,
+        'cpu.pc = cpu.w << 8 | cpu.z',      3,
+    ]),
+    0xED: {
+        0x91: ('NEXTREG reg,value', [
+            'cpu.z = memory_read(cpu.pc++)',
+            'cpu.w = memory_read(cpu.pc++)',
+            'io_write(0x243B, cpu.z)',
+            'io_write(0x253B, cpu.w)',     16,
+
+        ]),
+    },
+    0xF3: ('DI', [
+        'cpu.iff1 = cpu.iff2 = 0', 4
     ]),
 }
 
 
 def generate(instructions: Table, f: io.TextIOBase, level: int = 0) -> None:
-    spaces = ' ' * level * 2
+    spaces = ' ' * level * 4
 
-    f.write(f'''
-{spaces}const u8_t opcode = memory_read(cpu.pc++);
+    f.write(f'''{spaces}opcode = memory_read(cpu.pc++);
 {spaces}switch (opcode) {{
 ''')
 
     for opcode in sorted(instructions):
         item = instructions[opcode]
         if isinstance(item, tuple):
-            mnemonic, ticks, statements = item
+            mnemonic, statements = item
             f.write(f'{spaces}  case 0x{opcode:02X}:  /* {mnemonic} */\n')
             for statement in statements:
-                f.write(f'{spaces}    {statement};\n')
-            if ticks:
-                f.write(f'{spaces}    clock_ticks({ticks});\n')
-            f.write(f'{spaces}    break;\n')
+                if isinstance(statement, int):
+                    f.write(f'{spaces}    clock_ticks({statement});\n')
+                else:
+                    f.write(f'{spaces}    {statement};\n')
+            f.write(f'{spaces}    break;\n\n')
         else:
             f.write(f'{spaces}  case 0x{opcode:02X}:\n')
             generate(item, f, level + 1)
-            f.write(f'{spaces}    break;\n')
+            f.write(f'{spaces}    break;\n\n')
 
-    f.write(f'''
-{spaces}  default:
+    f.write(f'''{spaces}  default:
 {spaces}    fprintf(stderr, "Invalid opcode %02Xh at %04Xh\\n", opcode, cpu.pc - 1);
 {spaces}    return -1;
-}}''')
+{spaces}}}
+''')
 
 
 def main() -> None:

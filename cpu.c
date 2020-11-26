@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "clock.h"
 #include "defs.h"
+#include "io.h"
 #include "memory.h"
 
 #include "cpu.h"
@@ -37,6 +38,10 @@ typedef struct {
   u8_t  i;
   u8_t  r;
 
+  /* Hidden registers. */
+  u8_t z;
+  u8_t w;
+
   /* Interrupt stuff. */
   int iff1;
   int iff2;
@@ -67,6 +72,7 @@ void cpu_reset(void) {
 
 
 int cpu_run(u32_t ticks, s32_t* ticks_left) {
+  u8_t opcode;
 
 #include "opcodes.c"
 

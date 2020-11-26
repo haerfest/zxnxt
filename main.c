@@ -3,6 +3,7 @@
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"
+#include "io.h"
 #include "memory.h"
 
 
@@ -21,8 +22,12 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  if (memory_init() != 0) {
+  if (io_init() != 0) {
     goto exit_window;
+  }
+
+  if (memory_init() != 0) {
+    goto exit_io;
   }
 
   if (clock_init() != 0) {
@@ -40,6 +45,9 @@ exit_clock:
 
 exit_memory:
   memory_finit();
+
+exit_io:
+  io_finit();
 
 exit_window:
   SDL_DestroyWindow(window);
@@ -79,6 +87,11 @@ static void main_eventloop(void) {
 
 
 static void main_finit(void) {
+  cpu_finit();
+  clock_finit();
+  memory_finit();
+  io_finit();
+
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
