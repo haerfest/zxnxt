@@ -44,26 +44,36 @@ const u8_t parity[256] = {
 };
 
 
+/* TODO: Add a big-endian version. */
+#define MAKE_REG(both, high, low) \
+  union {                         \
+    struct {                      \
+      u8_t low;                   \
+      u8_t high;                  \
+    } b;      /* Byte. */         \
+    u16_t w;  /* Word. */         \
+  } both
+
+
 typedef struct {
-  /* Normal registers. */
-  u8_t a;
-  u8_t f;
-  u8_t h;
-  u8_t l;
-  u8_t b;
-  u8_t c;
-  u8_t d;
-  u8_t e;
+  /* Combined 8-bit and 16-bit registers. */
+  MAKE_REG(af, a, f);
+  MAKE_REG(hl, h, l);
+  MAKE_REG(bc, b, c);
+  MAKE_REG(de, d, e);
 
   /* Shadow registers. */
-  u8_t a_;
-  u8_t f_;
-  u8_t h_;
-  u8_t l_;
-  u8_t b_;
-  u8_t c_;
-  u8_t d_;
-  u8_t e_;
+  MAKE_REG(af_, a, f);
+  MAKE_REG(hl_, h, l);
+  MAKE_REG(bc_, b, c);
+  MAKE_REG(de_, d, e);
+
+  /* Hidden, internal registers. */
+  MAKE_REG(wz, w, z);
+
+  /* Interrupt mode and memory refresh registers. */
+  u8_t i;
+  u8_t r;
 
   /* Index registers. */
   u16_t ix;
@@ -72,12 +82,6 @@ typedef struct {
   /* Additional registers. */
   u16_t pc;
   u16_t sp;
-  u8_t  i;
-  u8_t  r;
-
-  /* Hidden registers. */
-  u8_t z;
-  u8_t w;
 
   /* Interrupt stuff. */
   int iff1;
@@ -87,6 +91,40 @@ typedef struct {
 
 /* Local-global cpu for fast reference. */
 static cpu_t cpu;
+
+
+/* Convenient shortcuts. */
+#define A    cpu.af.b.a
+#define F    cpu.af.b.f
+#define B    cpu.bc.b.b
+#define C    cpu.bc.b.c
+#define D    cpu.de.b.d
+#define E    cpu.de.b.e
+#define H    cpu.hl.b.h
+#define L    cpu.hl.b.l
+#define W    cpu.wz.b.w
+#define Z    cpu.wz.b.z
+
+#define BC   cpu.bc.w
+#define DE   cpu.de.w
+#define HL   cpu.hl.w
+#define WZ   cpu.wz.w
+
+#define BC_  cpu.bc_.w
+#define DE_  cpu.de_.w
+#define HL_  cpu.hl_.w
+
+#define I    cpu.i
+#define R    cpu.r
+
+#define IX   cpu.ix
+#define IY   cpu.iy
+
+#define PC   cpu.pc
+#define SP   cpu.sp
+
+#define IFF1 cpu.iff1
+#define IFF2 cpu.iff2
 
 
 int cpu_init(void) {
