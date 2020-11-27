@@ -79,9 +79,11 @@ static void main_eventloop(void) {
     }
     t1 = SDL_GetTicks();
 
+#if 0
     /* Assuming 3.5 MHz, 1,000,000 ticks take 286 milliseconds. */
     consumed = t1 - t0;
     SDL_Delay(286 - consumed);
+#endif
   }
 }
 

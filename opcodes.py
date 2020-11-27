@@ -18,6 +18,23 @@ Instruction    = Tuple[Mnemonic, Specifications]
 Table          = Dict[Opcode, Union[Instruction, 'Table']]
 
 
+def add_a_r(r: str) -> ConcreteSpecs:
+    return [
+        f'tmp8  = A',
+        f'tmp16 = A + {r}',
+        f'A += {r}',
+        f'F &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N | FLAG_C)',
+        f'F |= SIGN(A) | (A == 0) << SHIFT_Z | halfcarry[tmp8][{r}] | (SIGN(tmp8) == SIGN({r}) && SIGN({r}) != SIGN(A)) << SHIFT_V | (tmp16 > 255) << SHIFT_C'
+    ]
+
+def inc_r(r: str) -> ConcreteSpecs:
+    return [
+        f'tmp8 = {r}',
+        f'{r}++',
+        f'F &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
+        f'F |= SIGN({r}) | ({r} == 0) << SHIFT_Z | halfcarry[tmp8][1] | (tmp8 == 0x79) << SHIFT_V'
+    ]
+
 def ld_dd_nn(dd: str) -> ConcreteSpecs:
     hi, lo = dd
     return [
@@ -31,22 +48,24 @@ def ld_hl_r(r: str) -> ConcreteSpecs:
 def ld_r_n(r: str) -> ConcreteSpecs:
     return [f'{r} = memory_read(PC++)', 3]
 
+def ld_r_r(r1: str, r2: str) -> ConcreteSpecs:
+    return f'{r1} = {r2}'
+
 def out_c_r(r: str) -> ConcreteSpecs:
     return [f'io_write(BC, {r})', 4]
 
 
 instructions: Table = {
-    0x01: ('LD BC,nn', lambda: ld_dd_nn('BC')),
-    0x04: ('INC B', [
-        'B++',
-        'F &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
-        'F |= (B & 0x80) | (B == 0) << SHIFT_Z | (((B - 1) & 0x0F) + 1) & 0x10 | (B == 0x80) << SHIFT_V'
-    ]),
+    0x01: ('LD BC,nn',  lambda: ld_dd_nn('BC')),
+    0x04: ('INC B',     lambda: inc_r('B')),
     0x11: ('LD DE,nn',  lambda: ld_dd_nn('DE')),
     0x16: ('LD D,n',    lambda: ld_r_n('D')),
     0x21: ('LD HL,nn',  lambda: ld_dd_nn('HL')),
+    0x3C: ('INC A',     lambda: inc_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
     0x75: ('LD (HL),L', lambda: ld_hl_r('L')),
+    0x79: ('LD A,C',    lambda: ld_r_r('A', 'C')),
+    0x87: ('ADD A,A',   lambda: add_a_r('A')),
     0xAF: ('XOR A', [
         'A = 0',
         'F &= ~(FLAG_S | FLAG_H | FLAG_N | FLAG_C)',
@@ -57,10 +76,15 @@ instructions: Table = {
         'W  = memory_read(PC + 1)', 3,
         'PC = WZ'
     ]),
+    0xD9: ('EXX', [
+        'cpu_exchange(&BC, &BC_)',
+        'cpu_exchange(&DE, &DE_)',
+        'cpu_exchange(&HL, &HL_)',
+    ]),
     0xE6: ('AND n', [
         'A &= memory_read(PC++)',
         'F &= ~(FLAG_S | FLAG_Z | FLAG_P | FLAG_N | FLAG_C)',
-        'F |= (A & 0x80) | (A == 0) << SHIFT_Z | FLAG_H | parity[A]',
+        'F |= SIGN(A) | (A == 0) << SHIFT_Z | FLAG_H | parity[A]',
         3
     ]),
     0xED: {
@@ -68,7 +92,7 @@ instructions: Table = {
         0x78: ('IN A,(C)', [
             'A = io_read(BC)',
             'F &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
-            'F |= (A & 0x80) | (A == 0) << SHIFT_Z | parity[A]',
+            'F |= SIGN(A) | (A == 0) << SHIFT_Z | parity[A]',
             4
         ]),
         0x79: ('OUT (C),A', lambda: out_c_r('A')),
@@ -118,7 +142,11 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
             concrete_specs = []
             for specification in specifications:
                 if callable(specification):
-                    concrete_specs.extend(specification())
+                    concrete_spec = specification()
+                    if isinstance(concrete_spec, list):
+                        concrete_specs.extend(concrete_spec)
+                    else:
+                        concrete_specs.append(concrete_spec)
                 else:
                     concrete_specs.append(specification)
 
