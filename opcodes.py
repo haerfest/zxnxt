@@ -21,8 +21,7 @@ instructions: Table = {
     0x04: ('INC B', [
         'cpu.b++',
         'cpu.f &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
-        'cpu.f |= (cpu.b & 0x80) | (cpu.b == 0) << SHIFT_Z | (((cpu.b - 1) & 0x0F) + 1) & 0x10 | (cpu.b == 0x80) << SHIFT_V',
-        4
+        'cpu.f |= (cpu.b & 0x80) | (cpu.b == 0) << SHIFT_Z | (((cpu.b - 1) & 0x0F) + 1) & 0x10 | (cpu.b == 0x80) << SHIFT_V'
     ]),
     0x16: ('LD D,n', [
         'cpu.d = memory_read(cpu.pc++)', 3
