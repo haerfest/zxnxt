@@ -6,32 +6,10 @@
 
 #include "cpu.h"
 
-#define SHIFT_S 7
-#define SHIFT_Z 6
-#define SHIFT_H 4
-#define SHIFT_P 2
-#define SHIFT_V SHIFT_P
-#define SHIFT_N 1
-#define SHIFT_C 0
-
-#define FLAG_S (1 << SHIFT_S)
-#define FLAG_Z (1 << SHIFT_Z)
-#define FLAG_H (1 << SHIFT_H)
-#define FLAG_P (1 << SHIFT_P)
-#define FLAG_V FLAG_P
-#define FLAG_N (1 << SHIFT_N)
-#define FLAG_C (1 << SHIFT_C)
-
 
 /* Bitmask to (not) set FLAG_P for any byte. */
 static const u8_t parity[256] = {
   #include "parity.h"
-};
-
-
-/* Bitmask to (not) set FLAG_H for any u8_t + u8_t. */
-static const u8_t halfcarry[256][256] = {
-  #include "halfcarry.h"
 };
 
 
@@ -62,6 +40,16 @@ typedef struct {
   /* Hidden, internal registers. */
   MAKE_REG(wz, w, z);
 
+  /* Flags. */
+  struct {
+    int s;
+    int z;
+    int h;
+    int pv;
+    int n;
+    int c;
+  } flag;
+
   /* Interrupt mode and memory refresh registers. */
   u8_t i;
   u8_t r;
@@ -84,6 +72,15 @@ typedef struct {
 static cpu_t cpu;
 
 
+/* Convenient flag shortcuts. */
+#define FS   cpu.flag.s
+#define FZ   cpu.flag.z
+#define FH   cpu.flag.h
+#define FV   cpu.flag.pv
+#define FP   cpu.flag.pv
+#define FN   cpu.flag.n
+#define FC   cpu.flag.c
+
 /* Convenient register shortcuts. */
 #define A    cpu.af.b.a
 #define F    cpu.af.b.f
@@ -96,11 +93,13 @@ static cpu_t cpu;
 #define W    cpu.wz.b.w
 #define Z    cpu.wz.b.z
 
+#define AF   cpu.af.w
 #define BC   cpu.bc.w
 #define DE   cpu.de.w
 #define HL   cpu.hl.w
 #define WZ   cpu.wz.w
 
+#define AF_  cpu.af_.w
 #define BC_  cpu.bc_.w
 #define DE_  cpu.de_.w
 #define HL_  cpu.hl_.w
@@ -119,7 +118,8 @@ static cpu_t cpu;
 
 
 /* Other convenient macros. */
-#define SIGN(x) ((x) & 0x80)
+#define SIGN(x)          ((x) & 0x80)
+#define HALFCARRY(x,y,z) (((x) ^ (y) ^ (z)) & 0x10)
 
 
 int cpu_init(void) {
@@ -141,6 +141,21 @@ void cpu_reset(void) {
 }
 
 
+static void cpu_flags_pack() {
+  F = (FS << 7) | (FZ << 6) | (FH << 4) | (FV << 2) | (FN << 1) | FC;
+}
+
+
+static void cpu_flags_unpack() {
+  FS = (F & 0x80) >> 7;
+  FZ = (F & 0x40) >> 6;
+  FH = (F & 0x10) >> 4;
+  FV = (F & 0x04) >> 2;
+  FN = (F & 0x02) >> 1;
+  FC =  F & 0x01;
+}
+
+
 static void cpu_exchange(u16_t* x, u16_t* y) {
   u16_t tmp = *x;
   *x = *y;
@@ -150,7 +165,6 @@ static void cpu_exchange(u16_t* x, u16_t* y) {
 
 int cpu_run(u32_t ticks, s32_t* ticks_left) {
   u8_t  tmp8;
-  u16_t tmp16;
   u8_t  opcode;
 
 #include "opcodes.c"

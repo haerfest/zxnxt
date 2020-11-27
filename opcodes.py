@@ -20,19 +20,24 @@ Table          = Dict[Opcode, Union[Instruction, 'Table']]
 
 def add_a_r(r: str) -> ConcreteSpecs:
     return [
-        f'tmp8  = A',
-        f'tmp16 = A + {r}',
-        f'A += {r}',
-        f'F &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N | FLAG_C)',
-        f'F |= SIGN(A) | (A == 0) << SHIFT_Z | halfcarry[tmp8][{r}] | (SIGN(tmp8) == SIGN({r}) && SIGN({r}) != SIGN(A)) << SHIFT_V | (tmp16 > 255) << SHIFT_C'
+        f'FH  = HALFCARRY(A, {r}, A + {r})',
+        f'FV  = SIGN(A) == SIGN({r})',
+        f'A  += {r}',
+        f'FV &= SIGN({r}) != SIGN(A)',
+        f'FS  = SIGN(A)',
+        f'FZ  = A == 0',
+        f'FN  = 0',
+        f'FC  = ((u16_t) A) + {r} > 255'
     ]
 
 def inc_r(r: str) -> ConcreteSpecs:
     return [
-        f'tmp8 = {r}',
+        f'FH = HALFCARRY({r}, 1, {r} + 1)',
         f'{r}++',
-        f'F &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
-        f'F |= SIGN({r}) | ({r} == 0) << SHIFT_Z | halfcarry[tmp8][1] | (tmp8 == 0x79) << SHIFT_V'
+        f'FS = SIGN({r})',
+        f'FZ = {r} == 0',
+        f'FV = {r} = 0x80',
+        f'FN = 0',
     ]
 
 def ld_dd_nn(dd: str) -> ConcreteSpecs:
@@ -45,6 +50,9 @@ def ld_dd_nn(dd: str) -> ConcreteSpecs:
 def ld_hl_r(r: str) -> ConcreteSpecs:
     return [f'memory_write(HL, {r})', 3]
 
+def ld_r_hl(r: str) -> ConcreteSpecs:
+    return [f'{r} = memory_read(HL)', 3]
+
 def ld_r_n(r: str) -> ConcreteSpecs:
     return [f'{r} = memory_read(PC++)', 3]
 
@@ -54,9 +62,23 @@ def ld_r_r(r1: str, r2: str) -> ConcreteSpecs:
 def out_c_r(r: str) -> ConcreteSpecs:
     return [f'io_write(BC, {r})', 4]
 
+def srl_r(r: str) -> ConcreteSpecs:
+    return [
+        f'FC = {r} & 1',
+        f'{r} >>= 1',
+        f'FS = FH = FN = 0',
+        f'FZ = {r} == 0',
+        f'FP = parity[{r}]',
+    ]
+
 
 instructions: Table = {
     0x01: ('LD BC,nn',  lambda: ld_dd_nn('BC')),
+    0x08: ("EX AF,AF'", [
+        'cpu_flags_pack()',
+        'cpu_exchange(&AF, &AF_)',
+        'cpu_flags_unpack()'
+    ]),
     0x04: ('INC B',     lambda: inc_r('B')),
     0x11: ('LD DE,nn',  lambda: ld_dd_nn('DE')),
     0x16: ('LD D,n',    lambda: ld_r_n('D')),
@@ -64,12 +86,14 @@ instructions: Table = {
     0x3C: ('INC A',     lambda: inc_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
     0x75: ('LD (HL),L', lambda: ld_hl_r('L')),
+    0x77: ('LD (HL),A', lambda: ld_hl_r('A')),
     0x79: ('LD A,C',    lambda: ld_r_r('A', 'C')),
+    0x7E: ('LD A,(HL)', lambda: ld_r_hl('A')),
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
     0xAF: ('XOR A', [
         'A = 0',
-        'F &= ~(FLAG_S | FLAG_H | FLAG_N | FLAG_C)',
-        'F |= FLAG_Z | FLAG_P'
+        'FS = FH = FN = FC = 0',
+        'FZ = FP = 1',
     ]),
     0xC3: ('JP nn', [
         'Z  = memory_read(PC)',     3,
@@ -83,16 +107,24 @@ instructions: Table = {
     ]),
     0xE6: ('AND n', [
         'A &= memory_read(PC++)',
-        'F &= ~(FLAG_S | FLAG_Z | FLAG_P | FLAG_N | FLAG_C)',
-        'F |= SIGN(A) | (A == 0) << SHIFT_Z | FLAG_H | parity[A]',
+        'FS = SIGN(A)',
+        'FZ = A == 0',
+        'FH = 1',
+        'FP = parity[A]',
+        'FN = FC = 0',
         3
     ]),
+    0xCB: {
+        0x3F: ('SRL A', lambda: srl_r('A')),
+    },
     0xED: {
         0x51: ('OUT (C),D', lambda: out_c_r('D')),
         0x78: ('IN A,(C)', [
             'A = io_read(BC)',
-            'F &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
-            'F |= SIGN(A) | (A == 0) << SHIFT_Z | parity[A]',
+            'FS = SIGN(A)',
+            'FZ = A == 0',
+            'FH = FN = 0',
+            'FP = parity[A]',
             4
         ]),
         0x79: ('OUT (C),A', lambda: out_c_r('A')),
@@ -107,15 +139,26 @@ instructions: Table = {
             4
         ]),
         0xB0: ('LDIR', [
-            'memory_write(DE++, memory_read(HL++))', 3 + 5,
-            'F &= ~(FLAG_H | FLAG_V | FLAG_N)',
-            'F |= (BC - 1 != 0) << SHIFT_V',
+            'memory_write(DE++, memory_read(HL++))',
+            'FH = FN = 0',
+            'FV = BC - 1 != 0',
+            3 + 5,
             'if (--BC) {',
             '  PC -= 2', 5,
             '}',
         ]),
     },
-    0xF3: ('DI', 'IFF1 = IFF2 = 0')
+    0xF3: ('DI', 'IFF1 = IFF2 = 0'),
+    0xFE: ('CP n', [
+        f'tmp8 = memory_read(PC++)',
+        f'FS   = SIGN(A - tmp8)',
+        f'FZ   = A - tmp8 == 0',
+        f'FH   = HALFCARRY(A, tmp8, A - tmp8)',
+        f'FV   = SIGN(A) == SIGN(tmp8) && SIGN(tmp8) != SIGN(A - tmp8)',
+        f'FN   = 1',
+        f'FC   = A < tmp8',
+        3,
+    ]),
 }
 
 
@@ -171,7 +214,7 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
     s = ''.join(f'{opcode:02X}h ' for opcode in prefix)
     n = len(prefix) + 1
     f.write(f'''{spaces}  default:
-{spaces}    fprintf(stderr, "Invalid opcode {s}%02Xh at %04Xh\\n", opcode, cpu.pc - {n});
+{spaces}    fprintf(stderr, "Unknown opcode {s}%02Xh at %04Xh\\n", opcode, cpu.pc - {n});
 {spaces}    return -1;
 {spaces}}}
 ''')
