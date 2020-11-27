@@ -5,12 +5,29 @@ import io
 from typing import *
 
 
-Opcode      = int
-Mnemonic    = str
-Ticks       = int
-Statement   = str
-Instruction = Tuple[Mnemonic, List[Union[Statement, Ticks]]]
-Table       = Dict[Opcode, Union[Instruction, 'Table']]
+Opcode         = int
+Mnemonic       = str
+CCode          = str
+Ticks          = int
+ConcreteSpec   = Union[CCode, Ticks]
+ConcreteSpecs  = Union[ConcreteSpec, Sequence[ConcreteSpec]]
+SpecGenerator  = Callable[[], ConcreteSpecs]
+Specification  = Union[ConcreteSpec, SpecGenerator]
+Specifications = Union[Specification, Sequence[Specification]]
+Instruction    = Tuple[Mnemonic, Specifications]
+Table          = Dict[Opcode, Union[Instruction, 'Table']]
+
+
+def ld_r_n(r: str) -> ConcreteSpecs:
+    return [
+        f'cpu.{r} = memory_read(cpu.pc++)', 3
+    ]
+
+
+def out_c_r(r: str) -> ConcreteSpecs:
+    return [
+        f'io_write(cpu.b << 8 | cpu.c, cpu.{r})', 4
+    ]
 
 
 instructions: Table = {
@@ -23,12 +40,8 @@ instructions: Table = {
         'cpu.f &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
         'cpu.f |= (cpu.b & 0x80) | (cpu.b == 0) << SHIFT_Z | (((cpu.b - 1) & 0x0F) + 1) & 0x10 | (cpu.b == 0x80) << SHIFT_V'
     ]),
-    0x16: ('LD D,n', [
-        'cpu.d = memory_read(cpu.pc++)', 3
-    ]),
-    0x3E: ('LD A,n', [
-        'cpu.a = memory_read(cpu.pc++)', 3
-    ]),
+    0x16: ('LD D,n', lambda: ld_r_n('d')),
+    0x3E: ('LD A,n', lambda: ld_r_n('a')),
     0xAF: ('XOR A', [
         'cpu.a = 0',
         'cpu.f &= ~(FLAG_S | FLAG_H | FLAG_N | FLAG_C)',
@@ -39,10 +52,15 @@ instructions: Table = {
         'cpu.w  = memory_read(cpu.pc + 1)', 3,
         'cpu.pc = cpu.w << 8 | cpu.z'
     ]),
+    0xE6: ('AND n', [
+        'cpu.a &= memory_read(cpu.pc++)',
+        'cpu.f &= ~(FLAG_S | FLAG_Z | FLAG_P | FLAG_N | FLAG_C)',
+        'cpu.f |= (cpu.a & 0x80) | (cpu.a == 0) << SHIFT_Z | FLAG_H | parity[cpu.a]',
+        3
+    ]),
     0xED: {
-        0x51: ('OUT (C),D', [
-            'io_write(cpu.b << 8 | cpu.c, cpu.d)', 4
-        ]),
+        0x51: ('OUT (C),D', lambda: out_c_r('d')),
+        0x79: ('OUT (C),A', lambda: out_c_r('a')),
         0x78: ('IN A,(C)', [
             'cpu.a = io_read(cpu.b << 8 | cpu.c)',
             'cpu.f &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
@@ -60,9 +78,7 @@ instructions: Table = {
             4
         ]),
     },
-    0xF3: ('DI', [
-        'cpu.iff1 = cpu.iff2 = 0'
-    ]),
+    0xF3: ('DI', 'cpu.iff1 = cpu.iff2 = 0')
 }
 
 
@@ -78,14 +94,32 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
     for opcode in sorted(instructions):
         item = instructions[opcode]
         if isinstance(item, tuple):
-            mnemonic, statements = item
+            mnemonic, specifications = item
             f.write(f'{spaces}  case 0x{opcode:02X}:  /* {mnemonic} */\n')
-            for item in statements:
-                if isinstance(item, int):
-                    if item > 0:
-                        f.write(f'{spaces}    clock_ticks({item});\n')
+
+            # Make our life easier by ensuring we always have a sequence.
+            if not isinstance(specifications, list):
+                specifications = [specifications]
+
+            # Flatten the specifications by evaluating all generators first.
+            concrete_specs = []
+            for specification in specifications:
+                if callable(specification):
+                    concrete_specs.extend(specification())
                 else:
-                    f.write(f'{spaces}    {item};\n')
+                    concrete_specs.append(specification)
+
+            for concrete_spec in concrete_specs:
+                if isinstance(concrete_spec, int):
+                    # Number of clock ticks.
+                    if concrete_spec > 0:
+                        f.write(f'{spaces}    clock_ticks({concrete_spec});\n')
+                elif isinstance(concrete_spec, str):
+                    # Line of C code.
+                    f.write(f'{spaces}    {concrete_spec};\n')
+                else:
+                    raise RuntimeError(f'Unrecognised: {concrete_spec}')
+
             f.write(f'{spaces}    break;\n\n')
         else:
             f.write(f'{spaces}  case 0x{opcode:02X}:\n')
