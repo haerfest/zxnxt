@@ -54,9 +54,9 @@ typedef struct {
   u8_t i;
   u8_t r;
 
-  /* Index registers. */
-  u16_t ix;
-  u16_t iy;
+  /* Index registers, split for undocumented opcode support. */
+  MAKE_REG(ix, ixh, ixl);
+  MAKE_REG(iy, iyh, iyl);
 
   /* Additional registers. */
   u16_t pc;
@@ -107,8 +107,14 @@ static cpu_t cpu;
 #define I    cpu.i
 #define R    cpu.r
 
-#define IX   cpu.ix
-#define IY   cpu.iy
+#define IX   cpu.ix.w
+#define IY   cpu.iy.w
+
+#define IXH  cpu.ix.b.ixh
+#define IXL  cpu.ix.b.ixl
+#define IYH  cpu.iy.b.iyh
+#define IYL  cpu.iy.b.iyl
+
 
 #define PC   cpu.pc
 #define SP   cpu.sp

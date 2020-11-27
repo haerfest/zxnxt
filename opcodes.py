@@ -30,6 +30,19 @@ def add_a_r(r: str) -> ConcreteSpecs:
         f'FC  = ((u16_t) A) + {r} > 255'
     ]
 
+def and_r(r: str) -> ConcreteSpecs:
+    return [
+        f'A &= {r}',
+        'FS = SIGN(A)',
+        'FZ = A == 0',
+        'FH = 1',
+        'FP = parity[A]',
+        'FN = FC = 0'
+    ]
+
+def dec_ss(ss: str) -> ConcreteSpecs:
+    return [f'{ss}--', 2]
+
 def inc_r(r: str) -> ConcreteSpecs:
     return [
         f'FH = HALFCARRY({r}, 1, {r} + 1)',
@@ -38,6 +51,17 @@ def inc_r(r: str) -> ConcreteSpecs:
         f'FZ = {r} == 0',
         f'FV = {r} = 0x80',
         f'FN = 0',
+    ]
+
+def inc_ss(ss: str) -> ConcreteSpecs:
+    return [f'{ss}++', 2]
+
+def jr_c_e(c: str) -> ConcreteSpecs:
+    return [
+        f'tmp8 = memory_read(PC++)', 3,
+        f'if ({c}) {{',
+        f'  PC += (s8_t) tmp8', 5,
+        f'}}'
     ]
 
 def ld_dd_nn(dd: str) -> ConcreteSpecs:
@@ -74,22 +98,52 @@ def srl_r(r: str) -> ConcreteSpecs:
 
 instructions: Table = {
     0x01: ('LD BC,nn',  lambda: ld_dd_nn('BC')),
+    0x03: ('INC BC',    lambda: inc_ss('BC')),
+    0x04: ('INC B',     lambda: inc_r('B')),
     0x08: ("EX AF,AF'", [
         'cpu_flags_pack()',
         'cpu_exchange(&AF, &AF_)',
         'cpu_flags_unpack()'
     ]),
-    0x04: ('INC B',     lambda: inc_r('B')),
+    0x0A: ('DEC BC',    lambda: dec_ss('BC')),
+    0x0C: ('INC C',     lambda: inc_r('C')),
+    0x10: ('DJNZ e', [
+        1,
+        'tmp8 = memory_read(PC++)', 3,
+        'if (--B) {',
+        '  PC += (s8_t) tmp8', 5,
+        '}',
+    ]),
     0x11: ('LD DE,nn',  lambda: ld_dd_nn('DE')),
     0x16: ('LD D,n',    lambda: ld_r_n('D')),
+    0x18: ('JR e',      [
+        'tmp8 = memory_read(PC++)', 3,
+        'PC += (s8_t) tmp8', 5,
+    ]),
+    0x20: ('JR NZ,e',   lambda: jr_c_e('!FZ')),
     0x21: ('LD HL,nn',  lambda: ld_dd_nn('HL')),
+    0x23: ('INC HL',    lambda: inc_ss('HL')),
+    0x28: ('JR Z,e',    lambda: jr_c_e('FZ')),
+    0x2B: ('DEC HL',    lambda: dec_ss('HL')),
+    0x2F: ('CPL', [
+        'A = ~A',
+        'FH = FN = 1',
+    ]),
+    0x30: ('JR NC,e',   lambda: jr_c_e('!FC')),
+    0x36: ('LD (HL),n', [
+        f'tmp8 = memory_read(PC++)', 3,
+        f'memory_write(HL, tmp8)',   3,
+    ]),
     0x3C: ('INC A',     lambda: inc_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
+    0x6F: ('LD L,A',    lambda: ld_r_r('L', 'A')),
     0x75: ('LD (HL),L', lambda: ld_hl_r('L')),
     0x77: ('LD (HL),A', lambda: ld_hl_r('A')),
     0x79: ('LD A,C',    lambda: ld_r_r('A', 'C')),
+    0x7A: ('LD A,D',    lambda: ld_r_r('A', 'D')),
     0x7E: ('LD A,(HL)', lambda: ld_r_hl('A')),
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
+    0xA2: ('AND D',     lambda: and_r('D')),
     0xAF: ('XOR A', [
         'A = 0',
         'FS = FH = FN = FC = 0',
@@ -105,6 +159,9 @@ instructions: Table = {
         'cpu_exchange(&DE, &DE_)',
         'cpu_exchange(&HL, &HL_)',
     ]),
+    0xDD: {
+        0x6F: ('LD IXL,A', lambda: ld_r_r('IXL', 'A')),
+    },
     0xE6: ('AND n', [
         'A &= memory_read(PC++)',
         'FS = SIGN(A)',
@@ -139,10 +196,11 @@ instructions: Table = {
             4
         ]),
         0xB0: ('LDIR', [
-            'memory_write(DE++, memory_read(HL++))',
+            'tmp8 = memory_read(HL++)', 3,
+            'memory_write(DE++, tmp8)',
             'FH = FN = 0',
             'FV = BC - 1 != 0',
-            3 + 5,
+            5,
             'if (--BC) {',
             '  PC -= 2', 5,
             '}',
@@ -166,7 +224,10 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
     prefix = prefix or []
     spaces = ' ' * level * 4
 
-    f.write(f'''{spaces}opcode = memory_read(cpu.pc++);
+    if level == 0:
+        f.write(f'{spaces}printf("%04Xh\\n", PC);\n')
+
+    f.write(f'''{spaces}opcode = memory_read(PC++);
 {spaces}clock_ticks(4);
 {spaces}switch (opcode) {{
 ''')
