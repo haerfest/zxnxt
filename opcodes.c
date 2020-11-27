@@ -72,6 +72,15 @@ switch (opcode) {
     clock_ticks(5);
     break;
 
+  case 0x1D:  /* DEC E */
+    FH = HALFCARRY(E, -1, E - 1);
+    FV = E == 0x80;
+    E--;
+    FS = SIGN(E);
+    FZ = E == 0;
+    FN = 1;
+    break;
+
   case 0x20:  /* JR NZ,e */
     tmp8 = memory_read(PC++);
     clock_ticks(3);
@@ -207,6 +216,16 @@ switch (opcode) {
     opcode = memory_read(PC++);
     clock_ticks(4);
     switch (opcode) {
+      case 0x02:  /* RLC D */
+        FC  = D >> 7;
+        D = D << 1 | FC;
+        FS = SIGN(D);
+        FZ = D == 0;
+        FH = 0;
+        FP = parity[D];
+        FN = 0;
+        break;
+
       case 0x3F:  /* SRL A */
         FC = A & 1;
         A >>= 1;
@@ -233,6 +252,10 @@ switch (opcode) {
     switch (opcode) {
       case 0x6F:  /* LD IXL,A */
         IXL = A;
+        break;
+
+      case 0x7D:  /* LD A,IXL */
+        A = IXL;
         break;
 
       default:

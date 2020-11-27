@@ -40,6 +40,16 @@ def and_r(r: str) -> ConcreteSpecs:
         'FN = FC = 0'
     ]
 
+def dec_r(r: str) -> ConcreteSpecs:
+    return [
+        f'FH = HALFCARRY({r}, -1, {r} - 1)',
+        f'FV = {r} == 0x80',
+        f'{r}--',
+        f'FS = SIGN({r})',
+        f'FZ = {r} == 0',
+        f'FN = 1'
+    ]
+
 def dec_ss(ss: str) -> ConcreteSpecs:
     return [f'{ss}--', 2]
 
@@ -86,6 +96,18 @@ def ld_r_r(r1: str, r2: str) -> ConcreteSpecs:
 def out_c_r(r: str) -> ConcreteSpecs:
     return [f'io_write(BC, {r})', 4]
 
+def rlc_r(r: str) -> ConcreteSpecs:
+    return [
+        f'FC  = {r} >> 7',
+        f'{r} = {r} << 1 | FC',
+        f'FS = SIGN({r})',
+        f'FZ = {r} == 0',
+        f'FH = 0',
+        f'FP = parity[{r}]',
+        f'FN = 0',
+    ]
+
+
 def srl_r(r: str) -> ConcreteSpecs:
     return [
         f'FC = {r} & 1',
@@ -120,6 +142,7 @@ instructions: Table = {
         'tmp8 = memory_read(PC++)', 3,
         'PC += (s8_t) tmp8', 5,
     ]),
+    0x1D: ('DEC E',     lambda: dec_r('E')),
     0x20: ('JR NZ,e',   lambda: jr_c_e('!FZ')),
     0x21: ('LD HL,nn',  lambda: ld_dd_nn('HL')),
     0x23: ('INC HL',    lambda: inc_ss('HL')),
@@ -161,6 +184,7 @@ instructions: Table = {
     ]),
     0xDD: {
         0x6F: ('LD IXL,A', lambda: ld_r_r('IXL', 'A')),
+        0x7D: ('LD A,IXL', lambda: ld_r_r('A', 'IXL')),
     },
     0xE6: ('AND n', [
         'A &= memory_read(PC++)',
@@ -172,6 +196,7 @@ instructions: Table = {
         3
     ]),
     0xCB: {
+        0x02: ('RLC D', lambda: rlc_r('D')),
         0x3F: ('SRL A', lambda: srl_r('A')),
     },
     0xED: {
