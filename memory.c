@@ -101,3 +101,9 @@ void memory_finit(void) {
 u8_t memory_read(u16_t address) {
   return memory.memory[address];
 }
+
+
+void memory_write(u16_t address, u8_t value) {
+  /* TODO: Deal with non-writable ROM. */
+  memory.memory[address] = value;
+}

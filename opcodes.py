@@ -18,16 +18,21 @@ Instruction    = Tuple[Mnemonic, Specifications]
 Table          = Dict[Opcode, Union[Instruction, 'Table']]
 
 
-def ld_r_n(r: str) -> ConcreteSpecs:
+def ld_dd_nn(dd: str) -> ConcreteSpecs:
+    hi, lo = dd
     return [
-        f'cpu.{r} = memory_read(cpu.pc++)', 3
+        f'cpu.{lo} = memory_read(cpu.pc++)', 3,
+        f'cpu.{hi} = memory_read(cpu.pc++)', 3,
     ]
 
+def ld_hl_r(r: str) -> ConcreteSpecs:
+    return [f'memory_write(cpu.h << 8 | cpu.l, cpu.{r})', 3]
+
+def ld_r_n(r: str) -> ConcreteSpecs:
+    return [f'cpu.{r} = memory_read(cpu.pc++)', 3]
 
 def out_c_r(r: str) -> ConcreteSpecs:
-    return [
-        f'io_write(cpu.b << 8 | cpu.c, cpu.{r})', 4
-    ]
+    return [f'io_write(cpu.b << 8 | cpu.c, cpu.{r})', 4]
 
 
 instructions: Table = {
@@ -40,8 +45,11 @@ instructions: Table = {
         'cpu.f &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
         'cpu.f |= (cpu.b & 0x80) | (cpu.b == 0) << SHIFT_Z | (((cpu.b - 1) & 0x0F) + 1) & 0x10 | (cpu.b == 0x80) << SHIFT_V'
     ]),
+    0x11: ('LD DE,nn', lambda: ld_dd_nn('de')),
     0x16: ('LD D,n', lambda: ld_r_n('d')),
+    0x21: ('LD HL,nn', lambda: ld_dd_nn('hl')),
     0x3E: ('LD A,n', lambda: ld_r_n('a')),
+    0x75: ('LD (HL),L', lambda: ld_hl_r('l')),
     0xAF: ('XOR A', [
         'cpu.a = 0',
         'cpu.f &= ~(FLAG_S | FLAG_H | FLAG_N | FLAG_C)',
@@ -60,13 +68,13 @@ instructions: Table = {
     ]),
     0xED: {
         0x51: ('OUT (C),D', lambda: out_c_r('d')),
-        0x79: ('OUT (C),A', lambda: out_c_r('a')),
         0x78: ('IN A,(C)', [
             'cpu.a = io_read(cpu.b << 8 | cpu.c)',
             'cpu.f &= ~(FLAG_S | FLAG_Z | FLAG_H | FLAG_V | FLAG_N)',
             'cpu.f |= (cpu.a & 0x80) | (cpu.a == 0) << SHIFT_Z | parity[cpu.a]',
             4
         ]),
+        0x79: ('OUT (C),A', lambda: out_c_r('a')),
         0x91: ('NEXTREG reg,value', [
             'io_write(0x243B, memory_read(cpu.pc++))',
             'io_write(0x253B, memory_read(cpu.pc++))',
