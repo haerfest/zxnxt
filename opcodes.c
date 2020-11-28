@@ -1,4 +1,3 @@
-printf("%04Xh\n", PC);
 opcode = memory_read(PC++);
 clock_ticks(4);
 switch (opcode) {

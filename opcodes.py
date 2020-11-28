@@ -249,9 +249,6 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
     prefix = prefix or []
     spaces = ' ' * level * 4
 
-    if level == 0:
-        f.write(f'{spaces}printf("%04Xh\\n", PC);\n')
-
     f.write(f'''{spaces}opcode = memory_read(PC++);
 {spaces}clock_ticks(4);
 {spaces}switch (opcode) {{

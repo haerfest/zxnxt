@@ -2,7 +2,7 @@
 #include "defs.h"
 
 
-int  io_init(void) {
+int io_init(void) {
   return 0;
 }
 
