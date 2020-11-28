@@ -59,8 +59,8 @@ typedef struct {
   MAKE_REG(iy, iyh, iyl);
 
   /* Additional registers. */
-  u16_t pc;
-  u16_t sp;
+  MAKE_REG(pc, p, c);
+  MAKE_REG(sp, s, p);
 
   /* Interrupt stuff. */
   int iff1;
@@ -73,13 +73,13 @@ static cpu_t cpu;
 
 
 /* Convenient flag shortcuts. */
-#define FS   cpu.flag.s
-#define FZ   cpu.flag.z
-#define FH   cpu.flag.h
-#define FV   cpu.flag.pv
-#define FP   cpu.flag.pv
-#define FN   cpu.flag.n
-#define FC   cpu.flag.c
+#define SF   cpu.flag.s
+#define ZF   cpu.flag.z
+#define HF   cpu.flag.h
+#define VF   cpu.flag.pv
+#define PF   cpu.flag.pv
+#define NF   cpu.flag.n
+#define CF   cpu.flag.c
 
 /* Convenient register shortcuts. */
 #define A    cpu.af.b.a
@@ -116,16 +116,22 @@ static cpu_t cpu;
 #define IYL  cpu.iy.b.iyl
 
 
-#define PC   cpu.pc
-#define SP   cpu.sp
+#define S    cpu.sp.b.s
+#define P    cpu.sp.b.p
+#define SP   cpu.sp.w
+
+#define PC   cpu.pc.w
+#define PCH  cpu.pc.b.p
+#define PCL  cpu.pc.b.c
 
 #define IFF1 cpu.iff1
 #define IFF2 cpu.iff2
 
 
 /* Other convenient macros. */
-#define SIGN(x)          ((x) & 0x80)
-#define HALFCARRY(x,y,z) (((x) ^ (y) ^ (z)) & 0x10)
+#define SIGN(x)            ((x) & 0x80)
+#define HALFCARRY(x,y,z)   (((x) ^ (y) ^ (z)) & 0x10)
+#define HALFCARRY16(x,y,z) (((x) ^ (y) ^ (z)) & 0x1000)
 
 
 int cpu_init(void) {
@@ -139,26 +145,34 @@ void cpu_finit(void) {
 
 
 void cpu_reset(void) {
-  cpu.iff1 = 0;
-  cpu.pc   = 0;
-  cpu.i    = 0;
-  cpu.r    = 0;
+  AF   = 0xFFFF;
+  SP   = 0xFFFF;
+  BC   = 0xFFFF;
+  DE   = 0xFFFF;
+  HL   = 0xFFFF;
+  IX   = 0xFFFF;
+  IY   = 0xFFFF;
+  IFF1 = 0;
+  IFF2 = 0;
+  PC   = 0;
+  I    = 0;
+  R    = 0;
   clock_ticks(3);
 }
 
 
 static void cpu_flags_pack() {
-  F = (FS << 7) | (FZ << 6) | (FH << 4) | (FV << 2) | (FN << 1) | FC;
+  F = (SF << 7) | (ZF << 6) | (HF << 4) | (VF << 2) | (NF << 1) | CF;
 }
 
 
 static void cpu_flags_unpack() {
-  FS = (F & 0x80) >> 7;
-  FZ = (F & 0x40) >> 6;
-  FH = (F & 0x10) >> 4;
-  FV = (F & 0x04) >> 2;
-  FN = (F & 0x02) >> 1;
-  FC =  F & 0x01;
+  SF = (F & 0x80) >> 7;
+  ZF = (F & 0x40) >> 6;
+  HF = (F & 0x10) >> 4;
+  VF = (F & 0x04) >> 2;
+  NF = (F & 0x02) >> 1;
+  CF =  F & 0x01;
 }
 
 
@@ -170,7 +184,6 @@ static void cpu_exchange(u16_t* x, u16_t* y) {
 
 
 int cpu_run(u32_t ticks, s32_t* ticks_left) {
-  u8_t  tmp8;
   u8_t  opcode;
 
 #include "opcodes.c"
