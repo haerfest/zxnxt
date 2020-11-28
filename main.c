@@ -6,6 +6,7 @@
 #include "io.h"
 #include "memory.h"
 #include "mmu.h"
+#include "nextreg.h"
 
 
 static SDL_Window* window;
@@ -23,8 +24,12 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  if (io_init() != 0) {
+  if (nextreg_init() != 0) {
     goto exit_window;
+  }
+
+  if (io_init() != 0) {
+    goto exit_nextreg;
   }
 
   if (mmu_init() != 0) {
@@ -53,6 +58,8 @@ exit_mmu:
   mmu_finit();
 exit_io:
   io_finit();
+exit_nextreg:
+  nextreg_finit();
 exit_window:
   SDL_DestroyWindow(window);
 exit_sdl:
@@ -96,6 +103,7 @@ static void main_finit(void) {
   memory_finit();
   mmu_finit();
   io_finit();
+  nextreg_finit();
 
   SDL_DestroyWindow(window);
   SDL_Quit();

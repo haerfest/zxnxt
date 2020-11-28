@@ -7,7 +7,8 @@
 
 int  mmu_init(void);
 void mmu_finit(void);
-void mmu_page(u8_t slot, u8_t page);
+u8_t mmu_page_read(u8_t slot);
+void mmu_page_write(u8_t slot, u8_t page);
 u8_t mmu_read(u16_t address);
 void mmu_write(u16_t address, u8_t value);
 
