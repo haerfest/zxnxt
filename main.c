@@ -5,6 +5,7 @@
 #include "defs.h"
 #include "io.h"
 #include "memory.h"
+#include "mmu.h"
 
 
 static SDL_Window* window;
@@ -26,12 +27,16 @@ static int main_init(void) {
     goto exit_window;
   }
 
-  if (memory_init() != 0) {
+  if (mmu_init() != 0) {
     goto exit_io;
   }
 
+  if (memory_init() != 0) {
+    goto exit_mmu;
+  }
+
   if (clock_init() != 0) {
-    goto exit_memory;
+    goto exit_mmu;
   }
 
   if (cpu_init() != 0) {
@@ -42,19 +47,16 @@ static int main_init(void) {
 
 exit_clock:
   clock_finit();
-
 exit_memory:
   memory_finit();
-
+exit_mmu:
+  mmu_finit();
 exit_io:
   io_finit();
-
 exit_window:
   SDL_DestroyWindow(window);
-
 exit_sdl:
   SDL_Quit();
-
 exit:
   return -1;
 }
@@ -92,6 +94,7 @@ static void main_finit(void) {
   cpu_finit();
   clock_finit();
   memory_finit();
+  mmu_finit();
   io_finit();
 
   SDL_DestroyWindow(window);

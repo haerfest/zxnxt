@@ -1,8 +1,8 @@
 INCS=-I/usr/local/include
 LIBS=-lsdl2
 
-twatwa: main.o clock.o cpu.o io.o memory.o
-	cc -Wall $(INCS) $(LIBS) -o twatwa main.o clock.o cpu.o io.o memory.o
+twatwa: main.o clock.o cpu.o io.o memory.o mmu.o
+	cc -Wall $(INCS) $(LIBS) -o twatwa main.o clock.o cpu.o io.o memory.o mmu.o
 
 main.o: main.c clock.c copper.h cpu.h defs.h
 	cc $(INCS) -c main.c
@@ -24,6 +24,9 @@ opcodes.c: opcodes.py
 
 memory.o: memory.c memory.h defs.h
 	cc $(INCS) -c memory.c
+
+mmu.o: mmu.c mmu.h defs.h
+	cc $(INCS) -c mmu.c
 
 clean:
 	rm *.o
