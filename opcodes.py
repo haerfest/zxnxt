@@ -59,7 +59,7 @@ def inc_r(r: str) -> ConcreteSpecs:
         f'{r}++',
         f'FS = SIGN({r})',
         f'FZ = {r} == 0',
-        f'FV = {r} = 0x80',
+        f'FV = {r} == 0x80',
         f'FN = 0',
     ]
 
@@ -288,6 +288,7 @@ def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Opti
                 else:
                     raise RuntimeError(f'Unrecognised: {concrete_spec}')
 
+            f.write(f'{spaces}    fprintf(stderr, "%04Xh {mnemonic:15s} A=%02Xh BC=%04Xh DE=%04Xh HL=%04Xh F=%s%s-%s-%s%s%s\\n", PC - 1 - {len(prefix)}, A, BC, DE, HL, FS ? "S" : "s", FZ ? "Z" : "z", FH ? "H" : "h", FP ? "P/V" : "p/v", FN ? "N" : "n", FC ? "C" : "c");\n')
             f.write(f'{spaces}    break;\n\n')
         else:
             f.write(f'{spaces}  case 0x{opcode:02X}:\n')
