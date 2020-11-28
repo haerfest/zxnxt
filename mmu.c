@@ -6,6 +6,7 @@
 
 
 #define MEMORY_SIZE (2 * 1024 * 1024)
+#define ROM_START   0x00000
 #define RAM_START   0x40000
 #define PAGE_SIZE   (8 * 1024)
 #define N_SLOTS     8
@@ -16,12 +17,12 @@
 const u8_t default_pages[N_SLOTS] = {
   ROM_PAGE,  /* 0x0000 - 0x1FFF  =   0 KiB -  8 KiB  @  0x00000 */
   ROM_PAGE,  /* 0x2000 - 0x3FFF  =   8 KiB - 16 KiB  @  0x02000 */
-  10,        /* 0x4000 - 0x5FFF  =  16 KiB - 24 KiB  @  0x40000 + 10 * 0x4000 = 0x68000 */
-  11,        /* 0x6000 - 0x7FFF  =  24 KiB - 32 KiB  @  0x40000 + 11 * 0x4000 = 0x6C000 */
-  4,         /* 0x8000 - 0x9FFF  =  32 KiB - 40 KiB  @  0x40000 +  4 * 0x4000 = 0x50000 */
-  5,         /* 0xA000 - 0xBFFF  =  40 KiB - 48 KiB  @  0x40000 +  5 * 0x4000 = 0x54000 */
-  0,         /* 0xC000 - 0xDFFF  =  48 KiB - 56 KiB  @  0x40000 +  0 * 0x4000 = 0x40000 */
-  1          /* 0xE000 - 0xFFFF  =  56 KiB - 64 KiB  @  0x40000 +  1 * 0x4000 = 0x44000 */
+  10,        /* 0x4000 - 0x5FFF  =  16 KiB - 24 KiB  @  0x40000 + 10 * 0x2000 = 0x54000 */
+  11,        /* 0x6000 - 0x7FFF  =  24 KiB - 32 KiB  @  0x40000 + 11 * 0x2000 = 0x56000 */
+  4,         /* 0x8000 - 0x9FFF  =  32 KiB - 40 KiB  @  0x40000 +  4 * 0x2000 = 0x48000 */
+  5,         /* 0xA000 - 0xBFFF  =  40 KiB - 48 KiB  @  0x40000 +  5 * 0x2000 = 0x4A000 */
+  0,         /* 0xC000 - 0xDFFF  =  48 KiB - 56 KiB  @  0x40000 +  0 * 0x2000 = 0x40000 */
+  1          /* 0xE000 - 0xFFFF  =  56 KiB - 64 KiB  @  0x40000 +  1 * 0x2000 = 0x42000 */
 };
 
 
@@ -80,7 +81,7 @@ int mmu_init(void) {
   }
 
   /* See https://wiki.specnext.dev/Memory_map */
-  if (load_rom("enNextZX.rom", 64 * 1024, &mmu.memory[0]) != 0) {
+  if (load_rom("enNextZX.rom", 64 * 1024, &mmu.memory[ROM_START]) != 0) {
     goto exit;
   }
 
@@ -110,19 +111,14 @@ void mmu_finit(void) {
 
 
 void mmu_page(u8_t slot, u8_t page) {
-  // The first two slots can be mapped to ROM.
-  if (page == ROM_PAGE) {
-    if (slot < 2) {
-      // TODO: Implement IO port 7FFDh and 1FFDh to determine which ROMs
-      //       appear here.
-      mmu.pointer[slot] = &mmu.memory[slot * PAGE_SIZE];
-      mmu.page[slot]    = page;
-    }
-    return;
-  }
-
   if (page < N_PAGES) {
     mmu.pointer[slot] = &mmu.memory[RAM_START + page * PAGE_SIZE];
+    mmu.page[slot]    = page;
+  } else if (page == ROM_PAGE && slot < 2) {
+    // The first two slots can be mapped to ROM.
+    // TODO: Implement IO port 7FFDh and 1FFDh to determine which ROMs
+    //       appear here.
+    mmu.pointer[slot] = &mmu.memory[ROM_START + slot * PAGE_SIZE];
     mmu.page[slot]    = page;
   }
 }
