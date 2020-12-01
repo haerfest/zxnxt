@@ -7,60 +7,32 @@ from typing import *
 
 Opcode      = int
 Mnemonic    = str
-C           = str
+C           = Optional[str]
 CGenerator  = Callable[[], C]
 Instruction = Tuple[Mnemonic, Union[C, CGenerator]]
 Table       = Dict[Opcode, Union[Instruction, 'Table']]
 
 
 def adc_a_r(r: str) -> C:
-    return [
-        f'tmp8 = A',
-        f'if (F & CF_MASK) {'
-        f'  co8 = A >= 0xFF - {r}',
-        f'  A += {r} + 1',
-        f'} else {',
-        f'  co8 = A > 0xFF - {r}',
-        f'  A += {r}',
-        f'}',
-        f'ci8 = A ^ tmp8 ^ {r}',
-        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | VF_MASK | NF_MASK | CF_MASK)',
-        f'F |= (A & 0x80) | (A == 0) << ZF_SHIFT | (ci & HF_MASK) | (ci8 >> 7 ^ co8) << VF_SHIFT | co8',
-    ]
+    return None
     
 def add_a_r(r: str) -> C:
-    return [
-        f'tmp8 = A',
-        f'co = A > 0xFF - {r}',
-        f'A += {r}',
-        f'ci = A ^ tmp8 ^ {r}',
-        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | VF_MASK | NF_MASK | CF_MASK)',
-        f'F |= (A & 0x80) | (A == 0) << ZF_SHIFT | (ci & HF_MASK) | (ci8 >> 7 ^ co8) << VF_SHIFT | co8',
-    ]
+    return None
 
 def and_r(r: str) -> C:
-    return [
-        f'A &= {r}',
-        f'F &= ~(SF_MASK | ZF_MASK | PF_MASK | NF_MASK | CF_MASK)',
-        f'F |= (A & 0x80) | (A == 0) << ZF_SHIFT | (1 << HF_SHIFT) | parity[A]',
-    ]
+    return f'''
+        A &= memory_read(PC++); T(3);
+        F = SZ53P(A) | (1 << HF_SHIFT);
+    '''
 
 def dec_r(r: str) -> C:
-    return lambda: inc_r(r, delta=~1 + 1)
+    return ''
 
 def dec_ss(ss: str) -> C:
     return f'{ss}--; T(2);'
 
 def inc_r(r: str, delta: int = 1) -> C:
-    return [
-        f'tmp8 = {r}',
-        f'co8 = {r} > 0xFF - {delta}',
-        f'{r} += {delta}',
-        f'ci8 = {r} ^ tmp8 ^ {delta}',
-        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | VF_MASK | NF_MASK | CF_MASK)',
-        f'F |= ({r} & 0x80) | ({r} == 0) << ZF_SHIFT',
-        f'F |= (ci8 & HF_MASK) | (ci8 >> 7 ^ co8) << VF_SHIFT',
-    ]
+    return ''
 
 def inc_ss(ss: str) -> C:
     return f'{ss}++; T(2);'
@@ -109,8 +81,8 @@ def ldxr(op: str) -> C:
         F &= ~(HF_MASK | VF_MASK | NF_MASK);
         F |= (BC - 1 != 0) << VF_SHIFT;
         T(5);
-        if (--BC) { PC -= 2; T(5); }
-    ''')
+        if (--BC) {{ PC -= 2; T(5); }}
+    '''
 
 def out_c_r(r: str) -> C:
     return f'io_write(BC, {r}); T(4);'
@@ -124,12 +96,11 @@ def push_qq(qq: str) -> C:
     '''
 
 def rlc_r(r: str) -> C:
-    return [
-        f'F |= {r} >> 7',
-        f'{r} = {r} << 1 | CF',
-        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | PF_MASK | NF_MASK)',
-        f'F |= ({r} & 0x80) | ({r} == 0) << ZF_SHIFT | parity[{r}]',
-    ]
+    return f'''
+        const u8_t carry = {r} >> 7;
+        {r} = {r} << 1 | carry;
+        F = SZ53P({r}) | carry;
+    '''
 
 def rst(address: int) -> C:
     return f'''
@@ -140,11 +111,11 @@ def rst(address: int) -> C:
     '''
 
 def sbc_hl_ss(ss: str) -> C:
-    return f''
+    return None
 
 def srl_r(r: str) -> C:
     return f'''
-        const uint8_t previous = {r};
+        const u8_t previous = {r};
         {r} >>= 1;
         F = SZ53P({r}) | (previous & 0x01);
     '''
@@ -161,7 +132,6 @@ instructions: Table = {
            AF = AF_;
            AF_ = tmp;
            '''),
-    ]),
     0x0A: ('DEC BC',    lambda: dec_ss('BC')),
     0x0C: ('INC C',     lambda: inc_r('C')),
     0x10: ('DJNZ e',
@@ -240,7 +210,7 @@ instructions: Table = {
            '''),
     0xD9: ('EXX',
            '''
-           reg16_t tmp;
+           u16_t tmp;
            tmp = BC; BC = BC_; BC_ = tmp;
            tmp = DE; DE = DE_; DE_ = tmp;
            tmp = HL; HL = HL_; HL_ = tmp;
@@ -263,7 +233,6 @@ instructions: Table = {
            A &= memory_read(PC++); T(3);
            F = SZ53P(A) | (1 << HF_SHIFT);
            '''),
-    ]),
     0xE7: ('RST 20h', lambda: rst(0x20)),
     0xCB: {
         0x02: ('RLC D', lambda: rlc_r('D')),
@@ -277,7 +246,7 @@ instructions: Table = {
         0x78: ('IN A,(C)',
                f'''
                A = io_read(BC); T(4);
-               F = HF53P(A);
+               F = SZ53P(A);
                '''),
         0x79: ('OUT (C),A', lambda: out_c_r('A')),
         0x8A: ('PUSH nn',
@@ -303,7 +272,7 @@ instructions: Table = {
         0xB0: ('LDIR', lambda: ldxr('+')),
         0xB8: ('LDDR', lambda: ldxr('-')),
     },
-    0xF3: ('DI', 'IFF1 = IFF2 = 0'),
+    0xF3: ('DI', 'IFF1 = IFF2 = 0;'),
     0xFE: ('CP n',
            '''
            u8_t result;
@@ -315,62 +284,42 @@ instructions: Table = {
 }
 
 
-def generate(instructions: Table, f: io.TextIOBase, level: int = 0, prefix: Optional[List[Opcode]] = None) -> None:
+def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode]] = None) -> None:
     prefix = prefix or []
-    spaces = ' ' * level * 4
 
-    f.write(f'''{spaces}opcode = memory_read(PC++);
-{spaces}clock_ticks(4);
-{spaces}switch (opcode) {{
+    f.write(f'''
+opcode = memory_read(PC++);
+T(4);
+switch (opcode) {{
 ''')
 
     for opcode in sorted(instructions):
         item = instructions[opcode]
         if isinstance(item, tuple):
-            mnemonic, specifications = item
-            f.write(f'{spaces}  case 0x{opcode:02X}:  /* {mnemonic} */\n')
-            f.write(f'{spaces}    fprintf(stderr, "%04Xh {mnemonic:20s} A=%02Xh BC=%04Xh DE=%04Xh HL=%04Xh IX=%04Xh IY=%04Xh F=%s%s-%s-%s%s%s\\n", PC - 1 - {len(prefix)}, A, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");\n')
+            mnemonic, spec = item
+            c = spec() if callable(spec) else spec
+            if c:
+                f.write(f'''
+case 0x{opcode:02X}:  /* {mnemonic} */
+  fprintf(stderr, "%04Xh {mnemonic:20s} A=%02Xh BC=%04Xh DE=%04Xh HL=%04Xh IX=%04Xh IY=%04Xh F=%s%s-%s-%s%s%s\\n", PC - 1 - {len(prefix)}, A, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
+  {{
+    {c}
+  }}
+  break;
 
-            # Make our life easier by ensuring we always have a sequence.
-            if not isinstance(specifications, list):
-                specifications = [specifications]
+''')
 
-            # Flatten the specifications by evaluating all generators first.
-            concrete_specs = []
-            for specification in specifications:
-                if callable(specification):
-                    concrete_spec = specification()
-                    if isinstance(concrete_spec, list):
-                        concrete_specs.extend(concrete_spec)
-                    else:
-                        concrete_specs.append(concrete_spec)
-                else:
-                    concrete_specs.append(specification)
-
-            for concrete_spec in concrete_specs:
-                if isinstance(concrete_spec, int):
-                    # Number of clock ticks.
-                    if concrete_spec > 0:
-                        f.write(f'{spaces}    clock_ticks({concrete_spec});\n')
-                elif isinstance(concrete_spec, str):
-                    # Line of C code.
-                    terminator = ';' if concrete_spec[-1] not in ['{', '}'] else ''
-                    f.write(f'{spaces}    {concrete_spec}{terminator}\n')
-                else:
-                    raise RuntimeError(f'Unrecognised: {concrete_spec}')
-
-            f.write(f'{spaces}    break;\n\n')
         else:
-            f.write(f'{spaces}  case 0x{opcode:02X}:\n')
-            generate(item, f, level + 1, prefix + [opcode])
-            f.write(f'{spaces}    break;\n\n')
+            f.write(f'case 0x{opcode:02X}:\n')
+            generate(item, f, prefix + [opcode])
 
     s = ''.join(f'{opcode:02X}h ' for opcode in prefix)
     n = len(prefix) + 1
-    f.write(f'''{spaces}  default:
-{spaces}    fprintf(stderr, "Unknown opcode {s}%02Xh at %04Xh\\n", opcode, PC - {n});
-{spaces}    return -1;
-{spaces}}}
+    f.write(f'''
+default:
+  fprintf(stderr, "Unknown opcode {s}%02Xh at %04Xh\\n", opcode, PC - {n});
+  return -1;
+}}
 ''')
 
 

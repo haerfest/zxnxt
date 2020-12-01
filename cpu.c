@@ -69,13 +69,13 @@
 #define IYH  cpu.iy.b.h
 #define IYL  cpu.iy.b.l
 
-#define S    cpu.sp.b.s
-#define P    cpu.sp.b.p
+#define S    cpu.sp.b.h
+#define P    cpu.sp.b.l
 #define SP   cpu.sp.w
 
 #define PC   cpu.pc.w
-#define PCH  cpu.pc.b.p
-#define PCL  cpu.pc.b.c
+#define PCH  cpu.pc.b.h
+#define PCL  cpu.pc.b.l
 
 #define IFF1 cpu.iff1
 #define IFF2 cpu.iff2
@@ -84,7 +84,7 @@
 #define R    cpu.r
 
 /* Not a register, but a shortcut for "clock tick". */
-#define T    clock_tick
+#define T    clock_ticks
 
 
 #define SZ53(value)   cpu.sz53[value]
@@ -94,7 +94,7 @@
 
 /* All credits to Fuse for this efficent way of looking up the correct HF and
  * VF values. */
-#define LOOKUP_IDX(op1,op2,result) (((op1) & 0x08 | (op2) & 0x04 | (result) & 0x02)) >> 1)
+#define LOOKUP_IDX(op1,op2,result) ((((op1) & 0x08 | (op2) & 0x04 | (result) & 0x02)) >> 1)
 
 #define HF_ADD(op1,op2,result) lookup_hf_add[LOOKUP_IDX(op1,op2,result)]
 #define HF_SUB(op1,op2,result) lookup_hf_sub[LOOKUP_IDX(op1,op2,result)]
@@ -164,7 +164,7 @@ typedef struct {
 static cpu_t cpu;
 
 
-static u8_t parity(u8_t value) {
+static u8_t parity(int value) {
   u8_t parity;
   u8_t bit;
 
@@ -177,9 +177,9 @@ static u8_t parity(u8_t value) {
 
 
 static void cpu_fill_tables(void) {
-  u8_t value;
+  int value;
   
-  for (value = 0; value <= 255; value++) {
+  for (value = 0; value < 256; value++) {
     cpu.parity[value] = parity(value);
     cpu.sz53[value]   = (value & 0x80) | (value == 0) << ZF_SHIFT | (value & 0x20) | (value & 0x08);
     cpu.sz53p[value]  = cpu.sz53[value] | cpu.parity[value] << PF_SHIFT;
@@ -212,7 +212,7 @@ void cpu_reset(void) {
   PC   = 0;
   I    = 0;
   R    = 0;
-  clock_ticks(3);
+  T(3);
 }
 
 
