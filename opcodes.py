@@ -5,156 +5,149 @@ import io
 from typing import *
 
 
-Opcode         = int
-Mnemonic       = str
-CCode          = str
-Ticks          = int
-ConcreteSpec   = Union[CCode, Ticks]
-ConcreteSpecs  = Union[ConcreteSpec, Sequence[ConcreteSpec]]
-SpecGenerator  = Callable[[], ConcreteSpecs]
-Specification  = Union[ConcreteSpec, SpecGenerator]
-Specifications = Union[Specification, Sequence[Specification]]
-Instruction    = Tuple[Mnemonic, Specifications]
-Table          = Dict[Opcode, Union[Instruction, 'Table']]
+Opcode      = int
+Mnemonic    = str
+C           = str
+CGenerator  = Callable[[], C]
+Instruction = Tuple[Mnemonic, Union[C, CGenerator]]
+Table       = Dict[Opcode, Union[Instruction, 'Table']]
 
 
-def add_a_r(r: str) -> ConcreteSpecs:
+def adc_a_r(r: str) -> C:
     return [
-        f'HF  = HALFCARRY(A, {r}, A + {r})',
-        f'VF  = SIGN(A) == SIGN({r})',
-        f'A  += {r}',
-        f'VF &= SIGN({r}) != SIGN(A)',
-        f'SF  = SIGN(A)',
-        f'ZF  = A == 0',
-        f'NF  = 0',
-        f'CF  = ((u16_t) A) + {r} > 255'
+        f'tmp8 = A',
+        f'if (F & CF_MASK) {'
+        f'  co8 = A >= 0xFF - {r}',
+        f'  A += {r} + 1',
+        f'} else {',
+        f'  co8 = A > 0xFF - {r}',
+        f'  A += {r}',
+        f'}',
+        f'ci8 = A ^ tmp8 ^ {r}',
+        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | VF_MASK | NF_MASK | CF_MASK)',
+        f'F |= (A & 0x80) | (A == 0) << ZF_SHIFT | (ci & HF_MASK) | (ci8 >> 7 ^ co8) << VF_SHIFT | co8',
+    ]
+    
+def add_a_r(r: str) -> C:
+    return [
+        f'tmp8 = A',
+        f'co = A > 0xFF - {r}',
+        f'A += {r}',
+        f'ci = A ^ tmp8 ^ {r}',
+        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | VF_MASK | NF_MASK | CF_MASK)',
+        f'F |= (A & 0x80) | (A == 0) << ZF_SHIFT | (ci & HF_MASK) | (ci8 >> 7 ^ co8) << VF_SHIFT | co8',
     ]
 
-def and_r(r: str) -> ConcreteSpecs:
+def and_r(r: str) -> C:
     return [
         f'A &= {r}',
-        'SF = SIGN(A)',
-        'ZF = A == 0',
-        'HF = 1',
-        'PF = parity[A]',
-        'NF = CF = 0'
+        f'F &= ~(SF_MASK | ZF_MASK | PF_MASK | NF_MASK | CF_MASK)',
+        f'F |= (A & 0x80) | (A == 0) << ZF_SHIFT | (1 << HF_SHIFT) | parity[A]',
     ]
 
-def dec_r(r: str) -> ConcreteSpecs:
+def dec_r(r: str) -> C:
+    return lambda: inc_r(r, delta=~1 + 1)
+
+def dec_ss(ss: str) -> C:
+    return f'{ss}--; T(2);'
+
+def inc_r(r: str, delta: int = 1) -> C:
     return [
-        f'HF = HALFCARRY({r}, -1, {r} - 1)',
-        f'VF = {r} == 0x80',
-        f'{r}--',
-        f'SF = SIGN({r})',
-        f'ZF = {r} == 0',
-        f'NF = 1'
+        f'tmp8 = {r}',
+        f'co8 = {r} > 0xFF - {delta}',
+        f'{r} += {delta}',
+        f'ci8 = {r} ^ tmp8 ^ {delta}',
+        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | VF_MASK | NF_MASK | CF_MASK)',
+        f'F |= ({r} & 0x80) | ({r} == 0) << ZF_SHIFT',
+        f'F |= (ci8 & HF_MASK) | (ci8 >> 7 ^ co8) << VF_SHIFT',
     ]
 
-def dec_ss(ss: str) -> ConcreteSpecs:
-    return [f'{ss}--', 2]
+def inc_ss(ss: str) -> C:
+    return f'{ss}++; T(2);'
 
-def inc_r(r: str) -> ConcreteSpecs:
-    return [
-        f'HF = HALFCARRY({r}, 1, {r} + 1)',
-        f'{r}++',
-        f'SF = SIGN({r})',
-        f'ZF = {r} == 0',
-        f'VF = {r} == 0x80',
-        f'NF = 0',
-    ]
+def jr_c_e(c: str) -> C:
+    return f'''
+        Z = memory_read(PC++); T(3);
+        if ({c}) {{
+          PC += (s8_t) Z; T(5);
+        }}
+    '''
 
-def inc_ss(ss: str) -> ConcreteSpecs:
-    return [f'{ss}++', 2]
-
-def jr_c_e(c: str) -> ConcreteSpecs:
-    return [
-        f'Z = memory_read(PC++)', 3,
-        f'if ({c}) {{',
-        f'  PC += (s8_t) Z', 5,
-        f'}}'
-    ]
-
-def ld_dd_nn(dd: str) -> ConcreteSpecs:
+def ld_dd_nn(dd: str) -> C:
     hi, lo = dd
-    return [
-        f'{lo} = memory_read(PC++)', 3,
-        f'{hi} = memory_read(PC++)', 3,
-    ]
+    return f'''
+        {lo} = memory_read(PC++); T(3);
+        {hi} = memory_read(PC++); T(3);
+    '''
 
-def ld_hl_r(r: str) -> ConcreteSpecs:
-    return [f'memory_write(HL, {r})', 3]
+def ld_hl_r(r: str) -> C:
+    return f'memory_write(HL, {r}); T(3);'
 
-def ld_nn_dd(dd: str) -> ConcreteSpecs:
+def ld_nn_dd(dd: str) -> C:
     hi, lo = dd
-    return [
-        f'Z = memory_read(PC++)',      3,
-        f'W = memory_read(PC++)',      3,
-        f'memory_write(WZ,     {lo})', 3,
-        f'memory_write(WZ + 1, {hi})', 3,
-    ]
+    return f'''
+        Z = memory_read(PC++);      T(3);
+        W = memory_read(PC++);      T(3);
+        memory_write(WZ,     {lo}); T(3);
+        memory_write(WZ + 1, {hi}); T(3);
+    '''
 
-def ld_r_hl(r: str) -> ConcreteSpecs:
-    return [f'{r} = memory_read(HL)', 3]
+def ld_r_hl(r: str) -> C:
+    return f'{r} = memory_read(HL); T(3);'
 
-def ld_r_n(r: str) -> ConcreteSpecs:
-    return [f'{r} = memory_read(PC++)', 3]
+def ld_r_n(r: str) -> C:
+    return f'{r} = memory_read(PC++); T(3);'
 
-def ld_r_r(r1: str, r2: str) -> ConcreteSpecs:
-    return f'{r1} = {r2}'
+def ld_r_r(r1: str, r2: str) -> C:
+    return f'{r1} = {r2};'
 
-def out_c_r(r: str) -> ConcreteSpecs:
-    return [f'io_write(BC, {r})', 4]
 
-def push_qq(qq: str) -> ConcreteSpecs:
+def ldxr(op: str) -> C:
+    return f'''
+        Z  = memory_read(HL{op}{op}); T(3);
+        memory_write(DE{op}{op}, Z);
+        F &= ~(HF_MASK | VF_MASK | NF_MASK);
+        F |= (BC - 1 != 0) << VF_SHIFT;
+        T(5);
+        if (--BC) { PC -= 2; T(5); }
+    ''')
+
+def out_c_r(r: str) -> C:
+    return f'io_write(BC, {r}); T(4);'
+
+def push_qq(qq: str) -> C:
     hi, lo = qq
-    return [
-        1,
-        f'memory_write(--SP, {hi})', 3,
-        f'memory_write(--SP, {lo})', 3,
-    ]
+    return f'''
+        T(1);
+        memory_write(--SP, {hi}); T(3);
+        memory_write(--SP, {lo}); T(3);
+    '''
 
-def rlc_r(r: str) -> ConcreteSpecs:
+def rlc_r(r: str) -> C:
     return [
-        f'CF  = {r} >> 7',
+        f'F |= {r} >> 7',
         f'{r} = {r} << 1 | CF',
-        f'SF = SIGN({r})',
-        f'ZF = {r} == 0',
-        f'HF = 0',
-        f'PF = parity[{r}]',
-        f'NF = 0',
+        f'F &= ~(SF_MASK | ZF_MASK | HF_MASK | PF_MASK | NF_MASK)',
+        f'F |= ({r} & 0x80) | ({r} == 0) << ZF_SHIFT | parity[{r}]',
     ]
 
-def rst(address: int) -> ConcreteSpecs:
-    return [
-        1,
-        f'memory_write(--SP, PCH)', 3,
-        f'memory_write(--SP, PCL)',
-        f'PC = 0x{address:02X}',    3,
-    ]
+def rst(address: int) -> C:
+    return f'''
+        T(1);
+        memory_write(--SP, PCH); T(3);
+        memory_write(--SP, PCL);
+        PC = 0x{address:02X};    T(3);
+    '''
 
-def sbc_hl_ss(ss: str) -> ConcreteSpecs:
-    hi, _ = ss
-    return [
-        f'WZ  = HL',
-        f'HL -= {ss} + CF',
-        4,
-        f'SF  = SIGN(H)',
-        f'ZF  = HL == 0',
-        f'HF  = HALFCARRY16(WZ, -({ss} + CF), HL)',
-        f'VF  = SIGN(W) == SIGN({hi}) && SIGN({hi}) != SIGN(H)',
-        f'NF  = 1',
-        f'CF  = HL < {ss}',
-        3,
-    ]
+def sbc_hl_ss(ss: str) -> C:
+    return f''
 
-def srl_r(r: str) -> ConcreteSpecs:
-    return [
-        f'CF = {r} & 1',
-        f'{r} >>= 1',
-        f'SF = HF = NF = 0',
-        f'ZF = {r} == 0',
-        f'PF = parity[{r}]',
-    ]
+def srl_r(r: str) -> C:
+    return f'''
+        const uint8_t previous = {r};
+        {r} >>= 1;
+        F = SZ53P({r}) | (previous & 0x01);
+    '''
 
 
 instructions: Table = {
@@ -162,48 +155,55 @@ instructions: Table = {
     0x03: ('INC BC',    lambda: inc_ss('BC')),
     0x04: ('INC B',     lambda: inc_r('B')),
     0x06: ('LD B,n',    lambda: ld_r_n('B')),
-    0x08: ("EX AF,AF'", [
-        'cpu_flags_pack()',
-        'cpu_exchange(&AF, &AF_)',
-        'cpu_flags_unpack()'
+    0x08: ("EX AF,AF'",
+           '''
+           const u16_t tmp = AF;
+           AF = AF_;
+           AF_ = tmp;
+           '''),
     ]),
     0x0A: ('DEC BC',    lambda: dec_ss('BC')),
     0x0C: ('INC C',     lambda: inc_r('C')),
-    0x10: ('DJNZ e', [
-        1,
-        'Z = memory_read(PC++)', 3,
-        'if (--B) {',
-        '  PC += (s8_t) Z', 5,
-        '}',
-    ]),
+    0x10: ('DJNZ e',
+           f'''
+           T(1);
+           Z = memory_read(PC++); T(3);
+           if (--B) {{
+             PC += (s8_t) Z; T(5);
+           }}
+           '''),
     0x11: ('LD DE,nn',  lambda: ld_dd_nn('DE')),
     0x16: ('LD D,n',    lambda: ld_r_n('D')),
-    0x18: ('JR e',      [
-        'Z = memory_read(PC++)', 3,
-        'PC += (s8_t) Z', 5,
-    ]),
+    0x18: ('JR e',
+           '''
+           Z = memory_read(PC++); T(3);
+           PC += (s8_t) Z;        T(5);
+           '''),
     0x1D: ('DEC E',     lambda: dec_r('E')),
     0x20: ('JR NZ,e',   lambda: jr_c_e('!ZF')),
     0x21: ('LD HL,nn',  lambda: ld_dd_nn('HL')),
     0x23: ('INC HL',    lambda: inc_ss('HL')),
     0x28: ('JR Z,e',    lambda: jr_c_e('ZF')),
     0x2B: ('DEC HL',    lambda: dec_ss('HL')),
-    0x2F: ('CPL', [
-        'A = ~A',
-        'HF = NF = 1',
-    ]),
+    0x2F: ('CPL',
+           '''
+           A = ~A;
+           F |= (1 << HF_SHIFT) | (1 << NF_SHIFT);
+           '''),
     0x30: ('JR NC,e',   lambda: jr_c_e('!CF')),
     0x31: ('LD SP,nn',  lambda: ld_dd_nn('SP')),
-    0x32: ('LD nn,A',   [
-        'Z = memory_read(PC++)', 3,
-        'W = memory_read(PC++)', 3,
-        'memory_write(WZ, A)',   3,
-    ]),
-    0x36: ('LD (HL),n', [
-        f'Z = memory_read(PC++)', 3,
-        f'memory_write(HL, Z)',   3,
-    ]),
-    0x38: ('JR C,e',    lambda: jr_c_e('C')),
+    0x32: ('LD nn,A',
+           '''
+           Z = memory_read(PC++); T(3);
+           W = memory_read(PC++); T(3);
+           memory_write(WZ, A);   T(3);
+           '''),
+    0x36: ('LD (HL),n',
+           '''
+           Z = memory_read(PC++); T(3);
+           memory_write(HL, Z);   T(3);
+           '''),
+    0x38: ('JR C,e',    lambda: jr_c_e('CF')),
     0x3C: ('INC A',     lambda: inc_r('A')),
     0x3D: ('DEC A',     lambda: dec_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
@@ -221,46 +221,48 @@ instructions: Table = {
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
     0xA2: ('AND D',     lambda: and_r('D')),
     0xA7: ('AND A',     lambda: and_r('A')),
-    0xAF: ('XOR A', [
-        'A = 0',
-        'SF = HF = NF = CF = 0',
-        'ZF = PF = 1',
-    ]),
-    0xC3: ('JP nn', [
-        'Z  = memory_read(PC)',     3,
-        'W  = memory_read(PC + 1)', 3,
-        'PC = WZ'
-    ]),
+    0xAF: ('XOR A',
+           '''
+           A = 0;
+           F = SZ53P(0);
+           '''),
+    0xC3: ('JP nn',
+           '''
+           Z  = memory_read(PC);     T(3);
+           W  = memory_read(PC + 1); T(3);
+           PC = WZ;
+           '''),
     0xC5: ('PUSH BC', lambda: push_qq('BC')),
-    0xC9: ('RET', [
-        f'PCL = memory_read(SP++)', 3,
-        f'PCH = memory_read(SP++)', 3,
-    ]),
-    0xD9: ('EXX', [
-        'cpu_exchange(&BC, &BC_)',
-        'cpu_exchange(&DE, &DE_)',
-        'cpu_exchange(&HL, &HL_)',
-    ]),
+    0xC9: ('RET',
+           '''
+           PCL = memory_read(SP++); T(3);
+           PCH = memory_read(SP++); T(3);
+           '''),
+    0xD9: ('EXX',
+           '''
+           reg16_t tmp;
+           tmp = BC; BC = BC_; BC_ = tmp;
+           tmp = DE; DE = DE_; DE_ = tmp;
+           tmp = HL; HL = HL_; HL_ = tmp;
+           '''),
     0xDD: {
         0x6F: ('LD IXL,A', lambda: ld_r_r('IXL', 'A')),
         0x7D: ('LD A,IXL', lambda: ld_r_r('A', 'IXL')),
     },
-    0xE3: ('EX (SP),HL', [
-        f'Z = memory_read(SP)',     3,
-        f'memory_write(SP,     L)', 4,
-        f'W = memory_read(SP + 1)', 3,
-        f'memory_write(SP + 1, H)', 5,
-        f'H = W',
-        f'L = Z',
-    ]),
-    0xE6: ('AND n', [
-        'A &= memory_read(PC++)',
-        'SF = SIGN(A)',
-        'ZF = A == 0',
-        'HF = 1',
-        'PF = parity[A]',
-        'NF = CF = 0',
-        3
+    0xE3: ('EX (SP),HL',
+           '''
+           Z = memory_read(SP);     T(3);
+           W = memory_read(SP + 1); T(3);
+           memory_write(SP,     L); T(4);
+           memory_write(SP + 1, H); T(5);
+           H = W;
+           L = Z;
+           '''),
+    0xE6: ('AND n',
+           '''
+           A &= memory_read(PC++); T(3);
+           F = SZ53P(A) | (1 << HF_SHIFT);
+           '''),
     ]),
     0xE7: ('RST 20h', lambda: rst(0x20)),
     0xCB: {
@@ -272,64 +274,44 @@ instructions: Table = {
         0x4B: ('LD BC,(nn)', lambda: ld_dd_nn('BC')),
         0x51: ('OUT (C),D',  lambda: out_c_r('D')),
         0x52: ('SBC HL,DE',  lambda: sbc_hl_ss('DE')),
-        0x78: ('IN A,(C)', [
-            'A  = io_read(BC)',
-            'SF = SIGN(A)',
-            'ZF = A == 0',
-            'HF = NF = 0',
-            'PF = parity[A]',
-            4
-        ]),
+        0x78: ('IN A,(C)',
+               f'''
+               A = io_read(BC); T(4);
+               F = HF53P(A);
+               '''),
         0x79: ('OUT (C),A', lambda: out_c_r('A')),
-        0x8A: ('PUSH nn', [
-            f'Z = memory_read(PC++)',
-            f'W = memory_read(PC++)',
-            f'memory_write(--SP, W)',
-            f'memory_write(--SP, Z)',
-            11
-        ]),
-        0x91: ('NEXTREG reg,value', [
-            'io_write(0x243B, memory_read(PC++))',
-            'io_write(0x253B, memory_read(PC++))',
-            8
-        ]),
-        0x92: ('NEXTREG reg,A', [
-            'io_write(0x243B, memory_read(PC++))',
-            'io_write(0x253B, A)',
-            4
-        ]),
-        0xB0: ('LDIR', [
-            'Z  = memory_read(HL++)', 3,
-            'memory_write(DE++, Z)',
-            'HF = NF = 0',
-            'VF = BC - 1 != 0',
-            5,
-            'if (--BC) {',
-            '  PC -= 2', 5,
-            '}',
-        ]),
-        0xB8: ('LDDR', [
-            'Z = memory_read(HL--)', 3,
-            'memory_write(DE--, Z)',
-            'HF = NF = 0',
-            'VF = BC - 1 != 0',
-            5,
-            'if (--BC) {',
-            '  PC -= 2', 5,
-            '}',
-        ])
+        0x8A: ('PUSH nn',
+               '''
+               Z = memory_read(PC++);
+               W = memory_read(PC++);
+               memory_write(--SP, W);
+               memory_write(--SP, Z);
+               T(11);
+               '''),
+        0x91: ('NEXTREG reg,value',
+               '''
+               io_write(0x243B, memory_read(PC++));
+               io_write(0x253B, memory_read(PC++));
+               T(8);
+               '''),
+        0x92: ('NEXTREG reg,A',
+               '''
+               io_write(0x243B, memory_read(PC++));
+               io_write(0x253B, A);
+               T(4);
+               '''),
+        0xB0: ('LDIR', lambda: ldxr('+')),
+        0xB8: ('LDDR', lambda: ldxr('-')),
     },
     0xF3: ('DI', 'IFF1 = IFF2 = 0'),
-    0xFE: ('CP n', [
-        f'Z  = memory_read(PC++)',
-        f'SF = SIGN(A - Z)',
-        f'ZF = A - Z == 0',
-        f'HF = HALFCARRY(A, Z, A - Z)',
-        f'VF = SIGN(A) == SIGN(Z) && SIGN(Z) != SIGN(A - Z)',
-        f'NF = 1',
-        f'CF = A < Z',
-        3,
-    ]),
+    0xFE: ('CP n',
+           '''
+           u8_t result;
+           Z      = memory_read(PC++);
+           result = A - Z;
+           F      = SZ53(result) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | (A < Z) << CF_SHIFT;
+           T(3);
+           ''')
 }
 
 
