@@ -96,10 +96,14 @@
  * VF values. */
 #define LOOKUP_IDX(op1,op2,result) ((((op1) & 0x08 | (op2) & 0x04 | (result) & 0x02)) >> 1)
 
-#define HF_ADD(op1,op2,result) lookup_hf_add[LOOKUP_IDX(op1,op2,result)]
-#define HF_SUB(op1,op2,result) lookup_hf_sub[LOOKUP_IDX(op1,op2,result)]
-#define VF_ADD(op1,op2,result) lookup_vf_add[LOOKUP_IDX(op1,op2,result)]
-#define VF_SUB(op1,op2,result) lookup_vf_sub[LOOKUP_IDX(op1,op2,result)]
+#define HF_ADD_IDX(idx)        lookup_hf_add[idx]
+#define HF_SUB_IDX(idx)        lookup_hf_sub[idx]
+#define VF_ADD_IDX(idx)        lookup_vf_add[idx]
+#define VF_SUB_IDX(idx)        lookup_vf_sub[idx]
+#define HF_ADD(op1,op2,result) HF_ADD_IDX(LOOKUP_IDX(op1,op2,result))
+#define HF_SUB(op1,op2,result) HF_SUB_IDX(LOOKUP_IDX(op1,op2,result))
+#define VF_ADD(op1,op2,result) VF_ADD_IDX(LOOKUP_IDX(op1,op2,result))
+#define VF_SUB(op1,op2,result) VF_SUB_IDX(LOOKUP_IDX(op1,op2,result))
 
 static const u8_t lookup_hf_add[8] = { 0, HF_MASK, HF_MASK, HF_MASK,       0, 0,       0, HF_MASK };
 static const u8_t lookup_hf_sub[8] = { 0,       0, HF_MASK,       0, HF_MASK, 0, HF_MASK, HF_MASK };
