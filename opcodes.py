@@ -20,9 +20,18 @@ def adc_a_r(r: str) -> C:
 def add_a_r(r: str) -> C:
     return f'''
         const u8_t index = LOOKUP_IDX(A, {r}, A + {r});
-        const u8_t carry = A > 255 - {r};
+        const u8_t carry = A > 0xFF - {r};
         A += {r};
         F = SZ53(A) | HF_ADD_IDX(index) | VF_ADD_IDX(index) | carry;
+    '''
+
+def add_hl_ss(ss: str) -> C:
+    return f'''
+        const u16_t prev  = HL;
+        const u8_t  carry = HL > 0xFFFF - {ss};
+        HL += {ss}; T(4 + 3);
+        F &= ~(HF_MASK | NF_MASK | CF_MASK);
+        F |= HF_ADD(prev >> 8, {ss} >> 8, HL >> 8) | carry;
     '''
 
 def and_r(r: str) -> C:
@@ -95,6 +104,16 @@ def dec_r(r: str) -> C:
 def dec_ss(ss: str) -> C:
     return f'{ss}--; T(2);'
 
+def dec_xy_d(xy: str) -> C:
+    return f'''
+        u8_t m;
+        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
+        m = memory_read(WZ) - 1;              T(5);
+        memory_write(WZ, m);                  T(4);
+        F = SZ53(m) | HF_SUB(m + 1, 1, m) | (m == 0x79) << VF_SHIFT | NF_MASK;
+        T(3);
+    '''
+
 def inc_r(r: str) -> C:
     return f'''
        const u8_t index = LOOKUP_IDX({r}, 1, ++{r});
@@ -146,6 +165,12 @@ def ld_r_xy_d(r: str, xy: str) -> C:
         {r} = memory_read(WZ); T(3);
     '''
 
+def ld_xy_d_r(xy: str, r: str) -> C:
+    return f'''
+        WZ = {xy} + (s8_t) memory_read(PC++); T(3 + 5);
+        memory_write(WZ, {r}); T(3);
+    '''
+    
 def ldxr(op: str) -> C:
     return f'''
         Z  = memory_read(HL{op}{op});
@@ -181,6 +206,21 @@ def push_qq(qq: str) -> C:
         memory_write(--SP, {lo}); T(3);
     '''
 
+def ret(cond: Optional[str] = None) -> C:
+    s = 'T(1);\n'
+    if cond:
+        s += f'if ({cond}) {{\n';
+
+    s += '''
+        PCL = memory_read(SP++); T(3);
+        PCH = memory_read(SP++); T(3);
+    '''
+
+    if cond:
+        s += '}\n'
+
+    return s
+
 def rlc_r(r: str) -> C:
     return f'''
         const u8_t carry = {r} >> 7;
@@ -204,6 +244,14 @@ def srl_r(r: str) -> C:
         const u8_t previous = {r};
         {r} >>= 1;
         F = SZ53P({r}) | (previous & 0x01);
+    '''
+
+def sub_r(r: str) -> C:
+    return f'''
+        const u8_t previous = A;
+        const u8_t idx      = LOOKUP_IDX(A, {r}, A - {r});
+        A -= {r};
+        F = SZ53(A) | HF_SUB_IDX(idx) | VF_SUB_IDX(idx) | NF_MASK | (previous < {r});
     '''
 
 
@@ -232,16 +280,25 @@ instructions: Table = {
     0x11: ('LD DE,nn',  lambda: ld_dd_nn('DE')),
     0x14: ('INC D',     lambda: inc_r('D')),
     0x16: ('LD D,n',    lambda: ld_r_n('D')),
+    0x17: ('RLA',
+           '''
+           const u8_t carry = F & CF_MASK;
+           F &= ~(HF_MASK | NF_MASK | CF_MASK);
+           F |= (A & 0x80) >> 7;
+           A <<= 1 | carry;
+           '''),
     0x18: ('JR e',
            '''
            Z = memory_read(PC++); T(3);
            PC += (s8_t) Z;        T(5);
            '''),
     0x1D: ('DEC E',      lambda: dec_r('E')),
+    0x1E: ('LD E,n',     lambda: ld_r_n('E')),
     0x20: ('JR NZ,e',    lambda: jr_c_e('!ZF')),
     0x21: ('LD HL,nn',   lambda: ld_dd_nn('HL')),
     0x23: ('INC HL',     lambda: inc_ss('HL')),
     0x28: ('JR Z,e',     lambda: jr_c_e('ZF')),
+    0x29: ('ADD HL,HL',  lambda: add_hl_ss('HL')),
     0x2A: ('LD HL,(nn)',
            '''
            Z = memory_read(PC++);   T(3);
@@ -273,6 +330,7 @@ instructions: Table = {
     0x3D: ('DEC A',     lambda: dec_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
     0x46: ('LD B,(HL)', lambda: ld_r_hl('B')),
+    0x47: ('LD B,A',    lambda: ld_r_r('B', 'A')),
     0x4B: ('LD C,E',    lambda: ld_r_r('C', 'B')),
     0x4E: ('LD C,(HL)', lambda: ld_r_hl('C')),
     0x52: ('LD D,D',    lambda: ld_r_r('D', 'D')),
@@ -286,6 +344,7 @@ instructions: Table = {
     0x7E: ('LD A,(HL)', lambda: ld_r_hl('A')),
     0x80: ('ADD A,B',   lambda: add_a_r('B')),
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
+    0x93: ('SUB E',     lambda: sub_r('E')),
     0xA2: ('AND D',     lambda: and_r('D')),
     0xA7: ('AND A',     lambda: and_r('A')),
     0xAF: ('XOR A',
@@ -301,12 +360,18 @@ instructions: Table = {
            W  = memory_read(PC + 1); T(3);
            PC = WZ;
            '''),
-    0xC5: ('PUSH BC', lambda: push_qq('BC')),
-    0xC9: ('RET',
+    0xC4: ('CALL NZ,nn', lambda: call('!(F & ZF_MASK)')),
+    0xC5: ('PUSH BC',    lambda: push_qq('BC')),
+    0xC6: ('ADD A,n',
            '''
-           PCL = memory_read(SP++); T(3);
-           PCH = memory_read(SP++); T(3);
+           const u8_t n     = memory_read(PC++); T(3);
+           const u8_t index = LOOKUP_IDX(A, n, A + n);
+           const u8_t carry = A > 255 - n;
+           A += n;
+           F = SZ53(A) | HF_ADD_IDX(index) | VF_ADD_IDX(index) | carry;
            '''),
+    0xC8: ('RET Z',      lambda: ret('F & ZF_MASK')),
+    0xC9: ('RET',        ret),
     0xCD: ('CALL nn',    call),
     0xD4: ('CALL NC,nn', lambda: call('!(F & CF_MASK)')),
     0xD6: ('SUB n',
@@ -325,14 +390,27 @@ instructions: Table = {
            tmp = DE; DE = DE_; DE_ = tmp;
            tmp = HL; HL = HL_; HL_ = tmp;
            '''),
+    0xDC: ('CALL C,nn', lambda: call('F & CF_MASK')),
     0xDD: {
+        0x35: ('DEC (IX+d)',  lambda: dec_xy_d('IX')),
+        0x4E: ('LD C,(IX+d)', lambda: ld_r_xy_d('C', 'IX')),
+        0x66: ('LD H,(IX+d)', lambda: ld_r_xy_d('H', 'IX')),
+        0x6E: ('LD L,(IX+d)', lambda: ld_r_xy_d('L', 'IX')),
         0x6F: ('LD IXL,A',    lambda: ld_r_r('IXL', 'A')),
+        0x77: ('LD (IX+d),A', lambda: ld_xy_d_r('IX', 'A')),
         0x7D: ('LD A,IXL',    lambda: ld_r_r('A', 'IXL')),
         0x7E: ('LD A,(IX+d)', lambda: ld_r_xy_d('A', 'IX')),
         0xBE: ('CP (IX+d)',   lambda: cp_xy_d('IX')),
         0xCB: {
             # This is on the 4th byte, not the 3rd! PC remains at 3rd.
+            0x46: ('BIT 0,(IX+d)', lambda: bit_b_xy_d(0, 'IX')),
+            0x4E: ('BIT 1,(IX+d)', lambda: bit_b_xy_d(1, 'IX')),
+            0x56: ('BIT 2,(IX+d)', lambda: bit_b_xy_d(2, 'IX')),
+            0x5E: ('BIT 3,(IX+d)', lambda: bit_b_xy_d(3, 'IX')),
             0x66: ('BIT 4,(IX+d)', lambda: bit_b_xy_d(4, 'IX')),
+            0x6E: ('BIT 5,(IX+d)', lambda: bit_b_xy_d(5, 'IX')),
+            0x76: ('BIT 6,(IX+d)', lambda: bit_b_xy_d(6, 'IX')),
+            0x7E: ('BIT 7,(IX+d)', lambda: bit_b_xy_d(7, 'IX')),
         },
     },
     0xE1: ('POP HL', lambda: pop_qq('HL')),
