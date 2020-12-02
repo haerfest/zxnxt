@@ -9,6 +9,7 @@ Opcode      = int
 Mnemonic    = str
 C           = Optional[str]
 CGenerator  = Callable[[], C]
+ReadAhead   = bool
 Instruction = Tuple[Mnemonic, Union[C, CGenerator]]
 Table       = Dict[Opcode, Union[Instruction, 'Table']]
 
@@ -30,10 +31,59 @@ def and_r(r: str) -> C:
         F = SZ53P(A) | (1 << HF_SHIFT);
     '''
 
+def bit_b_xy_d(b: int, xy: str) -> C:
+    return f'''
+        T(1);
+        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
+        PC++;
+        F &= ~(ZF_MASK | NF_MASK);
+        F |= (memory_read(WZ) & 1 << {b} ? 0 : ZF_MASK) | HF_MASK;
+        T(4);
+    '''
+
+def call(cond: Optional[str] = None) -> C:
+    s = ''
+    if cond:
+        s += f'if ({cond}) {{\n'
+
+    s += '''
+        Z = memory_read(PC++);   T(3);
+        W = memory_read(PC++);   T(4);
+        memory_write(--SP, PCH); T(3);
+        memory_write(--SP, PCL); T(3);
+        PC = WZ;
+    '''
+
+    if cond:
+        # TODO: Does it still read the address from memory
+        #       even if the condition is false, and store
+        #       it in WZ?
+        s += '''
+            } else {
+                Z = memory_read(PC++); T(3);
+                W = memory_read(PC++); T(3);
+            }
+        '''
+
+    return s
+
 def cp_r(r: str) -> C:
     return f'''
         const u8_t result = A - {r};
-        F                 = SZ53(result) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
+        const u8_t idx    = LOOKUP_IDX(A, {r}, result);
+        F                 = SZ53(result) | HF_SUB_IDX(idx) | VF_SUB_IDX(idx) | NF_MASK | (A < {r}) << CF_SHIFT;
+    '''
+
+def cp_xy_d(xy: str) -> C:
+    return f'''
+        u8_t tmp;
+        u8_t result;
+        u8_t idx;
+        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
+        tmp    = memory_read(WZ);                 T(5);
+        result = A - tmp;
+        idx    = LOOKUP_IDX(A, tmp, result);
+        F      = SZ53(result) | HF_SUB_IDX(idx) | VF_SUB_IDX(idx) | NF_MASK | (A < tmp) << CF_SHIFT;
     '''
 
 def dec_r(r: str) -> C:
@@ -257,14 +307,8 @@ instructions: Table = {
            PCL = memory_read(SP++); T(3);
            PCH = memory_read(SP++); T(3);
            '''),
-    0xCD: ('CALL nn',
-           '''
-           Z  = memory_read(PC++);  T(3);
-           W  = memory_read(PC++);  T(4);
-           memory_write(--SP, PCH); T(3);
-           memory_write(--SP, PCL); T(3);
-           PC = WZ;
-           '''),
+    0xCD: ('CALL nn',    call),
+    0xD4: ('CALL NC,nn', lambda: call('!(F & CF_MASK)')),
     0xD6: ('SUB n',
            '''
            const u8_t previous = A;
@@ -285,7 +329,11 @@ instructions: Table = {
         0x6F: ('LD IXL,A',    lambda: ld_r_r('IXL', 'A')),
         0x7D: ('LD A,IXL',    lambda: ld_r_r('A', 'IXL')),
         0x7E: ('LD A,(IX+d)', lambda: ld_r_xy_d('A', 'IX')),
-        # TODO 0xCD <value> <operation>
+        0xBE: ('CP (IX+d)',   lambda: cp_xy_d('IX')),
+        0xCB: {
+            # This is on the 4th byte, not the 3rd! PC remains at 3rd.
+            0x66: ('BIT 4,(IX+d)', lambda: bit_b_xy_d(4, 'IX')),
+        },
     },
     0xE1: ('POP HL', lambda: pop_qq('HL')),
     0xE3: ('EX (SP),HL',
@@ -362,8 +410,15 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
     prefix_str     = ''.join(f'{opcode:02X}h ' for opcode in prefix)
     prefix_comment = f'/* {prefix_str}*/ ' if prefix else ''
 
+    if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
+        # Special opcode where 3rd byte is parameter and 4th byte needed for
+        # decoding. Read 4th byte, but keep PC at 3rd byte.
+        read_opcode = 'opcode = memory_read(PC + 1);'
+    else:
+        read_opcode = 'opcode = memory_read(PC++);'
+
     f.write(f'''
-opcode = memory_read(PC++);
+{read_opcode}
 T(4);
 switch (opcode) {{
 ''')
@@ -387,7 +442,6 @@ case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
         else:
             f.write(f'case 0x{opcode:02X}:\n')
             generate(item, f, prefix + [opcode])
-
 
     optional_break = 'break;' if prefix else ''
     f.write(f'''
