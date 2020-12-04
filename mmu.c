@@ -11,7 +11,8 @@
 #define PAGE_SIZE   (8 * 1024)
 #define N_SLOTS     8
 #define N_PAGES     ((MEMORY_SIZE - RAM_START) / PAGE_SIZE)
-#define ROM_PAGE    255
+#define ROM_PAGE    0xFF
+#define ROM_SIZE    (16 * 1024)
 
 
 const u8_t default_pages[N_SLOTS] = {
@@ -30,6 +31,7 @@ typedef struct  {
   u8_t* memory;
   u8_t  page[N_SLOTS];
   u8_t* pointer[N_SLOTS];
+  u8_t  selected_rom;
 } mmu_t;
 
 
@@ -85,6 +87,8 @@ int mmu_init(void) {
     goto exit;
   }
 
+  mmu.selected_rom = 0;
+
   /* TODO: Load in other ROMs:
    *       - EsxDOS
    *       - Multiface
@@ -120,10 +124,7 @@ void mmu_page_write(u8_t slot, u8_t page) {
     mmu.pointer[slot] = &mmu.memory[RAM_START + page * PAGE_SIZE];
     mmu.page[slot]    = page;
   } else if (page == ROM_PAGE && slot < 2) {
-    // The first two slots can be mapped to ROM.
-    // TODO: Implement IO port 7FFDh and 1FFDh to determine which ROMs
-    //       appear here.
-    mmu.pointer[slot] = &mmu.memory[ROM_START + slot * PAGE_SIZE];
+    mmu.pointer[slot] = &mmu.memory[ROM_START + mmu.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
     mmu.page[slot]    = page;
   }
 }
@@ -145,3 +146,13 @@ void mmu_write(u16_t address, u8_t value) {
   }
 }
 
+
+void mmu_select_rom(u8_t rom) {
+  mmu.selected_rom = rom & 0x03;
+
+  for (int slot = 0; slot < 2; slot++) {
+    if (mmu.page[slot] == ROM_PAGE) {
+      mmu.pointer[slot] = &mmu.memory[ROM_START + mmu.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
+    }
+  }
+}
