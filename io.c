@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "divmmc.h"
 #include "nextreg.h"
 #include "defs.h"
 
@@ -13,6 +14,10 @@ void io_finit(void) {
 
 
 u8_t io_read(u16_t address) {
+  if ((address & 0xFF) == 0xE3) {
+    return divmmc_control_read();
+  }
+
   if (address == 0x243B) {
     return nextreg_select_read();
   }
@@ -27,6 +32,11 @@ u8_t io_read(u16_t address) {
 
 
 void io_write(u16_t address, u8_t value) {
+  if ((address & 0xFF) == 0xE3) {
+    divmmc_control_write(value);
+    return;
+  }
+
   if (address == 0x243B) {
     nextreg_select_write(value);
     return;

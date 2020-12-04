@@ -3,6 +3,7 @@
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"
+#include "divmmc.h"
 #include "io.h"
 #include "memory.h"
 #include "mmu.h"
@@ -28,8 +29,12 @@ static int main_init(void) {
     goto exit_window;
   }
 
-  if (io_init() != 0) {
+  if (divmmc_init() != 0) {
     goto exit_nextreg;
+  }
+
+  if (io_init() != 0) {
+    goto exit_divmmc;
   }
 
   if (mmu_init() != 0) {
@@ -58,6 +63,8 @@ exit_mmu:
   mmu_finit();
 exit_io:
   io_finit();
+exit_divmmc:
+  divmmc_finit();
 exit_nextreg:
   nextreg_finit();
 exit_window:
@@ -103,6 +110,7 @@ static void main_finit(void) {
   memory_finit();
   mmu_finit();
   io_finit();
+  divmmc_finit();
   nextreg_finit();
 
   SDL_DestroyWindow(window);

@@ -381,6 +381,11 @@ instructions: Table = {
     0xC8: ('RET Z',      lambda: ret('F & ZF_MASK')),
     0xC9: ('RET',        ret),
     0xCD: ('CALL nn',    call),
+    0xD3: ('OUT (n),A',
+           '''
+           WZ = A << 8 | memory_read(PC++); T(3);
+           io_write(WZ, A);                 T(4);
+           '''),
     0xD4: ('CALL NC,nn', lambda: call('!(F & CF_MASK)')),
     0xD6: ('SUB n',
            '''
