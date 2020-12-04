@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
+#include "ula.h"
 
 
 static SDL_Window* window;
@@ -45,8 +46,12 @@ static int main_init(void) {
     goto exit_mmu;
   }
 
+  if (ula_init() != 0) {
+    goto exit_memory;
+  }
+
   if (clock_init() != 0) {
-    goto exit_mmu;
+    goto exit_ula;
   }
 
   if (cpu_init() != 0) {
@@ -57,6 +62,8 @@ static int main_init(void) {
 
 exit_clock:
   clock_finit();
+exit_ula:
+  ula_finit();
 exit_memory:
   memory_finit();
 exit_mmu:
@@ -107,6 +114,7 @@ static void main_eventloop(void) {
 static void main_finit(void) {
   cpu_finit();
   clock_finit();
+  ula_finit();
   memory_finit();
   mmu_finit();
   io_finit();

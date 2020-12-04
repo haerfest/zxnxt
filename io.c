@@ -2,6 +2,7 @@
 #include "divmmc.h"
 #include "nextreg.h"
 #include "defs.h"
+#include "ula.h"
 
 
 int io_init(void) {
@@ -14,7 +15,11 @@ void io_finit(void) {
 
 
 u8_t io_read(u16_t address) {
-  if ((address & 0xFF) == 0xE3) {
+  if ((address & 0x0001) == 0x0000) {
+    return ula_read();
+  }
+
+  if ((address & 0x00FF) == 0x00E3) {
     return divmmc_control_read();
   }
 
@@ -32,7 +37,12 @@ u8_t io_read(u16_t address) {
 
 
 void io_write(u16_t address, u8_t value) {
-  if ((address & 0xFF) == 0xE3) {
+  if ((address & 0x0001) == 0x0000) {
+    ula_write(value);
+    return;
+  }
+
+  if ((address & 0x00FF) == 0x00E3) {
     divmmc_control_write(value);
     return;
   }

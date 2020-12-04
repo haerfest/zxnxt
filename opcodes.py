@@ -51,28 +51,22 @@ def bit_b_xy_d(b: int, xy: str) -> C:
     '''
 
 def call(cond: Optional[str] = None) -> C:
-    s = ''
+    s = '''
+        Z = memory_read(PC++);   T(3);
+        W = memory_read(PC++);   T(4);
+    '''
+    
     if cond:
         s += f'if ({cond}) {{\n'
 
     s += '''
-        Z = memory_read(PC++);   T(3);
-        W = memory_read(PC++);   T(4);
         memory_write(--SP, PCH); T(3);
         memory_write(--SP, PCL); T(3);
         PC = WZ;
     '''
 
     if cond:
-        # TODO: Does it still read the address from memory
-        #       even if the condition is false, and store
-        #       it in WZ?
-        s += '''
-            } else {
-                Z = memory_read(PC++); T(3);
-                W = memory_read(PC++); T(3);
-            }
-        '''
+        s += '}\n'
 
     return s
 
@@ -130,6 +124,18 @@ def inc_r(r: str) -> C:
 def inc_ss(ss: str) -> C:
     return f'{ss}++; T(2);'
 
+def inx(op: str) -> C:
+    return f'''
+        u8_t tmp;
+        WZ = B << 8 | C;
+        tmp = io_read(WZ);     T(5);
+        memory_write(HL, tmp); T(3);
+        B--;
+        HL{op}{op};            T(4);
+        F &= ~ZF_MASK;
+        F |= (B == 0) << ZF_SHIFT | NF_MASK;
+    '''
+
 def jr_c_e(c: str) -> C:
     return f'''
         Z = memory_read(PC++); T(3);
@@ -137,6 +143,22 @@ def jr_c_e(c: str) -> C:
           PC += (s8_t) Z; T(5);
         }}
     '''
+
+def jp(cond: Optional[str] = None) -> C:
+    s = '''
+        Z = memory_read(PC++); T(3);
+        W = memory_read(PC++); T(3);
+    '''
+
+    if cond:
+        s += f'if ({cond}) {{\n'
+
+    s += 'PC = WZ;\n'
+
+    if cond:
+        s += '}'
+
+    return s
 
 def ld_dd_nn(dd: str) -> C:
     hi, lo = dd
@@ -263,6 +285,7 @@ def sub_r(r: str) -> C:
 
 
 instructions: Table = {
+    0x00: ('NOP',       ''),
     0x01: ('LD BC,nn',  lambda: ld_dd_nn('BC')),
     0x03: ('INC BC',    lambda: inc_ss('BC')),
     0x04: ('INC B',     lambda: inc_r('B')),
@@ -362,12 +385,8 @@ instructions: Table = {
            '''),
     0xB3: ('OR E',      lambda: or_r('E')),
     0xB9: ('CP C',      lambda: cp_r('C')),
-    0xC3: ('JP nn',
-           '''
-           Z  = memory_read(PC);     T(3);
-           W  = memory_read(PC + 1); T(3);
-           PC = WZ;
-           '''),
+    0xC2: ('JP NZ,nn',  lambda: jp('!(F & ZF_MASK)')),
+    0xC3: ('JP nn',     jp),
     0xC4: ('CALL NZ,nn', lambda: call('!(F & ZF_MASK)')),
     0xC5: ('PUSH BC',    lambda: push_qq('BC')),
     0xC6: ('ADD A,n',
@@ -443,6 +462,10 @@ instructions: Table = {
            F = SZ53P(A) | (1 << HF_SHIFT);
            '''),
     0xE7: ('RST 20h', lambda: rst(0x20)),
+    0xE9: ('JP (HL)',
+           '''
+           PC = HL;
+           '''),
     0xEB: ('EX DE,HL', lambda: ex('DE', 'HL')),
     0xCB: {
         0x02: ('RLC D', lambda: rlc_r('D')),
@@ -482,6 +505,7 @@ instructions: Table = {
                T(4);
                '''),
         0x94: ('pixelad', None), # using D,E (as Y,X) calculate the ULA screen address and store in HL
+        0xA2: ('INI', lambda: inx('+')),
         0xB0: ('LDIR', lambda: ldxr('+')),
         0xB8: ('LDDR', lambda: ldxr('-')),
     },
@@ -521,7 +545,7 @@ switch (opcode) {{
         if isinstance(item, tuple):
             mnemonic, spec = item
             c = spec() if callable(spec) else spec
-            if c:
+            if c is not None:
                 f.write(f'''
 case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
   /* fprintf(stderr, "%04Xh {mnemonic:20s} A=%02Xh BC=%04Xh DE=%04Xh HL=%04Xh IX=%04Xh IY=%04Xh F=%s%s-%s-%s%s%s\\n", PC - 1 - {len(prefix)}, A, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c"); */

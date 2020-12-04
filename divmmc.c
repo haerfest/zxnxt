@@ -11,12 +11,12 @@ void divmmc_finit(void) {
 }
 
 
-void divmmc_control_write(u8_t value) {
-  fprintf(stderr, "divmmc: unimplemented control write %02Xh\n", value);
-}
-
-
 u8_t divmmc_control_read(void) {
   fprintf(stderr, "divmmc: unimplemented control read\n");
   return 0x55;
+}
+
+
+void divmmc_control_write(u8_t value) {
+  fprintf(stderr, "divmmc: unimplemented control write %02Xh\n", value);
 }
