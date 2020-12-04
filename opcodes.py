@@ -534,7 +534,7 @@ case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
     optional_break = 'break;' if prefix else ''
     f.write(f'''
 default:
-  fprintf(stderr, "Unknown opcode {prefix_str}%02Xh at %04Xh\\n", opcode, PC - 1 - {prefix_len});
+  fprintf(stderr, "cpu: unknown opcode {prefix_str}%02Xh at %04Xh\\n", opcode, PC - 1 - {prefix_len});
   return -1;
 }}
 {optional_break}

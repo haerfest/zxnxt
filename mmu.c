@@ -127,6 +127,8 @@ void mmu_page_write(u8_t slot, u8_t page) {
     mmu.pointer[slot] = &mmu.memory[ROM_START + mmu.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
     mmu.page[slot]    = page;
   }
+
+  fprintf(stderr, "mmu: slot %u contains page %u\n", slot, page);
 }
 
 
@@ -149,6 +151,8 @@ void mmu_write(u16_t address, u8_t value) {
 
 void mmu_select_rom(u8_t rom) {
   mmu.selected_rom = rom & 0x03;
+
+  fprintf(stderr, "mmu: ROM %u selected\n", mmu.selected_rom);
 
   for (int slot = 0; slot < 2; slot++) {
     if (mmu.page[slot] == ROM_PAGE) {

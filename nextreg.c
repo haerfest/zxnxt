@@ -65,7 +65,7 @@ void nextreg_data_write(u8_t value) {
       break;
 
     default:
-      fprintf(stderr, "Unimplemented write %02Xh to Next register %02Xh\n", value, nextreg.selected_register);
+      fprintf(stderr, "nextreg: unimplemented write %02Xh to Next register %02Xh\n", value, nextreg.selected_register);
       break;
   }
 }
@@ -84,7 +84,7 @@ u8_t nextreg_data_read(void) {
       return mmu_page_read(nextreg.selected_register - REGISTER_MMU_SLOT0_CONTROL);
 
     default:
-      fprintf(stderr, "Unimplemented read from Next register %02Xh\n", nextreg.selected_register);
+      fprintf(stderr, "nextreg: unimplemented read from Next register %02Xh\n", nextreg.selected_register);
       break;
   }
 

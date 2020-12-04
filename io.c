@@ -20,7 +20,7 @@ u8_t io_read(u16_t address) {
     return nextreg_data_read();
   } 
 
-  fprintf(stderr, "io_read(%04Xh)\n", address);
+  fprintf(stderr, "io: read %04Xh\n", address);
 
   return 0xFF;
 }
@@ -36,5 +36,5 @@ void io_write(u16_t address, u8_t value) {
     return;
   }
 
-  fprintf(stderr, "io_write(%04Xh,%02Xh)\n", address, value);
+  fprintf(stderr, "io: write %02Xh to %04Xh\n", value, address);
 }
