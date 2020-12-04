@@ -114,6 +114,13 @@ def dec_xy_d(xy: str) -> C:
         T(3);
     '''
 
+def ex(r1: str, r2: str) -> C:
+    return f'''
+        const u16_t tmp = {r1};
+        {r1} = {r2};
+        {r2} = tmp;
+    '''
+
 def inc_r(r: str) -> C:
     return f'''
        const u8_t index = LOOKUP_IDX({r}, 1, ++{r});
@@ -261,12 +268,7 @@ instructions: Table = {
     0x04: ('INC B',     lambda: inc_r('B')),
     0x05: ('DEC B',     lambda: dec_r('B')),
     0x06: ('LD B,n',    lambda: ld_r_n('B')),
-    0x08: ("EX AF,AF'",
-           '''
-           const u16_t tmp = AF;
-           AF = AF_;
-           AF_ = tmp;
-           '''),
+    0x08: ("EX AF,AF'", lambda: ex('AF', 'AF_')),
     0x0A: ('DEC BC',    lambda: dec_ss('BC')),
     0x0C: ('INC C',     lambda: inc_r('C')),
     0x10: ('DJNZ e',
@@ -326,6 +328,12 @@ instructions: Table = {
            memory_write(HL, Z);   T(3);
            '''),
     0x38: ('JR C,e',    lambda: jr_c_e('CF')),
+    0x3A: ('LD A,(nn)',
+           '''
+           Z = memory_read(PC++); T(3);
+           W = memory_read(PC++); T(3);
+           A = memory_read(WZ);   T(3);
+           '''),
     0x3C: ('INC A',     lambda: inc_r('A')),
     0x3D: ('DEC A',     lambda: dec_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
@@ -430,6 +438,7 @@ instructions: Table = {
            F = SZ53P(A) | (1 << HF_SHIFT);
            '''),
     0xE7: ('RST 20h', lambda: rst(0x20)),
+    0xEB: ('EX DE,HL', lambda: ex('DE', 'HL')),
     0xCB: {
         0x02: ('RLC D', lambda: rlc_r('D')),
         0x3F: ('SRL A', lambda: srl_r('A')),
@@ -467,6 +476,7 @@ instructions: Table = {
                io_write(0x253B, A);
                T(4);
                '''),
+        0x94: ('pixelad', None), # using D,E (as Y,X) calculate the ULA screen address and store in HL
         0xB0: ('LDIR', lambda: ldxr('+')),
         0xB8: ('LDDR', lambda: ldxr('-')),
     },
@@ -509,7 +519,7 @@ switch (opcode) {{
             if c:
                 f.write(f'''
 case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
-  fprintf(stderr, "%04Xh {mnemonic:20s} A=%02Xh BC=%04Xh DE=%04Xh HL=%04Xh IX=%04Xh IY=%04Xh F=%s%s-%s-%s%s%s\\n", PC - 1 - {len(prefix)}, A, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
+  /* fprintf(stderr, "%04Xh {mnemonic:20s} A=%02Xh BC=%04Xh DE=%04Xh HL=%04Xh IX=%04Xh IY=%04Xh F=%s%s-%s-%s%s%s\\n", PC - 1 - {len(prefix)}, A, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c"); */
   {{
     {c}
   }}

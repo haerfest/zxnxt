@@ -13,8 +13,6 @@ void io_finit(void) {
 
 
 u8_t io_read(u16_t address) {
-  fprintf(stderr, "io_read(%04Xh)\n", address);
-
   if (address == 0x243B) {
     return nextreg_select_read();
   }
@@ -22,16 +20,21 @@ u8_t io_read(u16_t address) {
     return nextreg_data_read();
   } 
 
+  fprintf(stderr, "io_read(%04Xh)\n", address);
+
   return 0xFF;
 }
 
 
 void io_write(u16_t address, u8_t value) {
-  fprintf(stderr, "io_write(%04Xh,%02Xh)\n", address, value);
-
   if (address == 0x243B) {
     nextreg_select_write(value);
-  } else if (address == 0x253B) {
+    return;
+  }
+  if (address == 0x253B) {
     nextreg_data_write(value);
-  } 
+    return;
+  }
+
+  fprintf(stderr, "io_write(%04Xh,%02Xh)\n", address, value);
 }
