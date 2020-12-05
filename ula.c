@@ -35,6 +35,33 @@ static const ula_display_spec_t ula_display_spec[5][2][2] = {
 };
 
 
+typedef struct {
+  u8_t red;
+  u8_t green;
+  u8_t blue;
+} ula_colour_t;
+
+
+static const ula_colour_t colours[] = {
+  { 0x00, 0x00, 0x00 },  /*  0: Dark black.     */
+  { 0x00, 0x00, 0xD7 },  /*  1: Dark blue.      */
+  { 0xD7, 0x00, 0x00 },  /*  2: Dark red.       */
+  { 0xD7, 0x00, 0xD7 },  /*  3: Dark magenta.   */
+  { 0x00, 0xD7, 0x00 },  /*  4: Dark green.     */
+  { 0x00, 0xD7, 0xD7 },  /*  5: Dark cyan.      */
+  { 0xD7, 0xD7, 0x00 },  /*  6: Dark yellow.    */
+  { 0xD7, 0xD7, 0xD7 },  /*  7: Dark white.     */
+  { 0x00, 0x00, 0x00 },  /*  8: Bright black.   */
+  { 0x00, 0x00, 0xFF },  /*  9: Bright blue.    */
+  { 0xFF, 0x00, 0x00 },  /* 10: Bright red.     */
+  { 0xFF, 0x00, 0xFF },  /* 11: Bright magenta. */
+  { 0x00, 0xFF, 0x00 },  /* 12: Bright green.   */
+  { 0x00, 0xFF, 0xFF },  /* 13: Bright cyan.    */
+  { 0xFF, 0xFF, 0x00 },  /* 14: Bright yellow.  */
+  { 0xFF, 0xFF, 0xFF }   /* 15: Bright white.   */
+};
+
+
 typedef enum {
   E_ULA_DISPLAY_STATE_TOP_BORDER = 0,
   E_ULA_DISPLAY_STATE_LEFT_BORDER,
@@ -62,28 +89,89 @@ typedef struct {
 static ula_t ula;
 
 
-static void ula_state_machine_tick(const ula_display_spec_t spec) {
-  switch (ula.display_state) {
-    case E_ULA_DISPLAY_STATE_TOP_BORDER:
-      break;
+static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t spec) {
+  unsigned int tick;
 
-    case E_ULA_DISPLAY_STATE_LEFT_BORDER:
-      break;
+  /* The ULA uses a 7 MHz clock to refresh the display, which is 28/4 MHz. */
+  for (tick = 0; tick < delta; tick += 4) {
+    switch (ula.display_state) {
+      case E_ULA_DISPLAY_STATE_TOP_BORDER:
+        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
+        ula.display_column++;
+        if (ula.display_column == 32 + 256 + 64) {
+          ula.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+        }
+        break;
 
-    case E_ULA_DISPLAY_STATE_DISPLAY:
-      break;
+      case E_ULA_DISPLAY_STATE_LEFT_BORDER:
+        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
+        ula.display_column++;
+        if (ula.display_column == 32) {
+          ula.display_state = E_ULA_DISPLAY_STATE_DISPLAY;
+        }
+        break;
 
-    case E_ULA_DISPLAY_STATE_HSYNC:
-      break;
+      case E_ULA_DISPLAY_STATE_DISPLAY:
+        /* TODO: Read pixel and colour data from RAM and display. */
+        ula.display_column++;
+        if (ula.display_column == 32 + 256) {
+          ula.display_state = E_ULA_DISPLAY_STATE_RIGHT_BORDER;
+        }
+        break;
 
-    case E_ULA_DISPLAY_STATE_RIGHT_BORDER:
-      break;
+      case E_ULA_DISPLAY_STATE_HSYNC:
+        ula.display_column++;
+        if (ula.display_column == 32 + 256 + 64 + 96) {
+          ula.display_column = 0;
+          ula.display_line++;
+          if (ula.display_line < spec.top_border_lines) {
+            ula.display_state = E_ULA_DISPLAY_STATE_TOP_BORDER;
+          } else if (ula.display_line < spec.top_border_lines + spec.display_lines) {
+            ula.display_state = E_ULA_DISPLAY_STATE_LEFT_BORDER;
+          } else {
+            ula.display_state = E_ULA_DISPLAY_STATE_BOTTOM_BORDER;
+          }
+        }
+        break;
 
-    case E_ULA_DISPLAY_STATE_BOTTOM_BORDER:
-      break;
+      case E_ULA_DISPLAY_STATE_RIGHT_BORDER:
+        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
+        ula.display_column++;
+        if (ula.display_column == 32 + 256 + 64) {
+          ula.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+        }
+        break;
 
-    case E_ULA_DISPLAY_STATE_VSYNC:
-      break;
+      case E_ULA_DISPLAY_STATE_BOTTOM_BORDER:
+        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
+        ula.display_column++;
+        if (ula.display_column == 32 + 256 + 64) {
+          if (ula.display_line < spec.total_lines) {
+            ula.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+          } else {
+            /* TODO: Generate VSYNC interrupt. */
+            SDL_RenderPresent(ula.renderer);
+            ula.display_state = E_ULA_DISPLAY_STATE_VSYNC;
+          }
+        }
+        break;
+
+      case E_ULA_DISPLAY_STATE_VSYNC:
+        ula.display_column++;
+        if (ula.display_column == 32 + 256 + 64 + 96) {
+          ula.display_column = 0;
+          ula.display_line++;
+          if (ula.display_line == spec.total_lines + spec.blanking_period_lines) {
+            ula.display_line = 0;
+            ula.display_state = E_ULA_DISPLAY_STATE_TOP_BORDER;
+          }
+        }
+        break;
+    }
   }
 }
 
@@ -94,10 +182,7 @@ static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
   const unsigned int       k    = ula.display_frequency;
   const ula_display_spec_t spec = ula_display_spec[i][j][k];
 
-  unsigned int tick;
-  for (tick = 0; tick < delta; tick++) {
-    ula_state_machine_tick(spec);
-  }
+  ula_state_machine_run(delta, spec);
 }
 
 
