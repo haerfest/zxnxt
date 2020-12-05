@@ -47,11 +47,15 @@ typedef enum {
 
 
 typedef struct {
+  SDL_Renderer*           renderer;
   mmu_bank_t              display_bank;
+  u16_t                   display_offset;
   ula_display_frequency_t display_frequency;
   ula_display_state_t     display_state;
   unsigned int            display_line;
   unsigned int            display_column;
+  u8_t                    border_colour;
+  u8_t                    speaker_state;
 } ula_t;
 
 
@@ -97,12 +101,16 @@ static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
 }
 
 
-int ula_init(void) {
+int ula_init(SDL_Renderer* renderer) {
+  ula.renderer          = renderer;
   ula.display_bank      = 5;
+  ula.display_offset    = 0;
   ula.display_frequency = E_ULA_DISPLAY_FREQUENCY_50HZ;
   ula.display_state     = E_ULA_DISPLAY_STATE_TOP_BORDER;
   ula.display_line      = 0;
   ula.display_column    = 0;
+  ula.border_colour     = 0;
+  ula.speaker_state     = 0;
 
   if (clock_register_callback(ula_ticks_callback) != 0) {
     return -1;
@@ -123,7 +131,8 @@ u8_t ula_read(u16_t address) {
 
 
 void ula_write(u16_t address, u8_t value) {
-  fprintf(stderr, "ula: unimplemented write of %02Xh to %04Xh\n", value, address);
+  ula.border_colour = value & 0x03;
+  ula.speaker_state = value & 0x04;
 }
 
 

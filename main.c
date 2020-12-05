@@ -10,7 +10,13 @@
 #include "ula.h"
 
 
-static SDL_Window* window;
+typedef struct {
+  SDL_Window*   window;
+  SDL_Renderer* renderer;
+} main_t;
+
+
+static main_t mine;
 
 
 static int main_init(void) {
@@ -19,14 +25,13 @@ static int main_init(void) {
     goto exit;
   }
 
-  window = SDL_CreateWindow("twatwa", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
-  if (window == NULL) {
-    SDL_Log("SDL_CreateWindow: %s\n", SDL_GetError());
+  if (SDL_CreateWindowAndRenderer(640, 480, 0, &mine.window, &mine.renderer) != 0) {
+    fprintf(stderr, "main: SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
 
   if (nextreg_init() != 0) {
-    goto exit_window;
+    goto exit_window_and_renderer;
   }
 
   if (divmmc_init() != 0) {
@@ -49,7 +54,7 @@ static int main_init(void) {
     goto exit_memory;
   }
 
-  if (ula_init() != 0) {
+  if (ula_init(mine.renderer) != 0) {
     goto exit_clock;
   }
 
@@ -73,8 +78,9 @@ exit_divmmc:
   divmmc_finit();
 exit_nextreg:
   nextreg_finit();
-exit_window:
-  SDL_DestroyWindow(window);
+exit_window_and_renderer:
+  SDL_DestroyRenderer(mine.renderer);
+  SDL_DestroyWindow(mine.window);
 exit_sdl:
   SDL_Quit();
 exit:
@@ -120,7 +126,8 @@ static void main_finit(void) {
   divmmc_finit();
   nextreg_finit();
 
-  SDL_DestroyWindow(window);
+  SDL_DestroyRenderer(mine.renderer);
+  SDL_DestroyWindow(mine.window);
   SDL_Quit();
 }
 
