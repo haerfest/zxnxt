@@ -1,9 +1,20 @@
 #include <stdio.h>
+#include "clock.h"
 #include "memory.h"
 #include "mmu.h"
 #include "defs.h"
+#include "ula.h"
 
 
+/* See https://gitlab.com/thesmog358/tbblue/-/blob/master/docs/extra-hw/io-port-system/registers.txt */
+#define REGISTER_MACHINE_TYPE            0x03
+#define REGISTER_PERIPHERAL_1_SETTING    0x05
+#define REGISTER_PERIPHERAL_2_SETTING    0x06
+#define REGISTER_CPU_SPEED               0x07
+#define REGISTER_PERIPHERAL_3_SETTING    0x08
+#define REGISTER_PERIPHERAL_4_SETTING    0x09
+#define REGISTER_PERIPHERAL_5_SETTING    0x10
+#define REGISTER_VIDEO_TIMING            0x11
 #define REGISTER_MMU_SLOT0_CONTROL       0x50
 #define REGISTER_MMU_SLOT1_CONTROL       0x51
 #define REGISTER_MMU_SLOT2_CONTROL       0x52
@@ -18,6 +29,7 @@
 
 typedef struct {
   u8_t selected_register;
+  int  configuration_mode;
 } nextreg_t;
 
 
@@ -25,6 +37,8 @@ static nextreg_t nextreg;
 
 
 int nextreg_init(void) {
+  nextreg.selected_register  = 0x55;
+  nextreg.configuration_mode = 0;
   return 0;
 }
 
@@ -43,8 +57,33 @@ u8_t nextreg_select_read(void) {
 }
 
 
+static void nextreg_machine_type_write(u8_t value) {
+  if (value & 0x80) {
+    ula_display_timing_set((value >> 4) & 0x03);
+  }
+
+  nextreg.configuration_mode = (value & 0x03) == 0x00;
+  if (nextreg.configuration_mode) {
+    fprintf(stderr, "nextreg: configuration mode activated\n");
+  }
+}
+
+
+static void nextreg_cpu_speed_write(u8_t value) {
+  clock_cpu_speed_set(value & 0x03);
+}
+
+
 void nextreg_data_write(u8_t value) {
   switch (nextreg.selected_register) {
+    case REGISTER_MACHINE_TYPE:
+      nextreg_machine_type_write(value);
+      break;
+
+    case REGISTER_CPU_SPEED:
+      nextreg_cpu_speed_write(value);
+      break;
+
     case REGISTER_MMU_SLOT0_CONTROL:
     case REGISTER_MMU_SLOT1_CONTROL:
     case REGISTER_MMU_SLOT2_CONTROL:
