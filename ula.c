@@ -81,6 +81,8 @@ typedef struct {
   ula_display_state_t     display_state;
   unsigned int            display_line;
   unsigned int            display_column;
+  u8_t                    display_byte;
+  u8_t                    display_pixel_mask;
   u8_t                    border_colour;
   u8_t                    speaker_state;
 } ula_t;
@@ -114,7 +116,20 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         break;
 
       case E_ULA_DISPLAY_STATE_DISPLAY:
-        /* TODO: Read pixel and colour data from RAM and display. */
+        if (ula.display_pixel_mask == 0x00) {
+          ula.display_byte = mmu_bank_read(ula.display_bank, ula.display_offset);
+          ula.display_offset++;
+          ula.display_pixel_mask = 0x80;
+        }
+
+        if (ula.display_byte & ula.display_pixel_mask) {
+          SDL_SetRenderDrawColor(ula.renderer, 0x00, 0x00, 0xFF, SDL_ALPHA_OPAQUE);
+        } else {
+          SDL_SetRenderDrawColor(ula.renderer, 0xFF, 0xFF, 0x00, SDL_ALPHA_OPAQUE);
+        }
+        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
+
+        ula.display_pixel_mask >>= 1;
         ula.display_column++;
         if (ula.display_column == 32 + 256) {
           ula.display_state = E_ULA_DISPLAY_STATE_RIGHT_BORDER;
@@ -166,8 +181,9 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
           ula.display_column = 0;
           ula.display_line++;
           if (ula.display_line == spec.total_lines + spec.blanking_period_lines) {
-            ula.display_line = 0;
-            ula.display_state = E_ULA_DISPLAY_STATE_TOP_BORDER;
+            ula.display_line   = 0;
+            ula.display_offset = 0;
+            ula.display_state  = E_ULA_DISPLAY_STATE_TOP_BORDER;
           }
         }
         break;
@@ -187,15 +203,16 @@ static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
 
 
 int ula_init(SDL_Renderer* renderer, SDL_Texture* texture) {
-  ula.renderer          = renderer;
-  ula.display_bank      = 5;
-  ula.display_offset    = 0;
-  ula.display_frequency = E_ULA_DISPLAY_FREQUENCY_50HZ;
-  ula.display_state     = E_ULA_DISPLAY_STATE_TOP_BORDER;
-  ula.display_line      = 0;
-  ula.display_column    = 0;
-  ula.border_colour     = 0;
-  ula.speaker_state     = 0;
+  ula.renderer           = renderer;
+  ula.display_bank       = 5;
+  ula.display_offset     = 0;
+  ula.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
+  ula.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
+  ula.display_line       = 0;
+  ula.display_column     = 0;
+  ula.display_pixel_mask = 0;
+  ula.border_colour      = 0;
+  ula.speaker_state      = 0;
 
   if (clock_register_callback(ula_ticks_callback) != 0) {
     return -1;
