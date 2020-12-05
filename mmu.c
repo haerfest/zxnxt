@@ -9,7 +9,7 @@
 #define ROM_START   0x00000
 #define RAM_START   0x40000
 #define PAGE_SIZE   (8 * 1024)
-#define N_SLOTS     8
+#define N_SLOTS     (E_MMU_PAGE_SLOT_7 - E_MMU_PAGE_SLOT_0 + 1)
 #define N_PAGES     ((MEMORY_SIZE - RAM_START) / PAGE_SIZE)
 #define ROM_PAGE    0xFF
 #define ROM_SIZE    (16 * 1024)
@@ -28,10 +28,10 @@ const u8_t default_pages[N_SLOTS] = {
 
 
 typedef struct  {
-  u8_t* memory;
-  u8_t  page[N_SLOTS];
-  u8_t* pointer[N_SLOTS];
-  u8_t  selected_rom;
+  u8_t*      memory;
+  mmu_page_t page[N_SLOTS];
+  u8_t*      pointer[N_SLOTS];
+  mmu_rom_t selected_rom;
 } mmu_t;
 
 
@@ -114,12 +114,12 @@ void mmu_finit(void) {
 }
 
 
-u8_t mmu_page_get(u8_t slot) {
+u8_t mmu_page_get(mmu_page_slot_t slot) {
   return mmu.page[slot];
 }
 
 
-void mmu_page_set(u8_t slot, u8_t page) {
+void mmu_page_set(mmu_page_slot_t slot, mmu_page_t page) {
   if (page < N_PAGES) {
     mmu.pointer[slot] = &mmu.memory[RAM_START + page * PAGE_SIZE];
     mmu.page[slot]    = page;
@@ -129,6 +129,15 @@ void mmu_page_set(u8_t slot, u8_t page) {
   }
 
   fprintf(stderr, "mmu: slot %u contains page %u\n", slot, page);
+}
+
+
+void mmu_bank_set(mmu_bank_slot_t slot, mmu_bank_t bank) {
+  const mmu_page_slot_t page_slot = (slot - 1) * 2;
+  const mmu_page_t      page      = bank * 2;
+
+  mmu_page_set(page_slot, page);
+  mmu_page_set(page_slot, page + 1);
 }
 
 
@@ -149,12 +158,13 @@ void mmu_write(u16_t address, u8_t value) {
 }
 
 
-void mmu_select_rom(u8_t rom) {
-  mmu.selected_rom = rom & 0x03;
+void mmu_rom_set(mmu_rom_t rom) {
+  mmu_page_slot_t slot;
 
+  mmu.selected_rom = rom;
   fprintf(stderr, "mmu: ROM %u selected\n", mmu.selected_rom);
 
-  for (int slot = 0; slot < 2; slot++) {
+  for (slot = E_MMU_PAGE_SLOT_0; slot <= E_MMU_PAGE_SLOT_1; slot++) {
     if (mmu.page[slot] == ROM_PAGE) {
       mmu.pointer[slot] = &mmu.memory[ROM_START + mmu.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
     }

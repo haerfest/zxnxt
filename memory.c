@@ -32,19 +32,11 @@ void memory_mapping_mode_write(u8_t value) {
 }
 
 
-static void memory_bank_set(u8_t slot, u8_t bank) {
-  const u8_t page = bank * 2;
-
-  mmu_page_set((slot - 1) * 2,     page);
-  mmu_page_set((slot - 1) * 2 + 1, page + 1);
-}
-
-
 static void memory_all_ram(u8_t slot_1_bank_16k, u8_t slot_2_bank_16k, u8_t slot_3_bank_16k, u8_t slot_4_bank_16k) {
-  memory_bank_set(1, slot_1_bank_16k);
-  memory_bank_set(2, slot_2_bank_16k);
-  memory_bank_set(3, slot_3_bank_16k);
-  memory_bank_set(4, slot_4_bank_16k);
+  mmu_bank_set(1, slot_1_bank_16k);
+  mmu_bank_set(2, slot_2_bank_16k);
+  mmu_bank_set(3, slot_3_bank_16k);
+  mmu_bank_set(4, slot_4_bank_16k);
 }
 
 
@@ -67,35 +59,21 @@ static void memory_all_ram(u8_t slot_1_bank_16k, u8_t slot_2_bank_16k, u8_t slot
  * Writes immediately change the current mmu mapping as if by port write
  */
 void memory_spectrum_memory_mapping_write(u8_t value) {
-  const u8_t paging_mode = value & 0x04;
-  const u8_t bank        = value >> 4;
-  const int  change_bank = value & 0x08;
+  const int change_bank = value & 0x08;
+  const int paging_mode = value & 0x04;
   
   if (change_bank) {
-    memory_bank_set(4, bank);
+    mmu_bank_set(4, value >> 4);
   }
 
   if (paging_mode == 0) {
-    const u8_t rom = value & 0x03;
-    mmu_select_rom(rom);
+    mmu_rom_set(value & 0x03);
   } else {
-    const u8_t configuration = value & 0x03;
-    switch (configuration) {
-      case 0:
-        memory_all_ram(0, 1, 2, 3);
-        break;
-
-      case 1:
-        memory_all_ram(4, 5, 6, 7);
-        break;
-
-      case 2:
-        memory_all_ram(4, 5, 6, 3);
-        break;
-
-      default:
-        memory_all_ram(4, 7, 6, 3);
-        break;
+    switch (value & 0x03) {
+      case 0: memory_all_ram(0, 1, 2, 3); break;
+      case 1: memory_all_ram(4, 5, 6, 7); break;
+      case 2: memory_all_ram(4, 5, 6, 3); break;
+      case 3: memory_all_ram(4, 7, 6, 3); break;
     }
   }
 }
