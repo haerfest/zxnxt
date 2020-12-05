@@ -101,7 +101,7 @@ static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
 }
 
 
-int ula_init(SDL_Renderer* renderer) {
+int ula_init(SDL_Renderer* renderer, SDL_Texture* texture) {
   ula.renderer          = renderer;
   ula.display_bank      = 5;
   ula.display_offset    = 0;

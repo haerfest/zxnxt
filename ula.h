@@ -13,7 +13,7 @@ typedef enum {
 } ula_display_frequency_t;
 
 
-int  ula_init(SDL_Renderer* renderer);
+int  ula_init(SDL_Renderer* renderer, SDL_Texture* texture);
 void ula_finit(void);
 u8_t ula_read(u16_t address);
 void ula_write(u16_t address, u8_t value);

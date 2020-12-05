@@ -13,6 +13,7 @@
 typedef struct {
   SDL_Window*   window;
   SDL_Renderer* renderer;
+  SDL_Texture*  texture;
 } main_t;
 
 
@@ -30,8 +31,14 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  if (nextreg_init() != 0) {
+  mine.texture = SDL_CreateTexture(mine.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, 640, 480);
+  if (mine.texture == NULL) {
+    fprintf(stderr, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
+  }
+
+  if (nextreg_init() != 0) {
+    goto exit_texture;
   }
 
   if (divmmc_init() != 0) {
@@ -54,7 +61,7 @@ static int main_init(void) {
     goto exit_memory;
   }
 
-  if (ula_init(mine.renderer) != 0) {
+  if (ula_init(mine.renderer, mine.texture) != 0) {
     goto exit_clock;
   }
 
@@ -78,6 +85,8 @@ exit_divmmc:
   divmmc_finit();
 exit_nextreg:
   nextreg_finit();
+exit_texture:
+  SDL_DestroyTexture(mine.texture);
 exit_window_and_renderer:
   SDL_DestroyRenderer(mine.renderer);
   SDL_DestroyWindow(mine.window);
@@ -126,6 +135,7 @@ static void main_finit(void) {
   divmmc_finit();
   nextreg_finit();
 
+  SDL_DestroyTexture(mine.texture);
   SDL_DestroyRenderer(mine.renderer);
   SDL_DestroyWindow(mine.window);
   SDL_Quit();
