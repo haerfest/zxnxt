@@ -80,7 +80,9 @@ static void nextreg_cpu_speed_write(u8_t value) {
 
 
 static void nextreg_video_timing_write(u8_t value) {
-  ula_video_timing_set(value & 0x03);
+  if (nextreg.configuration_mode) {
+    ula_video_timing_set(value & 0x03);
+  }
 }
 
 

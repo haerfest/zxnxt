@@ -78,7 +78,7 @@ int mmu_init(void) {
 
   mmu.memory = malloc(MEMORY_SIZE);
   if (mmu.memory == NULL) {
-    fprintf(stderr, "Out of memory\n");
+    fprintf(stderr, "mmu: out of memory\n");
     return -1;
   }
 
