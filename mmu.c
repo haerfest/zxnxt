@@ -170,3 +170,9 @@ void mmu_rom_set(mmu_rom_t rom) {
     }
   }
 }
+
+
+u8_t mmu_bank_read(mmu_bank_t bank, u16_t offset) {
+  const mmu_page_t page = bank * 2;
+  return mmu.memory[RAM_START + page * PAGE_SIZE + offset];
+}

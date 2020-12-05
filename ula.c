@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include "defs.h"
+#include "mmu.h"
 
 
 typedef struct {
-  u8_t foo;
+  mmu_bank_t display_bank;
 } ula_t;
 
 
@@ -11,6 +12,7 @@ static ula_t ula;
 
 
 int ula_init(void) {
+  ula.display_bank = 5;
   return 0;
 }
 

@@ -45,6 +45,7 @@ void mmu_page_set(mmu_page_slot_t slot, mmu_page_t page);
 void mmu_bank_set(mmu_bank_slot_t slot, mmu_bank_t bank);
 u8_t mmu_read(u16_t address);
 void mmu_write(u16_t address, u8_t value);
+u8_t mmu_bank_read(mmu_bank_t bank, u16_t offset);
 void mmu_rom_set(mmu_rom_t rom);
 
 
