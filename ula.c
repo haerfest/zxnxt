@@ -76,6 +76,7 @@ typedef enum {
 
 typedef struct {
   SDL_Renderer*           renderer;
+  u16_t                   line_offsets[192];
   mmu_bank_t              display_bank;
   u16_t                   display_offset;
   ula_display_frequency_t display_frequency;
@@ -112,7 +113,8 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
         ula.display_column++;
         if (ula.display_column == 32) {
-          ula.display_state = E_ULA_DISPLAY_STATE_DISPLAY;
+          ula.display_offset = ula.line_offsets[ula.display_line];
+          ula.display_state  = E_ULA_DISPLAY_STATE_DISPLAY;
         }
         break;
 
@@ -203,6 +205,15 @@ static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
 }
 
 
+static void ula_fill_tables(void) {
+  int line;
+
+  for (line = 0; line < 192; line++) {
+    ula.line_offsets[line] = 2048 * line / 64 + (line % 8) * 8 + line / 8;
+  }
+}
+
+
 int ula_init(SDL_Renderer* renderer, SDL_Texture* texture) {
   ula.renderer           = renderer;
   ula.display_bank       = 5;
@@ -214,6 +225,8 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture) {
   ula.display_pixel_mask = 0;
   ula.border_colour      = 0;
   ula.speaker_state      = 0;
+
+  ula_fill_tables();
 
   if (clock_register_callback(ula_ticks_callback) != 0) {
     return -1;
