@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include "defs.h"
+#include "memory.h"
 #include "mmu.h"
 #include "ula.h"
 

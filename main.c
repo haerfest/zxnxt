@@ -10,6 +10,10 @@
 #include "ula.h"
 
 
+#define WINDOW_WIDTH  (32 + 256 + 64)
+#define WINDOW_HEIGHT 312
+
+
 typedef struct {
   SDL_Window*   window;
   SDL_Renderer* renderer;
@@ -26,12 +30,12 @@ static int main_init(void) {
     goto exit;
   }
 
-  if (SDL_CreateWindowAndRenderer(640, 480, 0, &mine.window, &mine.renderer) != 0) {
+  if (SDL_CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0, &mine.window, &mine.renderer) != 0) {
     fprintf(stderr, "main: SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
 
-  mine.texture = SDL_CreateTexture(mine.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, 640, 480);
+  mine.texture = SDL_CreateTexture(mine.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, WINDOW_WIDTH, WINDOW_HEIGHT);
   if (mine.texture == NULL) {
     fprintf(stderr, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;

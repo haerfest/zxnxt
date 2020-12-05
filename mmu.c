@@ -82,6 +82,8 @@ int mmu_init(void) {
     return -1;
   }
 
+  memset(mmu.memory, 0x55, MEMORY_SIZE);
+
   /* See https://wiki.specnext.dev/Memory_map */
   if (load_rom("enNextZX.rom", 64 * 1024, &mmu.memory[ROM_START]) != 0) {
     goto exit;
