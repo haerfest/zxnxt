@@ -124,9 +124,9 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         }
 
         if (ula.display_byte & ula.display_pixel_mask) {
-          SDL_SetRenderDrawColor(ula.renderer, 0x00, 0x00, 0xFF, SDL_ALPHA_OPAQUE);
+          SDL_SetRenderDrawColor(ula.renderer, 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE);
         } else {
-          SDL_SetRenderDrawColor(ula.renderer, 0xFF, 0xFF, 0x00, SDL_ALPHA_OPAQUE);
+          SDL_SetRenderDrawColor(ula.renderer, 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE);
         }
         SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
 
