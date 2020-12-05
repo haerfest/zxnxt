@@ -32,19 +32,19 @@ void memory_mapping_mode_write(u8_t value) {
 }
 
 
-static void memory_select_bank_16k(u8_t slot, u8_t bank_16k) {
-  const u8_t bank_8k = bank_16k * 2;
+static void memory_bank_set(u8_t slot, u8_t bank) {
+  const u8_t page = bank * 2;
 
-  mmu_page_write(slot * 2,     bank_8k);
-  mmu_page_write(slot * 2 + 1, bank_8k + 1);
+  mmu_page_set((slot - 1) * 2,     page);
+  mmu_page_set((slot - 1) * 2 + 1, page + 1);
 }
 
 
-static void memory_all_ram(u8_t slot_0_bank_16k, u8_t slot_1_bank_16k, u8_t slot_2_bank_16k, u8_t slot_3_bank_16k) {
-  memory_select_bank_16k(0, slot_0_bank_16k);
-  memory_select_bank_16k(1, slot_1_bank_16k);
-  memory_select_bank_16k(2, slot_2_bank_16k);
-  memory_select_bank_16k(3, slot_3_bank_16k);
+static void memory_all_ram(u8_t slot_1_bank_16k, u8_t slot_2_bank_16k, u8_t slot_3_bank_16k, u8_t slot_4_bank_16k) {
+  memory_bank_set(1, slot_1_bank_16k);
+  memory_bank_set(2, slot_2_bank_16k);
+  memory_bank_set(3, slot_3_bank_16k);
+  memory_bank_set(4, slot_4_bank_16k);
 }
 
 
@@ -72,7 +72,7 @@ void memory_spectrum_memory_mapping_write(u8_t value) {
   const int  change_bank = value & 0x08;
   
   if (change_bank) {
-    memory_select_bank_16k(3, bank);
+    memory_bank_set(4, bank);
   }
 
   if (paging_mode == 0) {

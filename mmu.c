@@ -96,7 +96,7 @@ int mmu_init(void) {
    */
 
   for (u8_t slot = 0; slot < N_SLOTS; slot++) {
-    mmu_page_write(slot, default_pages[slot]);
+    mmu_page_set(slot, default_pages[slot]);
   }
 
   return 0;
@@ -114,12 +114,12 @@ void mmu_finit(void) {
 }
 
 
-u8_t mmu_page_read(u8_t slot) {
+u8_t mmu_page_get(u8_t slot) {
   return mmu.page[slot];
 }
 
 
-void mmu_page_write(u8_t slot, u8_t page) {
+void mmu_page_set(u8_t slot, u8_t page) {
   if (page < N_PAGES) {
     mmu.pointer[slot] = &mmu.memory[RAM_START + page * PAGE_SIZE];
     mmu.page[slot]    = page;

@@ -2,6 +2,14 @@
 #include "defs.h"
 
 
+typedef struct {
+  u8_t foo;
+} ula_t;
+
+
+static ula_t ula;
+
+
 int ula_init(void) {
   return 0;
 }

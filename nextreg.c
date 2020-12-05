@@ -53,7 +53,7 @@ void nextreg_data_write(u8_t value) {
     case REGISTER_MMU_SLOT5_CONTROL:
     case REGISTER_MMU_SLOT6_CONTROL:
     case REGISTER_MMU_SLOT7_CONTROL:
-      mmu_page_write(nextreg.selected_register - REGISTER_MMU_SLOT0_CONTROL, value);
+      mmu_page_set(nextreg.selected_register - REGISTER_MMU_SLOT0_CONTROL, value);
       break;
 
     case REGISTER_SPECTRUM_MEMORY_MAPPING:
@@ -81,7 +81,7 @@ u8_t nextreg_data_read(void) {
     case REGISTER_MMU_SLOT5_CONTROL:
     case REGISTER_MMU_SLOT6_CONTROL:
     case REGISTER_MMU_SLOT7_CONTROL:
-      return mmu_page_read(nextreg.selected_register - REGISTER_MMU_SLOT0_CONTROL);
+      return mmu_page_get(nextreg.selected_register - REGISTER_MMU_SLOT0_CONTROL);
 
     default:
       fprintf(stderr, "nextreg: unimplemented read from Next register %02Xh\n", nextreg.selected_register);
