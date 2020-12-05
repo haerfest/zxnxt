@@ -69,8 +69,18 @@ static void nextreg_machine_type_write(u8_t value) {
 }
 
 
+static void nextreg_peripheral_1_setting_write(u8_t value) {
+  ula_refresh_frequency_set(value & 0x04);
+}
+
+
 static void nextreg_cpu_speed_write(u8_t value) {
   clock_cpu_speed_set(value & 0x03);
+}
+
+
+static void nextreg_video_timing_write(u8_t value) {
+  ula_video_timing_set(value & 0x03);
 }
 
 
@@ -80,8 +90,16 @@ void nextreg_data_write(u8_t value) {
       nextreg_machine_type_write(value);
       break;
 
+    case REGISTER_PERIPHERAL_1_SETTING:
+      nextreg_peripheral_1_setting_write(value);
+      break;
+
     case REGISTER_CPU_SPEED:
       nextreg_cpu_speed_write(value);
+      break;
+
+    case REGISTER_VIDEO_TIMING:
+      nextreg_video_timing_write(value);
       break;
 
     case REGISTER_MMU_SLOT0_CONTROL:
