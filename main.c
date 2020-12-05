@@ -46,24 +46,24 @@ static int main_init(void) {
     goto exit_mmu;
   }
 
-  if (ula_init() != 0) {
+  if (clock_init() != 0) {
     goto exit_memory;
   }
 
-  if (clock_init() != 0) {
-    goto exit_ula;
+  if (ula_init() != 0) {
+    goto exit_clock;
   }
 
   if (cpu_init() != 0) {
-    goto exit_clock;
+    goto exit_ula;
   }
 
   return 0;
 
-exit_clock:
-  clock_finit();
 exit_ula:
   ula_finit();
+exit_clock:
+  clock_finit();
 exit_memory:
   memory_finit();
 exit_mmu:
@@ -113,8 +113,8 @@ static void main_eventloop(void) {
 
 static void main_finit(void) {
   cpu_finit();
-  clock_finit();
   ula_finit();
+  clock_finit();
   memory_finit();
   mmu_finit();
   io_finit();

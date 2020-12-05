@@ -2,6 +2,9 @@
 #define __CLOCK_H
 
 
+#include "defs.h"
+
+
 /*
 typedef enum {
   E_CLOCK_DIVIDER_28MHZ = 1,
@@ -56,7 +59,7 @@ typedef enum {
 
 
 /* Called from the clock whenever 'ticks' 28 MHz master clock ticks have elapsed. */
-typedef void (*clock_callback_t)(unsigned int ticks);
+typedef void (*clock_callback_t)(u64_t ticks, unsigned int delta);
 
 
 int                    clock_init(void);

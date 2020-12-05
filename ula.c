@@ -13,9 +13,18 @@ typedef struct {
 static ula_t ula;
 
 
+static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
+  
+}
+
+
 int ula_init(void) {
   ula.display_bank      = 5;
   ula.refresh_frequency = E_ULA_REFRESH_FREQUENCY_50HZ;
+
+  if (clock_register_callback(ula_ticks_callback) != 0) {
+    return -1;
+  }
 
   return 0;
 }

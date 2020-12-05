@@ -51,8 +51,8 @@ typedef struct {
   clock_display_timing_t display_timing;
   clock_cpu_speed_t      cpu_speed;
   u64_t                  ticks;  /* At max dot clock overflows in 20k years. */
-  clock_callback_t*      callbacks;
   unsigned int           n_callbacks;
+  clock_callback_t*      callbacks;
 } clock_t;
 
 
@@ -64,8 +64,8 @@ int clock_init(void) {
   clock.display_timing = E_CLOCK_DISPLAY_TIMING_ZX_PLUS_2A;
   clock.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
   clock.ticks          = 0;
-  clock.callbacks      = NULL;
   clock.n_callbacks    = 0;
+  clock.callbacks      = NULL;
 
   return 0;
 }
@@ -144,16 +144,32 @@ int clock_register_callback(clock_callback_t callback) {
 }
 
 
+static void clock_invoke_callbacks(u64_t ticks, unsigned int delta) {
+  unsigned int i;
+  
+  for (i = 0; i < clock.n_callbacks; i++) {
+    (*clock.callbacks[i])(ticks, delta);
+  }
+}
+
+
 /* Called by the CPU, telling us how many of its ticks have passed. */
-void clock_ticks(unsigned cpu_ticks) {
+void clock_ticks(unsigned int cpu_ticks) {
   const unsigned int clock_frequency = clock_frequency_28mhz[clock.video_timing];
   const unsigned     ticks_28mhz     = cpu_ticks * clock_divider[clock.cpu_speed];
-  unsigned int       i;
 
   clock.ticks += ticks_28mhz;
+  clock_invoke_callbacks(clock.ticks, ticks_28mhz);
 
-  /* Forward time to all our callbacks. */
-  for (i = 0; i < clock.n_callbacks; i++) {
-    (*clock.callbacks[i])(ticks_28mhz);
-  }
+  /**
+   * Fastest ~28 MHz clock runs at 33 MHz.
+   * That is 33,000,000 ticks per second.
+   * If we want to adjust emulated speed 10 times per second,
+   * we have to adjust every 3,300,000 ticks.
+   * If we run at ~3 MHz that is every 412,500 ticks.
+   * We need to measure how much real time has elapsed.
+   * Ideal that should be 100 milliseconds.
+   * If it's more, we are running too slow.
+   * If it's less, we are running too fast.
+   */
 }
