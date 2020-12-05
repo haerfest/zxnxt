@@ -1,5 +1,4 @@
 #include <SDL2/SDL.h>
-
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"

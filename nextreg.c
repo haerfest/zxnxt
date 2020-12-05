@@ -70,7 +70,7 @@ static void nextreg_machine_type_write(u8_t value) {
 
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
-  ula_refresh_frequency_set(value & 0x04);
+  ula_display_frequency_set(value & 0x04);
 }
 
 

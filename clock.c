@@ -4,28 +4,6 @@
 #include "clock.h"
 
 
-#if 0
-typedef struct {
-  unsigned        lines;
-  unsigned        deci_tstates_per_line;
-  clock_divider_t divider;
-  unsigned        display_hz;
-  unsigned        dot_clock_hz;  /* Product of all of the above. */
-} timing_spec_t;
-
-
-static const timing_spec_t timing_spec[E_CLOCK_TIMING_HDMI_60HZ - E_CLOCK_TIMING_VGA_50HZ_48K + 1] = {
-  { 312, 2240, E_CLOCK_DIVIDER_3MHZ, 50, 27955200 },  /* E_CLOCK_TIMING_VGA_50HZ_48K */
-  { 311, 2280, E_CLOCK_DIVIDER_3MHZ, 50, 28363200 },  /* E_CLOCK_TIMING_VGA_50HZ_128 */
-  { 320, 2240, E_CLOCK_DIVIDER_3MHZ, 50, 28672000 },  /* E_CLOCK_TIMING_VGA_50HZ_PENTAGON */
-  { 262, 2240, E_CLOCK_DIVIDER_3MHZ, 60, 28170240 },  /* E_CLOCK_TIMING_VGA_60HZ_48K */
-  { 261, 2280, E_CLOCK_DIVIDER_3MHZ, 60, 28563840 },  /* E_CLOCK_TIMING_VGA_60HZ_128 */
-  { 312, 2160, E_CLOCK_DIVIDER_3MHZ, 50, 26956800 },  /* E_CLOCK_TIMING_HDMI_50HZ */
-  { 262, 2145, E_CLOCK_DIVIDER_3MHZ, 60, 26975520 }   /* E_CLOCK_TIMING_HDMI_60HZ */
-};
-#endif
-
-
 static const unsigned int clock_frequency_28mhz[E_CLOCK_VIDEO_TIMING_HDMI - E_CLOCK_VIDEO_TIMING_VGA_BASE + 1] = {
   28000000,  /* E_CLOCK_VIDEO_TIMING_VGA_BASE      */
   28571429,  /* E_CLOCK_VIDEO_TIMING_VGA_SETTING_1 */
