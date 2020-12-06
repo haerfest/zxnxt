@@ -2,7 +2,8 @@
 
 
 import io
-from typing import *
+import re
+from   typing import *
 
 
 Opcode      = int
@@ -504,7 +505,7 @@ instructions: Table = {
                io_write(0x253B, A);
                T(4);
                '''),
-        0x94: ('pixelad', None), # using D,E (as Y,X) calculate the ULA screen address and store in HL
+        0x94: ('PIXELAD', None), # using D,E (as Y,X) calculate the ULA screen address and store in HL
         0xA2: ('INI', lambda: inx('+')),
         0xB0: ('LDIR', lambda: ldxr('+')),
         0xB8: ('LDDR', lambda: ldxr('-')),
@@ -521,11 +522,48 @@ instructions: Table = {
 }
 
 
+def make_disassembler(mnemonic: str) -> str:
+    tokens = {
+        'n'    : (2, 'memory_read(PC)'),
+        'nn'   : (4, 'memory_read(PC + 1) << 8 | memory_read(PC)'),
+        'e'    : (4, 'PC + (s8_t) memory_read(PC)'),
+        'd'    : (2, 'memory_read(PC)'),
+        'reg'  : (2, 'memory_read(PC)'),
+        'value': (2, 'memory_read(PC + 1)'),
+    }
+
+    statement = 'fprintf(stderr, "'
+    args      = []
+
+    for part in re.split('([a-z]+)', mnemonic):
+        if part in tokens:
+            width, argument = tokens[part]
+            statement += f'$%0{width}X'
+            args.append(argument)
+        else:
+            statement += part
+
+    statement += '\\n"'
+    if args:
+        statement += ', '
+        statement += ', '.join(args)
+    statement += ');'
+
+    return statement
+    
+    
 def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode]] = None) -> None:
     prefix         = prefix or []
     prefix_len     = len(prefix)
-    prefix_str     = ''.join(f'{opcode:02X}h ' for opcode in prefix)
+    prefix_str     = ''.join(f'${opcode:02X} ' for opcode in prefix)
     prefix_comment = f'/* {prefix_str}*/ ' if prefix else ''
+
+    if not prefix:
+        f.write('''
+fprintf(stderr, "     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
+fprintf(stderr, "     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
+fprintf(stderr, "%04X ", PC);
+''')
 
     if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
         # Special opcode where 3rd byte is parameter and 4th byte needed for
@@ -544,14 +582,13 @@ switch (opcode) {{
         item = instructions[opcode]
         if isinstance(item, tuple):
             mnemonic, spec = item
+            disassembler   = make_disassembler(mnemonic)
             c = spec() if callable(spec) else spec
             if c is not None:
                 f.write(f'''
 case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
-# if 1
-  fprintf(stderr, "%04Xh {mnemonic:20s} A=%02Xh BC=%04Xh DE=%04Xh HL=%04Xh IX=%04Xh IY=%04Xh F=%s%s-%s-%s%s%s\\n", PC - 1 - {len(prefix)}, A, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
-#endif
   {{
+    {disassembler}
     {c}
   }}
   break;
