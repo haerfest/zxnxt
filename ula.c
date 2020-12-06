@@ -113,7 +113,7 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
         ula.display_column++;
         if (ula.display_column == 32) {
-          ula.display_offset = ula.line_offsets[ula.display_line];
+          ula.display_offset = ula.line_offsets[ula.display_line - spec.top_border_lines];
           ula.display_state  = E_ULA_DISPLAY_STATE_DISPLAY;
         }
         break;
@@ -209,7 +209,11 @@ static void ula_fill_tables(void) {
   int line;
 
   for (line = 0; line < 192; line++) {
-    ula.line_offsets[line] = 2048 * line / 64 + (line % 8) * 8 + line / 8;
+    const u16_t third = 2048 * (line / 64);
+    const u8_t  row    = line / 8;
+    const u8_t  offset = (line % 8) * 8;
+
+    ula.line_offsets[line] = third + (row + offset) * 32;
   }
 }
 
