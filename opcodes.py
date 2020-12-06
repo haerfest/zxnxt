@@ -168,10 +168,19 @@ def ld_dd_nn(dd: str) -> C:
         {hi} = memory_read(PC++); T(3);
     '''
 
-def ld_hl_r(r: str) -> C:
+def ld_dd_pnn(dd: str) -> C:
+    hi, lo = dd
+    return f'''
+      Z = memory_read(PC++);      T(3);
+      W = memory_read(PC++);      T(3);
+      {lo} = memory_read(WZ);     T(3);
+      {hi} = memory_read(WZ + 1); T(3);
+    '''
+
+def ld_phl_r(r: str) -> C:
     return f'memory_write(HL, {r}); T(3);'
 
-def ld_nn_dd(dd: str) -> C:
+def ld_pnn_dd(dd: str) -> C:
     hi, lo = dd
     return f'''
         Z = memory_read(PC++);      T(3);
@@ -180,7 +189,7 @@ def ld_nn_dd(dd: str) -> C:
         memory_write(WZ + 1, {hi}); T(3);
     '''
 
-def ld_r_hl(r: str) -> C:
+def ld_r_phl(r: str) -> C:
     return f'{r} = memory_read(HL); T(3);'
 
 def ld_r_n(r: str) -> C:
@@ -285,6 +294,7 @@ def sub_r(r: str) -> C:
     '''
 
 
+# See https://wiki.specnext.dev/Extended_Z80_instruction_set.
 instructions: Table = {
     0x00: ('NOP',       ''),
     0x01: ('LD BC,nn',  lambda: ld_dd_nn('BC')),
@@ -361,19 +371,19 @@ instructions: Table = {
     0x3C: ('INC A',     lambda: inc_r('A')),
     0x3D: ('DEC A',     lambda: dec_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
-    0x46: ('LD B,(HL)', lambda: ld_r_hl('B')),
+    0x46: ('LD B,(HL)', lambda: ld_r_phl('B')),
     0x47: ('LD B,A',    lambda: ld_r_r('B', 'A')),
     0x4B: ('LD C,E',    lambda: ld_r_r('C', 'B')),
-    0x4E: ('LD C,(HL)', lambda: ld_r_hl('C')),
+    0x4E: ('LD C,(HL)', lambda: ld_r_phl('C')),
     0x52: ('LD D,D',    lambda: ld_r_r('D', 'D')),
     0x67: ('LD H,A',    lambda: ld_r_r('H', 'A')),
     0x6F: ('LD L,A',    lambda: ld_r_r('L', 'A')),
-    0x75: ('LD (HL),L', lambda: ld_hl_r('L')),
-    0x77: ('LD (HL),A', lambda: ld_hl_r('A')),
+    0x75: ('LD (HL),L', lambda: ld_phl_r('L')),
+    0x77: ('LD (HL),A', lambda: ld_phl_r('A')),
     0x79: ('LD A,C',    lambda: ld_r_r('A', 'C')),
     0x7A: ('LD A,D',    lambda: ld_r_r('A', 'D')),
     0x7C: ('LD A,H',    lambda: ld_r_r('A', 'H')),
-    0x7E: ('LD A,(HL)', lambda: ld_r_hl('A')),
+    0x7E: ('LD A,(HL)', lambda: ld_r_phl('A')),
     0x80: ('ADD A,B',   lambda: add_a_r('B')),
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
     0x93: ('SUB E',     lambda: sub_r('E')),
@@ -473,8 +483,8 @@ instructions: Table = {
         0x3F: ('SRL A', lambda: srl_r('A')),
     },
     0xED: {
-        0x43: ('LD (nn),BC', lambda: ld_nn_dd('BC')),
-        0x4B: ('LD BC,(nn)', lambda: ld_dd_nn('BC')),
+        0x43: ('LD (nn),BC', lambda: ld_pnn_dd('BC')),
+        0x4B: ('LD BC,(nn)', lambda: ld_dd_pnn('BC')),
         0x51: ('OUT (C),D',  lambda: out_c_r('D')),
         0x52: ('SBC HL,DE',  lambda: sbc_hl_ss('DE')),
         0x61: ('OUT (C),H',  lambda: out_c_r('H')),
@@ -526,7 +536,7 @@ def make_disassembler(mnemonic: str) -> str:
     tokens = {
         'n'    : (2, 'memory_read(PC)'),
         'nn'   : (4, 'memory_read(PC + 1) << 8 | memory_read(PC)'),
-        'e'    : (4, 'PC + (s8_t) memory_read(PC)'),
+        'e'    : (4, 'PC + 1 + (s8_t) memory_read(PC)'),
         'd'    : (2, 'memory_read(PC)'),
         'reg'  : (2, 'memory_read(PC)'),
         'value': (2, 'memory_read(PC + 1)'),
