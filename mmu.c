@@ -138,8 +138,8 @@ void mmu_bank_set(mmu_bank_slot_t slot, mmu_bank_t bank) {
   const mmu_page_slot_t page_slot = (slot - 1) * 2;
   const mmu_page_t      page      = bank * 2;
 
-  mmu_page_set(page_slot, page);
-  mmu_page_set(page_slot, page + 1);
+  mmu_page_set(page_slot,     page);
+  mmu_page_set(page_slot + 1, page + 1);
 }
 
 
