@@ -30,7 +30,7 @@ u8_t io_read(u16_t address) {
     return nextreg_data_read();
   } 
 
-  fprintf(stderr, "io: read %04Xh\n", address);
+  fprintf(stderr, "io: unimplemented read from $%04X\n", address);
 
   return 0xFF;
 }
@@ -56,5 +56,5 @@ void io_write(u16_t address, u8_t value) {
     return;
   }
 
-  fprintf(stderr, "io: write %02Xh to %04Xh\n", value, address);
+  fprintf(stderr, "io: unimplemented write of $%02X to $%04X\n", value, address);
 }
