@@ -2,6 +2,12 @@
 #include "defs.h"
 
 
+/**
+ * DivMMC seems to be a backwards-compatible evolution of DivIDE.
+ * See: https://velesoft.speccy.cz/zx/divide/divide-memory.htm
+ */
+
+
 int divmmc_init(void) {
   return 0;
 }
