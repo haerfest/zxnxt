@@ -8,6 +8,7 @@
 #include "mmu.h"
 #include "nextreg.h"
 #include "ula.h"
+#include "utils.h"
 
 
 #define WINDOW_WIDTH  (32 + 256 + 64)
@@ -41,8 +42,12 @@ static int main_init(void) {
     goto exit_window_and_renderer;
   }
 
-  if (nextreg_init() != 0) {
+  if (utils_init() != 0) {
     goto exit_texture;
+  }
+
+  if (nextreg_init() != 0) {
+    goto exit_utils;
   }
 
   if (divmmc_init() != 0) {
@@ -89,6 +94,8 @@ exit_divmmc:
   divmmc_finit();
 exit_nextreg:
   nextreg_finit();
+exit_utils:
+  utils_finit();
 exit_texture:
   SDL_DestroyTexture(mine.texture);
 exit_window_and_renderer:
@@ -138,6 +145,7 @@ static void main_finit(void) {
   io_finit();
   divmmc_finit();
   nextreg_finit();
+  utils_finit();
 
   SDL_DestroyTexture(mine.texture);
   SDL_DestroyRenderer(mine.renderer);

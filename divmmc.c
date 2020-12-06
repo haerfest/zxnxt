@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "defs.h"
+#include "utils.h"
 
 
 /**
@@ -8,12 +9,37 @@
  */
 
 
+#define ROM_SIZE (8 * 1024)
+
+
+typedef struct {
+  u8_t* rom;
+} divmmc_t;
+
+
+static divmmc_t divmmc;
+
+
 int divmmc_init(void) {
+  divmmc.rom = malloc(ROM_SIZE);
+  if (divmmc.rom == NULL) {
+    fprintf(stderr, "divmmc: out of memory\n");
+    return -1;
+  }
+
+  if (utils_load_rom("enNxtmmc.rom", ROM_SIZE, divmmc.rom) != 0) {
+    return -1;
+  }
+
   return 0;
 }
 
 
 void divmmc_finit(void) {
+  if (divmmc.rom != NULL) {
+    free(divmmc.rom);
+    divmmc.rom = NULL;
+  }
 }
 
 

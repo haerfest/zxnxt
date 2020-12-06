@@ -1,8 +1,8 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "defs.h"
 #include "mmu.h"
+#include "utils.h"
 
 
 #define MEMORY_SIZE (2 * 1024 * 1024)
@@ -38,41 +38,6 @@ typedef struct  {
 static mmu_t mmu;
 
 
-static int load_rom(const char* filename, size_t expected_size, u8_t* address) {
-  FILE* fp;
-  long  size;
-
-  fp = fopen(filename, "rb");
-  if (fp == NULL) {
-    fprintf(stderr, "Could not read %s\n", filename);
-    goto exit;
-  }
-
-  fseek(fp, 0L, SEEK_END);
-  size = ftell(fp);
-  fseek(fp, 0L, SEEK_SET);
-
-  if (size != expected_size) {
-    fprintf(stderr, "Size of %s is not %lu bytes\n", filename, expected_size);
-    goto exit_file;
-  }
-
-  if (fread(address, size, 1, fp) != 1) {
-    fprintf(stderr, "Error reading %s\n", filename);
-    goto exit_file;
-  }
-
-  fclose(fp);
-
-  return 0;
-
-exit_file:
-  fclose(fp);
-exit:
-  return -1;
-}
-
-
 int mmu_init(void) {
   FILE *fp;
 
@@ -85,7 +50,7 @@ int mmu_init(void) {
   memset(mmu.memory, 0x55, MEMORY_SIZE);
 
   /* See https://wiki.specnext.dev/Memory_map */
-  if (load_rom("enNextZX.rom", 64 * 1024, &mmu.memory[ROM_START]) != 0) {
+  if (utils_load_rom("enNextZX.rom", 64 * 1024, &mmu.memory[ROM_START]) != 0) {
     goto exit;
   }
 
