@@ -94,7 +94,7 @@
 
 /* All credits to Fuse for this efficent way of looking up the correct HF and
  * VF values. */
-#define LOOKUP_IDX(op1,op2,result) ((((op1) & 0x08 | (op2) & 0x04 | (result) & 0x02)) >> 1)
+#define LOOKUP_IDX(op1,op2,result) (((op1) & 0x08) >> 3 | ((op2) & 0x08) >> 2 | ((result) & 0x08) >> 1)
 
 #define HF_ADD_IDX(idx)        lookup_hf_add[idx]
 #define HF_SUB_IDX(idx)        lookup_hf_sub[idx]
