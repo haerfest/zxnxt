@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "defs.h"
+#include "divmmc.h"
 #include "mmu.h"
 #include "memory.h"
 
@@ -14,12 +15,12 @@ void memory_finit(void) {
 
 
 u8_t memory_read(u16_t address) {
-  return mmu_read(address);
+  return divmmc_read(address);
 }
 
 
 void memory_write(u16_t address, u8_t value) {
-  mmu_write(address, value);
+  divmmc_write(address, value);
 }
 
 

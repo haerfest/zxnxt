@@ -5,14 +5,20 @@
 #include "utils.h"
 
 
-#define MEMORY_SIZE (2 * 1024 * 1024)
-#define ROM_START   0x00000
-#define RAM_START   0x40000
-#define PAGE_SIZE   (8 * 1024)
-#define N_SLOTS     (E_MMU_PAGE_SLOT_7 - E_MMU_PAGE_SLOT_0 + 1)
-#define N_PAGES     ((MEMORY_SIZE - RAM_START) / PAGE_SIZE)
-#define ROM_PAGE    0xFF
-#define ROM_SIZE    (16 * 1024)
+/**
+ * See https://wiki.specnext.dev/Memory_map.
+ */
+
+
+#define MEMORY_SIZE  (2 * 1024 * 1024)
+#define ROM_START    0x00000
+#define DIVMMC_START 0x20000
+#define RAM_START    0x40000
+#define PAGE_SIZE    (8 * 1024)
+#define N_SLOTS      (E_MMU_PAGE_SLOT_7 - E_MMU_PAGE_SLOT_0 + 1)
+#define N_PAGES      ((MEMORY_SIZE - RAM_START) / PAGE_SIZE)
+#define ROM_PAGE     0xFF
+#define ROM_SIZE     (16 * 1024)
 
 
 const u8_t default_pages[N_SLOTS] = {
@@ -49,7 +55,6 @@ int mmu_init(void) {
 
   memset(mmu.memory, 0x55, MEMORY_SIZE);
 
-  /* See https://wiki.specnext.dev/Memory_map */
   if (utils_load_rom("enNextZX.rom", 64 * 1024, &mmu.memory[ROM_START]) != 0) {
     goto exit;
   }
@@ -78,6 +83,11 @@ void mmu_finit(void) {
     free(mmu.memory);
     mmu.memory = NULL;
   }
+}
+
+
+u8_t* mmu_divmmc_get(void) {
+  return &mmu.memory[DIVMMC_START];
 }
 
 
