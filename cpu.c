@@ -92,23 +92,23 @@
 #define PARITY(value) cpu.parity[value]
 
 
-/* All credits to Fuse for this efficent way of looking up the correct HF and
- * VF values. */
-#define LOOKUP_IDX(op1,op2,result) (((op1) & 0x08) >> 3 | ((op2) & 0x08) >> 2 | ((result) & 0x08) >> 1)
+/**
+ * All credits to Fuse for this efficent way of looking up the correct HF and
+ * VF values. Note that for VF_IDX to work correctly, 'result' should be u16_t,
+ * not u8_t.
+ */
+#define HF_IDX(op1,op2,result) (((op1) & 0x08) >> 3 | ((op2) & 0x08) >> 2 | ((result) & 0x08) >> 1)
+#define VF_IDX(op1,op2,result) (((op1) & 0x80) >> 7 | ((op2) & 0x80) >> 6 | ((result) & 0x80) >> 5)
 
-#define HF_ADD_IDX(idx)        lookup_hf_add[idx]
-#define HF_SUB_IDX(idx)        lookup_hf_sub[idx]
-#define VF_ADD_IDX(idx)        lookup_vf_add[idx]
-#define VF_SUB_IDX(idx)        lookup_vf_sub[idx]
-#define HF_ADD(op1,op2,result) HF_ADD_IDX(LOOKUP_IDX(op1,op2,result))
-#define HF_SUB(op1,op2,result) HF_SUB_IDX(LOOKUP_IDX(op1,op2,result))
-#define VF_ADD(op1,op2,result) VF_ADD_IDX(LOOKUP_IDX(op1,op2,result))
-#define VF_SUB(op1,op2,result) VF_SUB_IDX(LOOKUP_IDX(op1,op2,result))
+#define HF_ADD(op1,op2,result) hf_add[HF_IDX(op1,op2,result)]
+#define HF_SUB(op1,op2,result) hf_sub[HF_IDX(op1,op2,result)]
+#define VF_ADD(op1,op2,result) vf_add[VF_IDX(op1,op2,result)]
+#define VF_SUB(op1,op2,result) vf_sub[VF_IDX(op1,op2,result)]
 
-static const u8_t lookup_hf_add[8] = { 0, HF_MASK, HF_MASK, HF_MASK,       0, 0,       0, HF_MASK };
-static const u8_t lookup_hf_sub[8] = { 0,       0, HF_MASK,       0, HF_MASK, 0, HF_MASK, HF_MASK };
-static const u8_t lookup_vf_add[8] = { 0,       0,       0, VF_MASK, VF_MASK, 0,       0,       0 };
-static const u8_t lookup_vf_sub[8] = { 0, VF_MASK,       0,       0,       0, 0, VF_MASK,       0 };
+static const u8_t hf_add[8] = { 0, HF_MASK, HF_MASK, HF_MASK,       0, 0,       0, HF_MASK };
+static const u8_t hf_sub[8] = { 0,       0, HF_MASK,       0, HF_MASK, 0, HF_MASK, HF_MASK };
+static const u8_t vf_add[8] = { 0,       0,       0, VF_MASK, VF_MASK, 0,       0,       0 };
+static const u8_t vf_sub[8] = { 0, VF_MASK,       0,       0,       0, 0, VF_MASK,       0 };
 
 
 /* Simple way to combine two 8-bit registers into a 16-bit one.

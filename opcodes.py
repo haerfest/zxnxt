@@ -20,10 +20,10 @@ def adc_a_r(r: str) -> C:
     
 def add_a_r(r: str) -> C:
     return f'''
-        const u8_t index = LOOKUP_IDX(A, {r}, A + {r});
-        const u8_t carry = A > 0xFF - {r};
-        A += {r};
-        F = SZ53(A) | HF_ADD_IDX(index) | VF_ADD_IDX(index) | carry;
+        const u16_t result = A + {r};
+        const u8_t  carry  = A > 0xFF - {r};
+        F = SZ53(A) | HF_ADD(A, {r}, result) | VF_ADD(A, {r}, result) | carry;
+        A += {r} & 0xFF;
     '''
 
 def add_hl_ss(ss: str) -> C:
@@ -73,21 +73,18 @@ def call(cond: Optional[str] = None) -> C:
 
 def cp_r(r: str) -> C:
     return f'''
-        const u8_t result = A - {r};
-        const u8_t idx    = LOOKUP_IDX(A, {r}, result);
-        F                 = SZ53(result) | HF_SUB_IDX(idx) | VF_SUB_IDX(idx) | NF_MASK | (A < {r}) << CF_SHIFT;
+        const u16_t result = A - {r};
+        F                  = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
     '''
 
 def cp_xy_d(xy: str) -> C:
     return f'''
-        u8_t tmp;
-        u8_t result;
-        u8_t idx;
+        u16_t result;
+        u8_t  tmp;
         WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
         tmp    = memory_read(WZ);                 T(5);
         result = A - tmp;
-        idx    = LOOKUP_IDX(A, tmp, result);
-        F      = SZ53(result) | HF_SUB_IDX(idx) | VF_SUB_IDX(idx) | NF_MASK | (A < tmp) << CF_SHIFT;
+        F      = SZ53(result & 0xFF) | HF_SUB({xy}, tmp, result) | VF_SUB({xy}, tmp, result) | NF_MASK | (A < tmp) << CF_SHIFT;
     '''
 
 def dec_r(r: str) -> C:
@@ -118,8 +115,8 @@ def ex(r1: str, r2: str) -> C:
 
 def inc_r(r: str) -> C:
     return f'''
-       const u8_t index = LOOKUP_IDX({r}, 1, ++{r});
-       F = SZ53({r}) | HF_ADD_IDX(index) | VF_ADD_IDX(index);
+       {r}++;
+       F = SZ53({r}) | HF_ADD({r} - 1, 1, {r}) | ({r} == 0x80) << VF_SHIFT;
     '''
 
 def inc_ss(ss: str) -> C:
@@ -287,10 +284,9 @@ def srl_r(r: str) -> C:
 
 def sub_r(r: str) -> C:
     return f'''
-        const u8_t previous = A;
-        const u8_t idx      = LOOKUP_IDX(A, {r}, A - {r});
-        A -= {r};
-        F = SZ53(A) | HF_SUB_IDX(idx) | VF_SUB_IDX(idx) | NF_MASK | (previous < {r});
+        const u16_t result = A - {r};
+        F = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r});
+        A = result & 0xFF;
     '''
 
 
@@ -402,11 +398,11 @@ instructions: Table = {
     0xC5: ('PUSH BC',    lambda: push_qq('BC')),
     0xC6: ('ADD A,n',
            '''
-           const u8_t n     = memory_read(PC++); T(3);
-           const u8_t index = LOOKUP_IDX(A, n, A + n);
-           const u8_t carry = A > 255 - n;
-           A += n;
-           F = SZ53(A) | HF_ADD_IDX(index) | VF_ADD_IDX(index) | carry;
+           const u8_t n       = memory_read(PC++); T(3);
+           const u16_t result = A + n;
+           const u8_t  carry  = A > 255 - n;
+           F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | carry;
+           A = result & 0xFF;
            '''),
     0xC8: ('RET Z',      lambda: ret('F & ZF_MASK')),
     0xC9: ('RET',        ret),
@@ -419,12 +415,11 @@ instructions: Table = {
     0xD4: ('CALL NC,nn', lambda: call('!(F & CF_MASK)')),
     0xD6: ('SUB n',
            '''
-           const u8_t previous = A;
-           u8_t idx;
-           Z   = memory_read(PC++); T(3);
-           A  -= Z;
-           idx = LOOKUP_IDX(previous, Z, A);
-           F   = SZ53(A) | HF_SUB_IDX(idx) | VF_SUB_IDX(idx) | NF_MASK | previous < Z;
+           u16_t result;
+           Z      = memory_read(PC++); T(3);
+           result = A - Z;
+           F     = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
+           A     = result & 0xFF;
            '''),
     0xD9: ('EXX',
            '''
@@ -523,10 +518,10 @@ instructions: Table = {
     0xF3: ('DI', 'IFF1 = IFF2 = 0;'),
     0xFE: ('CP n',
            '''
-           u8_t result;
+           u16_t result;
            Z      = memory_read(PC++);
            result = A - Z;
-           F      = SZ53(result) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | (A < Z) << CF_SHIFT;
+           F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
            T(3);
            ''')
 }
