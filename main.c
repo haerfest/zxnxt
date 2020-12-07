@@ -50,20 +50,20 @@ static int main_init(void) {
     goto exit_utils;
   }
 
-  if (divmmc_init() != 0) {
-    goto exit_nextreg;
-  }
-
   if (io_init() != 0) {
-    goto exit_divmmc;
+    goto exit_nextreg;
   }
 
   if (mmu_init() != 0) {
     goto exit_io;
   }
 
-  if (memory_init() != 0) {
+  if (divmmc_init() != 0) {
     goto exit_mmu;
+  }
+
+  if (memory_init() != 0) {
+    goto exit_divmmc;
   }
 
   if (clock_init() != 0) {
@@ -86,12 +86,12 @@ exit_clock:
   clock_finit();
 exit_memory:
   memory_finit();
+exit_divmmc:
+  divmmc_finit();
 exit_mmu:
   mmu_finit();
 exit_io:
   io_finit();
-exit_divmmc:
-  divmmc_finit();
 exit_nextreg:
   nextreg_finit();
 exit_utils:
@@ -141,9 +141,9 @@ static void main_finit(void) {
   ula_finit();
   clock_finit();
   memory_finit();
+  divmmc_finit();
   mmu_finit();
   io_finit();
-  divmmc_finit();
   nextreg_finit();
   utils_finit();
 
