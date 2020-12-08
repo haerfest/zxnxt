@@ -219,6 +219,12 @@ def ld_r_xy_d(r: str, xy: str) -> C:
         {r} = memory_read(WZ); T(3);
     '''
 
+def ld_xy_d_n(xy: str) -> C:
+    return f'''
+        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
+        memory_write(WZ, memory_read(PC++));  T(5 + 3);
+    '''
+
 def ld_xy_d_r(xy: str, r: str) -> C:
     return f'''
         WZ = {xy} + (s8_t) memory_read(PC++); T(3 + 5);
@@ -256,6 +262,15 @@ def push_qq(qq: str) -> C:
         T(1);
         memory_write(--SP, {hi(qq)}); T(3);
         memory_write(--SP, {lo(qq)}); T(3);
+    '''
+
+def res_b_xy_d(b: int, xy: str) -> C:
+    return f'''
+        T(1);
+        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
+        PC++;
+        Z = memory_read(WZ) & ~(1 << {b});    T(4);
+        memory_write(WZ, Z);                  T(3);
     '''
 
 def ret(cond: Optional[str] = None) -> C:
@@ -329,13 +344,14 @@ def xy_table(xy: str) -> Table:
         0x21: (f'LD {xy},nn',    lambda: ld_dd_nn(xy)),
         0x23: (f'INC {xy}',      lambda: inc_ss(xy)),
         0x35: (f'DEC ({xy}+d)',  lambda: dec_xy_d(xy)),
+        0x36: (f'LD ({xy}+d),n', lambda: ld_xy_d_n(xy)),
         0x4E: (f'LD C,({xy}+d)', lambda: ld_r_xy_d('C', xy)),
         0xE5: (f'PUSH {xy}',     lambda: push_qq(xy)),
         0x66: (f'LD H,({xy}+d)', lambda: ld_r_xy_d('H', xy)),
         0x6E: (f'LD L,({xy}+d)', lambda: ld_r_xy_d('L', xy)),
-        0x6F: (f'LD {xy}L,A',    lambda: ld_r_r(lo(xy), 'A')),
+        0x6F: (f'LD {lo(xy)},A', lambda: ld_r_r(lo(xy), 'A')),
         0x77: (f'LD ({xy}+d),A', lambda: ld_xy_d_r(xy, 'A')),
-        0x7D: (f'LD A,{xy}L',    lambda: ld_r_r('A', lo(xy))),
+        0x7D: (f'LD A,{lo(xy)}', lambda: ld_r_r('A', lo(xy))),
         0x7E: (f'LD A,({xy}+d)', lambda: ld_r_xy_d('A', xy)),
         0xBE: (f'CP ({xy}+d)',   lambda: cp_xy_d(xy)),
         0xCB: {
@@ -348,7 +364,22 @@ def xy_table(xy: str) -> Table:
             0x6E: (f'BIT 5,({xy}+d)', lambda: bit_b_xy_d(5, xy)),
             0x76: (f'BIT 6,({xy}+d)', lambda: bit_b_xy_d(6, xy)),
             0x7E: (f'BIT 7,({xy}+d)', lambda: bit_b_xy_d(7, xy)),
+            0x86: (f'RES 0,({xy}+d)', lambda: res_b_xy_d(0, xy)),
+            0x8E: (f'RES 1,({xy}+d)', lambda: res_b_xy_d(1, xy)),
+            0x96: (f'RES 2,({xy}+d)', lambda: res_b_xy_d(2, xy)),
+            0x9E: (f'RES 3,({xy}+d)', lambda: res_b_xy_d(3, xy)),
+            0xA6: (f'RES 4,({xy}+d)', lambda: res_b_xy_d(4, xy)),
+            0xAE: (f'RES 5,({xy}+d)', lambda: res_b_xy_d(5, xy)),
+            0xB6: (f'RES 6,({xy}+d)', lambda: res_b_xy_d(6, xy)),
+            0xBE: (f'RES 7,({xy}+d)', lambda: res_b_xy_d(7, xy)),
+            0xC6: (f'SET 0,({xy}+d)', lambda: set_b_xy_d(0, xy)),
+            0xCE: (f'SET 1,({xy}+d)', lambda: set_b_xy_d(1, xy)),
+            0xD6: (f'SET 2,({xy}+d)', lambda: set_b_xy_d(2, xy)),
+            0xDE: (f'SET 3,({xy}+d)', lambda: set_b_xy_d(3, xy)),
             0xE6: (f'SET 4,({xy}+d)', lambda: set_b_xy_d(4, xy)),
+            0xEE: (f'SET 5,({xy}+d)', lambda: set_b_xy_d(5, xy)),
+            0xF6: (f'SET 6,({xy}+d)', lambda: set_b_xy_d(6, xy)),
+            0xFE: (f'SET 7,({xy}+d)', lambda: set_b_xy_d(7, xy)),
         },
         0xE1: (f'POP {xy}', lambda: pop_qq(xy)),
     }
@@ -361,6 +392,14 @@ instructions: Table = {
     0x04: ('INC B',     lambda: inc_r('B')),
     0x05: ('DEC B',     lambda: dec_r('B')),
     0x06: ('LD B,n',    lambda: ld_r_n('B')),
+    0x07: ('RLCA',
+           '''
+           const u8_t carry = A >> 7;;
+           F &= ~(NF_MASK | CF_MASK);
+           F |= HF_MASK | carry << CF_SHIFT;
+           A <<= 1;
+           A |= carry;
+           '''),
     0x08: ("EX AF,AF'", lambda: ex('AF', 'AF_')),
     0x0A: ('LD A,(BC)', lambda: ld_r_pdd('A', 'BC')),
     0x0B: ('DEC BC',    lambda: dec_ss('BC')),
@@ -393,7 +432,9 @@ instructions: Table = {
            Z = memory_read(PC++); T(3);
            PC += (s8_t) Z;        T(5);
            '''),
+    0x19: ('ADD HL,DE',  lambda: add_hl_ss('DE')),
     0x1A: ('LD A,(DE)',  lambda: ld_r_pdd('A', 'DE')),
+    0x1B: ('DEC DE',     lambda: dec_ss('DE')),
     0x1D: ('DEC E',      lambda: dec_r('E')),
     0x1E: ('LD E,n',     lambda: ld_r_n('E')),
     0x20: ('JR NZ,e',    lambda: jr_c_e('!ZF')),
@@ -401,6 +442,7 @@ instructions: Table = {
     0x22: ('LD (nn),HL', lambda: ld_pnn_dd('HL')),
     0x23: ('INC HL',     lambda: inc_ss('HL')),
     0x25: ('DEC H',      lambda: dec_r('H')),
+    0x26: ('LD H,n',     lambda: ld_r_n('H')),
     0x28: ('JR Z,e',     lambda: jr_c_e('ZF')),
     0x29: ('ADD HL,HL',  lambda: add_hl_ss('HL')),
     0x2A: ('LD HL,(nn)',
@@ -431,6 +473,11 @@ instructions: Table = {
            Z = memory_read(PC++); T(3);
            memory_write(HL, Z);   T(3);
            '''),
+    0x37: ('SCF',
+           '''
+           F &= ~(HF_MASK | NF_MASK);
+           F |= CF_MASK;
+           '''),
     0x38: ('JR C,e',    lambda: jr_c_e('CF')),
     0x39: ('ADD HL,SP', lambda: add_hl_ss('SP')),
     0x3A: ('LD A,(nn)',
@@ -451,8 +498,10 @@ instructions: Table = {
     0x4F: ('LD C,A',    lambda: ld_r_r('C', 'A')),
     0x52: ('LD D,D',    lambda: ld_r_r('D', 'D')),
     0x54: ('LD D,H',    lambda: ld_r_r('D', 'H')),
+    0x56: ('LD D,(HL)', lambda: ld_r_pdd('D', 'HL')),
     0x57: ('LD D,A',    lambda: ld_r_r('D', 'A')),
     0x58: ('LD E,B',    lambda: ld_r_r('E', 'B')),
+    0x5E: ('LD E,(HL)', lambda: ld_r_pdd('E', 'HL')),
     0x5F: ('LD E,A',    lambda: ld_r_r('E', 'A')),
     0x62: ('LD H,D',    lambda: ld_r_r('H', 'D')),
     0x67: ('LD H,A',    lambda: ld_r_r('H', 'A')),
@@ -503,6 +552,7 @@ instructions: Table = {
         0xF2: ('SET 6,D', lambda: set_b_r(6, 'D')),
     },
     0xCD: ('CALL nn', call),
+    0xD0: ('RET NC',  lambda: ret('!(F & CF_MASK)')),
     0xD1: ('POP DE',  lambda: pop_qq('DE')),
     0xD3: ('OUT (n),A',
            '''
@@ -613,6 +663,7 @@ instructions: Table = {
            '''
            SP = HL; T(2);
            '''),
+    0xFB: ('EI', 'IFF1 = IFF2 = 1;'),  # TODO: enabled maskable interrupt only AFTER NEXT instruction
     0xFD: xy_table('IY'),
     0xFE: ('CP n',
            '''
@@ -627,23 +678,25 @@ instructions: Table = {
 
 def make_disassembler(mnemonic: str) -> str:
     tokens = {
-        'n'    : (2, 'memory_read(PC)'),
-        'nn'   : (4, 'memory_read(PC + 1) << 8 | memory_read(PC)'),
-        'mm'   : (4, 'memory_read(PC) << 8 | memory_read(PC + 1)'),
-        'e'    : (4, 'PC + 1 + (s8_t) memory_read(PC)'),
-        'd'    : (2, 'memory_read(PC)'),
-        'reg'  : (2, 'memory_read(PC)'),
-        'value': (2, 'memory_read(PC + 1)'),
+        'n'    : (2, lambda offset: f'memory_read(PC + {offset})'),
+        'nn'   : (4, lambda offset: f'memory_read(PC + {offset} + 1) << 8 | memory_read(PC + {offset})'),
+        'mm'   : (4, lambda offset: f'memory_read(PC + {offset}) << 8 | memory_read(PC + {offset} + 1)'),
+        'e'    : (4, lambda offset: f'PC + {offset} + 1 + (s8_t) memory_read(PC + {offset})'),
+        'd'    : (2, lambda offset: f'memory_read(PC + {offset})'),
+        'reg'  : (2, lambda offset: f'memory_read(PC + {offset})'),
+        'value': (2, lambda offset: f'memory_read(PC + {offset} + 1)'),
     }
 
     statement = 'fprintf(stderr, "'
     args      = []
 
+    offset = 0
     for part in re.split('([a-z]+)', mnemonic):
         if part in tokens:
             width, argument = tokens[part]
             statement += f'$%0{width}X'
-            args.append(argument)
+            args.append(argument(offset))
+            offset += width // 2
         else:
             statement += part
 
