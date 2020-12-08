@@ -172,7 +172,7 @@ static u8_t parity(int value) {
   u8_t parity;
   u8_t bit;
 
-  for (parity = bit = 0; bit < 8; bit++, value >>= 1) {
+  for (parity = 1, bit = 0; bit < 8; bit++, value >>= 1) {
     parity ^= value & 1;
   }
 
