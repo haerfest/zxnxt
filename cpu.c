@@ -82,6 +82,7 @@
 
 #define I    cpu.i
 #define R    cpu.r
+#define IM   cpu.im
 
 /* Not a register, but a shortcut for "clock tick". */
 #define T    clock_ticks
@@ -150,9 +151,12 @@ typedef struct {
   int iff1;
   int iff2;
 
-  /* Interrupt mode and memory refresh registers. */
+  /* Interrupt table start and memory refresh registers. */
   u8_t i;
   u8_t r;
+
+  /* Interrupt mode. */
+  u8_t im;
 
   /* Look-up tables to set multiple flags at once and prevent needing to
    * calculate things every time. */
@@ -216,6 +220,7 @@ void cpu_reset(void) {
   PC   = 0;
   I    = 0;
   R    = 0;
+  IM   = 0;
   T(3);
 }
 
