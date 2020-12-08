@@ -37,7 +37,7 @@ def add_hl_ss(ss: str) -> C:
 
 def and_r(r: str) -> C:
     return f'''
-        A &= memory_read(PC++); T(3);
+        A &= {r};
         F = SZ53P(A) | (1 << HF_SHIFT);
     '''
 
@@ -115,8 +115,9 @@ def ex(r1: str, r2: str) -> C:
 
 def inc_r(r: str) -> C:
     return f'''
+       const u8_t carry = F & CF_MASK;
        {r}++;
-       F = SZ53({r}) | HF_ADD({r} - 1, 1, {r}) | ({r} == 0x80) << VF_SHIFT;
+       F = SZ53({r}) | HF_ADD({r} - 1, 1, {r}) | ({r} == 0x80) << VF_SHIFT | carry;
     '''
 
 def inc_ss(ss: str) -> C:
@@ -186,8 +187,8 @@ def ld_pnn_dd(dd: str) -> C:
         memory_write(WZ + 1, {hi}); T(3);
     '''
 
-def ld_r_phl(r: str) -> C:
-    return f'{r} = memory_read(HL); T(3);'
+def ld_r_pdd(r: str, dd: str) -> C:
+    return f'{r} = memory_read({dd}); T(3);'
 
 def ld_r_n(r: str) -> C:
     return f'{r} = memory_read(PC++); T(3);'
@@ -277,9 +278,9 @@ def sbc_hl_ss(ss: str) -> C:
 
 def srl_r(r: str) -> C:
     return f'''
-        const u8_t previous = {r};
+        const u8_t carry = {r} & 0x01;
         {r} >>= 1;
-        F = SZ53P({r}) | (previous & 0x01);
+        F = SZ53P({r}) | carry;
     '''
 
 def sub_r(r: str) -> C:
@@ -299,7 +300,8 @@ instructions: Table = {
     0x05: ('DEC B',     lambda: dec_r('B')),
     0x06: ('LD B,n',    lambda: ld_r_n('B')),
     0x08: ("EX AF,AF'", lambda: ex('AF', 'AF_')),
-    0x0A: ('DEC BC',    lambda: dec_ss('BC')),
+    0x0A: ('LD A,(BC)', lambda: ld_r_pdd('A', 'BC')),
+    0x0B: ('DEC BC',    lambda: dec_ss('BC')),
     0x0C: ('INC C',     lambda: inc_r('C')),
     0x10: ('DJNZ e',
            f'''
@@ -367,10 +369,10 @@ instructions: Table = {
     0x3C: ('INC A',     lambda: inc_r('A')),
     0x3D: ('DEC A',     lambda: dec_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
-    0x46: ('LD B,(HL)', lambda: ld_r_phl('B')),
+    0x46: ('LD B,(HL)', lambda: ld_r_pdd('B', 'HL')),
     0x47: ('LD B,A',    lambda: ld_r_r('B', 'A')),
     0x4B: ('LD C,E',    lambda: ld_r_r('C', 'B')),
-    0x4E: ('LD C,(HL)', lambda: ld_r_phl('C')),
+    0x4E: ('LD C,(HL)', lambda: ld_r_pdd('C', 'HL')),
     0x52: ('LD D,D',    lambda: ld_r_r('D', 'D')),
     0x67: ('LD H,A',    lambda: ld_r_r('H', 'A')),
     0x6F: ('LD L,A',    lambda: ld_r_r('L', 'A')),
@@ -379,7 +381,7 @@ instructions: Table = {
     0x79: ('LD A,C',    lambda: ld_r_r('A', 'C')),
     0x7A: ('LD A,D',    lambda: ld_r_r('A', 'D')),
     0x7C: ('LD A,H',    lambda: ld_r_r('A', 'H')),
-    0x7E: ('LD A,(HL)', lambda: ld_r_phl('A')),
+    0x7E: ('LD A,(HL)', lambda: ld_r_pdd('A', 'HL')),
     0x80: ('ADD A,B',   lambda: add_a_r('B')),
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
     0x93: ('SUB E',     lambda: sub_r('E')),
@@ -490,13 +492,13 @@ instructions: Table = {
                F = SZ53P(A);
                '''),
         0x79: ('OUT (C),A', lambda: out_c_r('A')),
-        0x8A: ('PUSH nn',
+        0x8A: ('PUSH mm',
                '''
-               Z = memory_read(PC++);
-               W = memory_read(PC++);
+               W = memory_read(PC++);  /* High byte first. */
+               Z = memory_read(PC++);  /* Then low byte.   */
                memory_write(--SP, W);
                memory_write(--SP, Z);
-               T(11);
+               T(15);
                '''),
         0x91: ('NEXTREG reg,value',
                '''
@@ -531,6 +533,7 @@ def make_disassembler(mnemonic: str) -> str:
     tokens = {
         'n'    : (2, 'memory_read(PC)'),
         'nn'   : (4, 'memory_read(PC + 1) << 8 | memory_read(PC)'),
+        'mm'   : (4, 'memory_read(PC) << 8 | memory_read(PC + 1)'),
         'e'    : (4, 'PC + 1 + (s8_t) memory_read(PC)'),
         'd'    : (2, 'memory_read(PC)'),
         'reg'  : (2, 'memory_read(PC)'),
@@ -607,7 +610,7 @@ case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
     optional_break = 'break;' if prefix else ''
     f.write(f'''
 default:
-  fprintf(stderr, "cpu: unknown opcode {prefix_str}%02Xh at %04Xh\\n", opcode, PC - 1 - {prefix_len});
+  fprintf(stderr, "cpu: unknown opcode {prefix_str}$%02X at $%04X\\n", opcode, PC - 1 - {prefix_len});
   return -1;
 }}
 {optional_break}
