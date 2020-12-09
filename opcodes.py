@@ -394,7 +394,7 @@ instructions: Table = {
     0x06: ('LD B,n',    lambda: ld_r_n('B')),
     0x07: ('RLCA',
            '''
-           const u8_t carry = A >> 7;;
+           const u8_t carry = A >> 7;
            F &= ~(NF_MASK | CF_MASK);
            F |= HF_MASK | carry << CF_SHIFT;
            A <<= 1;
@@ -406,6 +406,14 @@ instructions: Table = {
     0x0C: ('INC C',     lambda: inc_r('C')),
     0x0D: ('DEC C',     lambda: dec_r('C')),
     0x0E: ('LD C,n',    lambda: ld_r_n('C')),
+    0x0F: ('RRCA',
+           '''
+           const u8_t carry = A & 0x01;
+           F &= ~(NF_MASK | HF_MASK | CF_MASK);
+           F |= carry << CF_SHIFT;
+           A >>= 1;
+           A |= carry << 7;
+           '''),
     0x10: ('DJNZ e',
            f'''
            T(1);
@@ -441,6 +449,7 @@ instructions: Table = {
     0x21: ('LD HL,nn',   lambda: ld_dd_nn('HL')),
     0x22: ('LD (nn),HL', lambda: ld_pnn_dd('HL')),
     0x23: ('INC HL',     lambda: inc_ss('HL')),
+    0x24: ('INC H',      lambda: inc_r('H')),
     0x25: ('DEC H',      lambda: dec_r('H')),
     0x26: ('LD H,n',     lambda: ld_r_n('H')),
     0x28: ('JR Z,e',     lambda: jr_c_e('ZF')),
@@ -489,6 +498,12 @@ instructions: Table = {
     0x3C: ('INC A',     lambda: inc_r('A')),
     0x3D: ('DEC A',     lambda: dec_r('A')),
     0x3E: ('LD A,n',    lambda: ld_r_n('A')),
+    0x3F: ('CCF',
+           '''
+           const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
+           F &= ~(HF_MASK | CF_MASK);
+           F |= carry << HF_SHIFT | (1 - carry) << CF_SHIFT;
+           '''),
     0x44: ('LD B,H',    lambda: ld_r_r('B', 'H')),
     0x46: ('LD B,(HL)', lambda: ld_r_pdd('B', 'HL')),
     0x47: ('LD B,A',    lambda: ld_r_r('B', 'A')),
@@ -501,14 +516,29 @@ instructions: Table = {
     0x56: ('LD D,(HL)', lambda: ld_r_pdd('D', 'HL')),
     0x57: ('LD D,A',    lambda: ld_r_r('D', 'A')),
     0x58: ('LD E,B',    lambda: ld_r_r('E', 'B')),
+    0x59: ('LD E,C',    lambda: ld_r_r('E', 'C')),
+    0x5A: ('LD E,D',    lambda: ld_r_r('E', 'D')),
+    0x5B: ('LD E,E',    lambda: ld_r_r('E', 'E')),
+    0x5C: ('LD E,H',    lambda: ld_r_r('E', 'H')),
+    0x5D: ('LD E,L',    lambda: ld_r_r('E', 'L')),
     0x5E: ('LD E,(HL)', lambda: ld_r_pdd('E', 'HL')),
     0x5F: ('LD E,A',    lambda: ld_r_r('E', 'A')),
+    0x60: ('LD H,B',    lambda: ld_r_r('H', 'B')),
+    0x61: ('LD H,C',    lambda: ld_r_r('H', 'C')),
     0x62: ('LD H,D',    lambda: ld_r_r('H', 'D')),
     0x67: ('LD H,A',    lambda: ld_r_r('H', 'A')),
+    0x68: ('LD L,B',    lambda: ld_r_r('L', 'B')),
+    0x69: ('LD L,C',    lambda: ld_r_r('L', 'C')),
+    0x6A: ('LD L,D',    lambda: ld_r_r('L', 'D')),
     0x6B: ('LD L,E',    lambda: ld_r_r('L', 'E')),
+    0x6C: ('LD L,H',    lambda: ld_r_r('L', 'H')),
+    0x6D: ('LD L,L',    lambda: ld_r_r('L', 'L')),
+    0x6E: ('LD L,(HL)', lambda: ld_r_pdd('L', 'HL')),
     0x6F: ('LD L,A',    lambda: ld_r_r('L', 'A')),
     0x70: ('LD (HL),B', lambda: ld_pdd_r('HL', 'B')),
     0x71: ('LD (HL),C', lambda: ld_pdd_r('HL', 'C')),
+    0x72: ('LD (HL),D', lambda: ld_pdd_r('HL', 'D')),
+    0x73: ('LD (HL),E', lambda: ld_pdd_r('HL', 'E')),
     0x75: ('LD (HL),L', lambda: ld_pdd_r('HL', 'L')),
     0x77: ('LD (HL),A', lambda: ld_pdd_r('HL', 'A')),
     0x78: ('LD A,B',    lambda: ld_r_r('A', 'B')),
@@ -519,11 +549,25 @@ instructions: Table = {
     0x7E: ('LD A,(HL)', lambda: ld_r_pdd('A', 'HL')),
     0x80: ('ADD A,B',   lambda: add_a_r('B')),
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
+    0x90: ('SUB B',     lambda: sub_r('B')),
+    0x91: ('SUB C',     lambda: sub_r('C')),
+    0x92: ('SUB D',     lambda: sub_r('D')),
     0x93: ('SUB E',     lambda: sub_r('E')),
+    0x94: ('SUB H',     lambda: sub_r('H')),
+    0x95: ('SUB L',     lambda: sub_r('L')),
+    0xA0: ('AND B',     lambda: and_r('B')),
+    0xA1: ('AND C',     lambda: and_r('C')),
     0xA2: ('AND D',     lambda: and_r('D')),
     0xA3: ('AND E',     lambda: and_r('E')),
+    0xA4: ('AND H',     lambda: and_r('H')),
+    0xA5: ('AND L',     lambda: and_r('L')),
     0xA7: ('AND A',     lambda: and_r('A')),
     0xA9: ('XOR C',     lambda: xor_r('C')),
+    0xAE: ('XOR (HL)',
+           '''
+           A ^= memory_read(HL); T(3);
+           F = SZ53P(A);
+           '''),
     0xAF: ('XOR A',     lambda: xor_r('A')),
     0xB2: ('OR D',      lambda: or_r('D')),
     0xB3: ('OR E',      lambda: or_r('E')),
@@ -715,8 +759,9 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
     prefix_str     = ''.join(f'${opcode:02X} ' for opcode in prefix)
     prefix_comment = f'/* {prefix_str}*/ ' if prefix else ''
 
-    if not prefix:
-        f.write('''
+    if False:
+        if not prefix:
+            f.write('''
 fprintf(stderr, "     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
 fprintf(stderr, "     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
 fprintf(stderr, "%04X ", PC);
@@ -745,7 +790,7 @@ switch (opcode) {{
                 f.write(f'''
 case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
   {{
-    {disassembler}
+    /* {disassembler} */
     {c}
   }}
   break;
