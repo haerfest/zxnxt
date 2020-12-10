@@ -32,6 +32,18 @@ def add_a_r(r: str) -> C:
         A += {r} & 0xFF;
     '''
 
+def add_a_xy_d(xy: str) -> C:
+    return f'''
+        u16_t result;
+        u8_t  tmp;
+        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
+        tmp    = memory_read(WZ);                 T(5);
+        result = A + tmp;
+        F      = SZ53(result & 0xFF) | HF_ADD(A, tmp, result) | VF_ADD(A, tmp, result) | NF_MASK | (result & 0x100) >> 8 << CF_SHIFT;
+        A      = result & 0xFF;
+        T(3);
+    '''
+
 def add_dd_nn(dd: str) -> C:
     return f'''
         Z = memory_read(PC++); T(4);
@@ -104,7 +116,7 @@ def cp_xy_d(xy: str) -> C:
         WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
         tmp    = memory_read(WZ);                 T(5);
         result = A - tmp;
-        F      = SZ53(result & 0xFF) | HF_SUB({xy}, tmp, result) | VF_SUB({xy}, tmp, result) | NF_MASK | (A < tmp) << CF_SHIFT;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, tmp, result) | VF_SUB(A, tmp, result) | NF_MASK | (A < tmp) << CF_SHIFT;
     '''
 
 def dec_r(r: str) -> C:
@@ -138,6 +150,12 @@ def inc_r(r: str) -> C:
        const u8_t carry = F & CF_MASK;
        {r}++;
        F = SZ53({r}) | HF_ADD({r} - 1, 1, {r}) | ({r} == 0x80) << VF_SHIFT | carry;
+    '''
+
+def in_r_pc(r: str) -> C:
+    return f'''
+        {r} = io_read(BC); T(4);
+        F = SZ53P({r});
     '''
 
 def inc_ss(ss: str) -> C:
@@ -264,6 +282,12 @@ def push_qq(qq: str) -> C:
         memory_write(--SP, {lo(qq)}); T(3);
     '''
 
+def res_b_phl(b: int) -> C:
+    return f'''
+        Z = memory_read(WZ) & ~(1 << {b}); T(4);
+        memory_write(WZ, Z);               T(3);
+    '''
+
 def res_b_xy_d(b: int, xy: str) -> C:
     return f'''
         T(1);
@@ -304,7 +328,18 @@ def rst(address: int) -> C:
     '''
 
 def sbc_hl_ss(ss: str) -> C:
-    return None
+    return f'''
+        const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
+        const u32_t result = HL - {ss} - carry; T(4);
+        F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x40) | (result & 0x20) | HF_SUB(H, {hi(ss)}, result >> 8) | VF_SUB(H, {hi(ss)}, result >> 8) | NF_MASK | (HL < {ss}) << CF_MASK;
+        HL = result & 0xFFFF; T(3);
+    '''
+
+def set_b_phl(b: int) -> C:
+    return f'''
+      Z = memory_read(HL) | 1 << {b}; T(4);
+      memory_write(HL, Z);            T(3);
+    '''
 
 def set_b_r(b: int, r: str) -> C:
     return f'{r} |= 1 << {b};'
@@ -341,19 +376,31 @@ def xor_r(r: str) -> C:
 
 def xy_table(xy: str) -> Table:
     return {
-        0x21: (f'LD {xy},nn',    lambda: ld_dd_nn(xy)),
-        0x23: (f'INC {xy}',      lambda: inc_ss(xy)),
-        0x35: (f'DEC ({xy}+d)',  lambda: dec_xy_d(xy)),
-        0x36: (f'LD ({xy}+d),n', lambda: ld_xy_d_n(xy)),
-        0x4E: (f'LD C,({xy}+d)', lambda: ld_r_xy_d('C', xy)),
-        0xE5: (f'PUSH {xy}',     lambda: push_qq(xy)),
-        0x66: (f'LD H,({xy}+d)', lambda: ld_r_xy_d('H', xy)),
-        0x6E: (f'LD L,({xy}+d)', lambda: ld_r_xy_d('L', xy)),
-        0x6F: (f'LD {lo(xy)},A', lambda: ld_r_r(lo(xy), 'A')),
-        0x77: (f'LD ({xy}+d),A', lambda: ld_xy_d_r(xy, 'A')),
-        0x7D: (f'LD A,{lo(xy)}', lambda: ld_r_r('A', lo(xy))),
-        0x7E: (f'LD A,({xy}+d)', lambda: ld_r_xy_d('A', xy)),
-        0xBE: (f'CP ({xy}+d)',   lambda: cp_xy_d(xy)),
+        0x21: (f'LD {xy},nn',     lambda: ld_dd_nn(xy)),
+        0x23: (f'INC {xy}',       lambda: inc_ss(xy)),
+        0x35: (f'DEC ({xy}+d)',   lambda: dec_xy_d(xy)),
+        0x36: (f'LD ({xy}+d),n',  lambda: ld_xy_d_n(xy)),
+        0x46: (f'LD B,({xy}+d)',  lambda: ld_r_xy_d('B', xy)),
+        0x4E: (f'LD C,({xy}+d)',  lambda: ld_r_xy_d('C', xy)),
+        0x56: (f'LD D,({xy}+d)',  lambda: ld_r_xy_d('D', xy)),
+        0x5E: (f'LD E,({xy}+d)',  lambda: ld_r_xy_d('E', xy)),
+        0x66: (f'LD H,({xy}+d)',  lambda: ld_r_xy_d('H', xy)),
+        0x66: (f'LD H,({xy}+d)',  lambda: ld_r_xy_d('H', xy)),
+        0x6E: (f'LD L,({xy}+d)',  lambda: ld_r_xy_d('L', xy)),
+        0x6E: (f'LD L,({xy}+d)',  lambda: ld_r_xy_d('L', xy)),
+        0x6F: (f'LD {lo(xy)},A',  lambda: ld_r_r(lo(xy), 'A')),
+        0x70: (f'LD ({xy}+d),B',  lambda: ld_xy_d_r(xy, 'B')),
+        0x71: (f'LD ({xy}+d),C',  lambda: ld_xy_d_r(xy, 'C')),
+        0x72: (f'LD ({xy}+d),D',  lambda: ld_xy_d_r(xy, 'D')),
+        0x73: (f'LD ({xy}+d),E',  lambda: ld_xy_d_r(xy, 'E')),
+        0x74: (f'LD ({xy}+d),H',  lambda: ld_xy_d_r(xy, 'H')),
+        0x75: (f'LD ({xy}+d),L',  lambda: ld_xy_d_r(xy, 'L')),
+        0x77: (f'LD ({xy}+d),A',  lambda: ld_xy_d_r(xy, 'A')),
+        0x7D: (f'LD A,{lo(xy)}',  lambda: ld_r_r('A', lo(xy))),
+        0x7E: (f'LD A,({xy}+d)',  lambda: ld_r_xy_d('A', xy)),
+        0x86: (f'ADD A,({xy}+d)', lambda: add_a_xy_d(xy)),
+        0xBE: (f'CP ({xy}+d)',    lambda: cp_xy_d(xy)),
+        0xE5: (f'PUSH {xy}',      lambda: push_qq(xy)),
         0xCB: {
             # This is on the 4th byte, not the 3rd! PC remains at 3rd.
             0x46: (f'BIT 0,({xy}+d)', lambda: bit_b_xy_d(0, xy)),
@@ -511,8 +558,12 @@ instructions: Table = {
     0x4D: ('LD C,L',    lambda: ld_r_r('C', 'L')),
     0x4E: ('LD C,(HL)', lambda: ld_r_pdd('C', 'HL')),
     0x4F: ('LD C,A',    lambda: ld_r_r('C', 'A')),
+    0x50: ('LD D,B',    lambda: ld_r_r('D', 'B')),
+    0x51: ('LD D,C',    lambda: ld_r_r('D', 'C')),
     0x52: ('LD D,D',    lambda: ld_r_r('D', 'D')),
+    0x53: ('LD D,E',    lambda: ld_r_r('D', 'E')),
     0x54: ('LD D,H',    lambda: ld_r_r('D', 'H')),
+    0x55: ('LD D,L',    lambda: ld_r_r('D', 'L')),
     0x56: ('LD D,(HL)', lambda: ld_r_pdd('D', 'HL')),
     0x57: ('LD D,A',    lambda: ld_r_r('D', 'A')),
     0x58: ('LD E,B',    lambda: ld_r_r('E', 'B')),
@@ -544,10 +595,16 @@ instructions: Table = {
     0x78: ('LD A,B',    lambda: ld_r_r('A', 'B')),
     0x79: ('LD A,C',    lambda: ld_r_r('A', 'C')),
     0x7A: ('LD A,D',    lambda: ld_r_r('A', 'D')),
+    0x7B: ('LD A,E',    lambda: ld_r_r('A', 'E')),
     0x7C: ('LD A,H',    lambda: ld_r_r('A', 'H')),
     0x7D: ('LD A,L',    lambda: ld_r_r('A', 'L')),
     0x7E: ('LD A,(HL)', lambda: ld_r_pdd('A', 'HL')),
     0x80: ('ADD A,B',   lambda: add_a_r('B')),
+    0x81: ('ADD A,C',   lambda: add_a_r('C')),
+    0x82: ('ADD A,D',   lambda: add_a_r('D')),
+    0x83: ('ADD A,E',   lambda: add_a_r('E')),
+    0x84: ('ADD A,H',   lambda: add_a_r('H')),
+    0x85: ('ADD A,L',   lambda: add_a_r('L')),
     0x87: ('ADD A,A',   lambda: add_a_r('A')),
     0x90: ('SUB B',     lambda: sub_r('B')),
     0x91: ('SUB C',     lambda: sub_r('C')),
@@ -569,10 +626,16 @@ instructions: Table = {
            F = SZ53P(A);
            '''),
     0xAF: ('XOR A',     lambda: xor_r('A')),
+    0xB0: ('OR B',      lambda: or_r('B')),
+    0xB1: ('OR C',      lambda: or_r('C')),
     0xB2: ('OR D',      lambda: or_r('D')),
     0xB3: ('OR E',      lambda: or_r('E')),
+    0xB4: ('OR H',      lambda: or_r('H')),
+    0xB5: ('OR L',      lambda: or_r('L')),
+    0xB7: ('OR A',      lambda: or_r('A')),
     0xB9: ('CP C',      lambda: cp_r('C')),
     0xBC: ('CP H',      lambda: cp_r('H')),
+    0xC0: ('RET NZ',    lambda: ret('!(F & ZF_MASK)')),
     0xC1: ('POP BC',    lambda: pop_qq('BC')),
     0xC2: ('JP NZ,nn',  lambda: jp('!(F & ZF_MASK)')),
     0xC3: ('JP nn',     jp),
@@ -589,13 +652,31 @@ instructions: Table = {
     0xC8: ('RET Z',      lambda: ret('F & ZF_MASK')),
     0xC9: ('RET',        ret),
     0xCB: {
-        0x02: ('RLC D',   lambda: rlc_r('D')),
-        0x3F: ('SRL A',   lambda: srl_r('A')),
-        0x59: ('BIT 3,C', lambda: bit_b_r(3, 'C')),
-        0x72: ('BIT 6,D', lambda: bit_b_r(6, 'D')),
-        0xF2: ('SET 6,D', lambda: set_b_r(6, 'D')),
+        0x02: ('RLC D',      lambda: rlc_r('D')),
+        0x3F: ('SRL A',      lambda: srl_r('A')),
+        0x59: ('BIT 3,C',    lambda: bit_b_r(3, 'C')),
+        0x72: ('BIT 6,D',    lambda: bit_b_r(6, 'D')),
+        0x86: ('RES 0,(HL)', lambda: res_b_phl(0)),
+        0x8E: ('RES 1,(HL)', lambda: res_b_phl(1)),
+        0x96: ('RES 2,(HL)', lambda: res_b_phl(2)),
+        0x9E: ('RES 3,(HL)', lambda: res_b_phl(3)),
+        0xA6: ('RES 4,(HL)', lambda: res_b_phl(4)),
+        0xAE: ('RES 5,(HL)', lambda: res_b_phl(5)),
+        0xB6: ('RES 6,(HL)', lambda: res_b_phl(6)),
+        0xBE: ('RES 7,(HL)', lambda: res_b_phl(7)),
+        0xC6: ('SET 0,(HL)', lambda: set_b_phl(0)),
+        0xCE: ('SET 1,(HL)', lambda: set_b_phl(1)),
+        0xD6: ('SET 2,(HL)', lambda: set_b_phl(2)),
+        0xDE: ('SET 3,(HL)', lambda: set_b_phl(3)),
+        0xE6: ('SET 4,(HL)', lambda: set_b_phl(4)),
+        0xEE: ('SET 5,(HL)', lambda: set_b_phl(5)),
+        0xF2: ('SET 6,D',    lambda: set_b_r(6, 'D')),
+        0xF6: ('SET 6,(HL)', lambda: set_b_phl(6)),
+        0xFE: ('SET 7,(HL)', lambda: set_b_phl(7)),
     },
     0xCD: ('CALL nn', call),
+    0xC7: ('RST $00', lambda: rst(0x00)),
+    0xCF: ('RST $08', lambda: rst(0x08)),
     0xD0: ('RET NC',  lambda: ret('!(F & CF_MASK)')),
     0xD1: ('POP DE',  lambda: pop_qq('DE')),
     0xD3: ('OUT (n),A',
@@ -613,13 +694,20 @@ instructions: Table = {
            F     = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
            A     = result & 0xFF;
            '''),
-    0xD8: ('RET C', lambda: ret('F & CF_MASK')),
+    0xD7: ('RST $10', lambda: rst(0x10)),
+    0xD8: ('RET C',   lambda: ret('F & CF_MASK')),
     0xD9: ('EXX',
            '''
            u16_t tmp;
            tmp = BC; BC = BC_; BC_ = tmp;
            tmp = DE; DE = DE_; DE_ = tmp;
            tmp = HL; HL = HL_; HL_ = tmp;
+           '''),
+    0xDB: ('IN A,(n)',
+           '''
+           Z = memory_read(PC++);   T(3);
+           A = io_read(A << 8 | Z); T(4);
+           F = SZ53P(A);
            '''),
     0xDC: ('CALL C,nn', lambda: call('F & CF_MASK')),
     0xDD: xy_table('IX'),
@@ -650,20 +738,19 @@ instructions: Table = {
     0xED: {
         0x30: ('MUL D,E', 'DE = D * E;'),
         0x35: ('ADD DE,nn',  lambda: add_dd_nn('DE')),
+        0x42: ('SBC HL,BC',  lambda: sbc_hl_ss('BC')),
         0x43: ('LD (nn),BC', lambda: ld_pnn_dd('BC')),
         0x4B: ('LD BC,(nn)', lambda: ld_dd_pnn('BC')),
         0x51: ('OUT (C),D',  lambda: out_c_r('D')),
         0x52: ('SBC HL,DE',  lambda: sbc_hl_ss('DE')),
         0x56: ('IM 1', 'IM = 1;'),
         0x59: ('OUT (C),E',  lambda: out_c_r('E')),
+        0x5B: ('LD DE,(nn)', lambda: ld_dd_pnn('DE')),
         0x61: ('OUT (C),H',  lambda: out_c_r('H')),
+        0x68: ('IN L,(C)',   lambda: in_r_pc('L')),
         0x69: ('OUT (C),L',  lambda: out_c_r('L')),
         0x73: ('LD (nn),SP', lambda: ld_pnn_dd('SP')),
-        0x78: ('IN A,(C)',
-               f'''
-               A = io_read(BC); T(4);
-               F = SZ53P(A);
-               '''),
+        0x78: ('IN A,(C)',   lambda: in_r_pc('A')),
         0x79: ('OUT (C),A', lambda: out_c_r('A')),
         0x8A: ('PUSH mm',
                '''
@@ -703,6 +790,7 @@ instructions: Table = {
            A |= memory_read(PC++); T(3);
            F = SZ53P(A);
            '''),
+    0xF7: ('RST $30', lambda: rst(0x30)),
     0xF9: ('LD SP,HL',
            '''
            SP = HL; T(2);
