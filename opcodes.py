@@ -439,8 +439,24 @@ def cb_table() -> Table:
         0x3C: ('SRL H',      lambda: srl_r('H')),
         0x3D: ('SRL L',      lambda: srl_r('L')),
         0x3F: ('SRL A',      lambda: srl_r('A')),
+        0x40: ('BIT 0,B',    lambda: bit_b_r(0, 'B')),
+        0x45: ('BIT 0,L',    lambda: bit_b_r(0, 'L')),
+        0x48: ('BIT 1,B',    lambda: bit_b_r(1, 'B')),
+        0x4D: ('BIT 1,L',    lambda: bit_b_r(1, 'L')),
+        0x50: ('BIT 2,B',    lambda: bit_b_r(2, 'B')),
+        0x55: ('BIT 2,L',    lambda: bit_b_r(2, 'L')),
+        0x58: ('BIT 3,B',    lambda: bit_b_r(3, 'B')),
         0x59: ('BIT 3,C',    lambda: bit_b_r(3, 'C')),
+        0x5D: ('BIT 3,L',    lambda: bit_b_r(3, 'L')),
+        0x60: ('BIT 4,B',    lambda: bit_b_r(4, 'B')),
+        0x65: ('BIT 4,L',    lambda: bit_b_r(4, 'L')),
+        0x68: ('BIT 5,B',    lambda: bit_b_r(5, 'B')),
+        0x6D: ('BIT 5,L',    lambda: bit_b_r(5, 'L')),
+        0x70: ('BIT 6,B',    lambda: bit_b_r(6, 'B')),
         0x72: ('BIT 6,D',    lambda: bit_b_r(6, 'D')),
+        0x75: ('BIT 6,L',    lambda: bit_b_r(6, 'L')),
+        0x78: ('BIT 7,B',    lambda: bit_b_r(7, 'B')),
+        0x7D: ('BIT 7,L',    lambda: bit_b_r(7, 'L')),
         0x86: ('RES 0,(HL)', lambda: res_b_phl(0)),
         0x8E: ('RES 1,(HL)', lambda: res_b_phl(1)),
         0x96: ('RES 2,(HL)', lambda: res_b_phl(2)),
@@ -475,6 +491,11 @@ def ed_table() -> Table:
         0x35: ('ADD DE,nn',  lambda: add_dd_nn('DE')),
         0x42: ('SBC HL,BC',  lambda: sbc_hl_ss('BC')),
         0x43: ('LD (nn),BC', lambda: ld_pnn_dd('BC')),
+        0x47: ('LD I,A',
+               '''
+               T(1);
+               I = A;
+               '''),
         0x4A: ('ADC HL,BC',  lambda: adc_hl_ss('BC')),
         0x4B: ('LD BC,(nn)', lambda: ld_dd_pnn('BC')),
         0x51: ('OUT (C),D',  lambda: out_c_r('D')),
@@ -482,9 +503,16 @@ def ed_table() -> Table:
         0x56: ('IM 1', 'IM = 1;'),
         0x59: ('OUT (C),E',  lambda: out_c_r('E')),
         0x5B: ('LD DE,(nn)', lambda: ld_dd_pnn('DE')),
+        0x5F: ('LD A,R',
+               '''
+               T(1);
+               A = R;
+               F = SZ53(A) | (IFF2 << VF_SHIFT) | (F & CF_MASK) >> CF_SHIFT;
+               '''),
         0x61: ('OUT (C),H',  lambda: out_c_r('H')),
         0x68: ('IN L,(C)',   lambda: in_r_pc('L')),
         0x69: ('OUT (C),L',  lambda: out_c_r('L')),
+        0x6A: ('ADC HL,HL',  lambda: adc_hl_ss('HL')),
         0x73: ('LD (nn),SP', lambda: ld_pnn_dd('SP')),
         0x78: ('IN A,(C)',   lambda: in_r_pc('A')),
         0x79: ('OUT (C),A', lambda: out_c_r('A')),
@@ -521,6 +549,7 @@ def xy_table(xy: str) -> Table:
         0x21: (f'LD {xy},nn',     lambda: ld_dd_nn(xy)),
         0x22: (f'LD (nn),{xy}',   lambda: ld_pnn_dd(xy)),
         0x23: (f'INC {xy}',       lambda: inc_ss(xy)),
+        0x2A: (f'LD {xy},(nn)',   lambda: ld_dd_pnn(xy)),
         0x35: (f'DEC ({xy}+d)',   lambda: dec_xy_d(xy)),
         0x36: (f'LD ({xy}+d),n',  lambda: ld_xy_d_n(xy)),
         0x46: (f'LD B,({xy}+d)',  lambda: ld_r_xy_d('B', xy)),
@@ -575,6 +604,7 @@ def xy_table(xy: str) -> Table:
         },
         0xE1: (f'POP {xy}',     lambda: pop_qq(xy)),
         0xE3: (f'EX (SP),{xy}', lambda: ex_psp_dd(xy)),
+        0xE9: (f'JP ({xy})',    f'PC = {xy};'),
     }
 
 # See https://wiki.specnext.dev/Extended_Z80_instruction_set.
@@ -715,7 +745,11 @@ instructions: Table = {
     0x45: ('LD B,L',    lambda: ld_r_r('B', 'L')),
     0x46: ('LD B,(HL)', lambda: ld_r_pdd('B', 'HL')),
     0x47: ('LD B,A',    lambda: ld_r_r('B', 'A')),
+    0x48: ('LD C,B',    lambda: ld_r_r('C', 'B')),
+    0x49: ('LD C,C',    lambda: ld_r_r('C', 'C')),
+    0x4A: ('LD C,D',    lambda: ld_r_r('C', 'D')),
     0x4B: ('LD C,E',    lambda: ld_r_r('C', 'B')),
+    0x4C: ('LD C,H',    lambda: ld_r_r('C', 'H')),
     0x4D: ('LD C,L',    lambda: ld_r_r('C', 'L')),
     0x4E: ('LD C,(HL)', lambda: ld_r_pdd('C', 'HL')),
     0x4F: ('LD C,A',    lambda: ld_r_r('C', 'A')),
@@ -798,8 +832,12 @@ instructions: Table = {
     0xB4: ('OR H',      lambda: or_r('H')),
     0xB5: ('OR L',      lambda: or_r('L')),
     0xB7: ('OR A',      lambda: or_r('A')),
+    0xB8: ('CP B',      lambda: cp_r('B')),
     0xB9: ('CP C',      lambda: cp_r('C')),
+    0xBA: ('CP D',      lambda: cp_r('D')),
+    0xBB: ('CP E',      lambda: cp_r('E')),
     0xBC: ('CP H',      lambda: cp_r('H')),
+    0xBD: ('CP L',      lambda: cp_r('L')),
     0xC0: ('RET NZ',    lambda: ret('!(F & ZF_MASK)')),
     0xC1: ('POP BC',    lambda: pop_qq('BC')),
     0xC2: ('JP NZ,nn',  lambda: jp('!(F & ZF_MASK)')),
@@ -817,7 +855,8 @@ instructions: Table = {
     0xC8: ('RET Z',      lambda: ret('F & ZF_MASK')),
     0xC9: ('RET',        ret),
     0xCB: cb_table(),
-    0xCD: ('CALL nn', call),
+    0xCC: ('CALL Z,nn',  lambda: call('F & ZF_MASK')),
+    0xCD: ('CALL nn',    call),
     0xCE: ('ADC A,n',
            '''
            const u8_t  n      = memory_read(PC++); T(3);
@@ -826,10 +865,11 @@ instructions: Table = {
            F = SZ53(A) | HF_ADD(A, n + carry, result) | VF_ADD(A, n + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
            A = result & 0xFF;
            '''),
-    0xC7: ('RST $00', lambda: rst(0x00)),
-    0xCF: ('RST $08', lambda: rst(0x08)),
-    0xD0: ('RET NC',  lambda: ret('!(F & CF_MASK)')),
-    0xD1: ('POP DE',  lambda: pop_qq('DE')),
+    0xC7: ('RST $00',  lambda: rst(0x00)),
+    0xCF: ('RST $08',  lambda: rst(0x08)),
+    0xD0: ('RET NC',   lambda: ret('!(F & CF_MASK)')),
+    0xD1: ('POP DE',   lambda: pop_qq('DE')),
+    0xD2: ('JP NC,nn', lambda: jp('!(F & CF_MASK)')),
     0xD3: ('OUT (n),A',
            '''
            WZ = A << 8 | memory_read(PC++); T(3);
@@ -872,10 +912,8 @@ instructions: Table = {
            F = SZ53P(A) | (1 << HF_SHIFT);
            '''),
     0xE7: ('RST $20', lambda: rst(0x20)),
-    0xE9: ('JP (HL)',
-           '''
-           PC = HL;
-           '''),
+    0xE8: ('RET PE',  lambda: ret('F & PF_MASK')),
+    0xE9: ('JP (HL)', 'PC = HL;'),
     0xEB: ('EX DE,HL', lambda: ex('DE', 'HL')),
     0xEF: ('RST $28',  lambda: rst(0x28)),
     0xED: ed_table(),
@@ -960,15 +998,14 @@ fprintf(stderr, "%04X ", PC);
     if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
         # Special opcode where 3rd byte is parameter and 4th byte needed for
         # decoding. Read 4th byte, but keep PC at 3rd byte.
-        read_opcode = 'opcode = memory_read(PC + 1);'
+        read_opcode = 'opcode = memory_read(PC + 1)'
     else:
-        read_opcode = 'opcode = memory_read(PC++);'
+        read_opcode = 'opcode = memory_read(PC++)'
 
-    f.write(f'''
-{read_opcode}
-T(4);
-switch (opcode) {{
-''')
+    f.write(f'{read_opcode}; T(4);')
+    if not prefix:
+        f.write('R = (R & 0x80) | (++R & 0x7F);')
+    f.write('switch (opcode) {')
 
     for opcode in sorted(instructions):
         item = instructions[opcode]
