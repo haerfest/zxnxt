@@ -9,7 +9,10 @@ typedef enum {
   E_CMD_GO_IDLE_STATE     = 0,
   E_CMD_SEND_OP_COND      = 1,
   E_CMD_SEND_IF_COND      = 8,
-  E_CMD_STOP_TRANSMISSION = 12
+  E_CMD_STOP_TRANSMISSION = 12,
+  E_CMD_APP_SEND_OP_COND  = 41,  /* Prepended by E_CMD_APP_CMD */
+  E_CMD_APP_CMD           = 55,
+  E_CMD_READ_OCR          = 58
 } cmd_t;
 
 
@@ -30,6 +33,7 @@ typedef enum {
   E_STATE_INITIALISED,
   E_STATE_BUSY,
   E_STATE_RESPONDING,
+  E_STATE_APP_CMD
 } state_t;
 
   
@@ -37,7 +41,9 @@ typedef struct {
   state_t    state;
   u8_t       command_buffer[6];
   int        command_length;
-  response_t response;
+  u8_t       response_buffer[4];
+  int        response_length;
+  int        response_index;
   u8_t       error;
 } sdcard_t;
 
@@ -46,10 +52,11 @@ static sdcard_t self;
 
 
 int sdcard_init(void) {
-  self.state          = E_STATE_IDLE;
-  self.response       = E_RESPONSE_R1;
-  self.error          = E_ERROR_NONE;
-  self.command_length = 0;
+  self.state           = E_STATE_IDLE;
+  self.error           = E_ERROR_NONE;
+  self.command_length  = 0;
+  self.response_length = 0;
+  self.response_index  = 0;
   return 0;
 }
 
@@ -59,71 +66,75 @@ void sdcard_finit(void) {
 
 
 u8_t sdcard_read(u16_t address) {
-  switch (self.state) {
-    case E_STATE_IDLE:
-      return self.error | 0x01;
-
-    case E_STATE_INITIALISED:
-      return self.error;
-
-    case E_STATE_BUSY:
-      return 0x00;
- 
-    case E_STATE_RESPONDING:
-      switch (self.response) {
-        case E_RESPONSE_R1:
-          self.state = E_STATE_IDLE;
-          return self.error;
-
-        case E_RESPONSE_R1B_R1:
-          self.response = E_RESPONSE_R1B_BUSY;
-          return self.error;
-
-        case E_RESPONSE_R1B_BUSY:
-          self.state    = E_STATE_IDLE;
-          self.response = E_RESPONSE_R1;
-          return 0xFF;
-      }
-      break;
+  if (self.response_index < self.response_length) {
+    return self.response_buffer[self.response_index++];
   }
+
+  /* Standard R1 response. */
+  return self.error | (self.state == E_STATE_IDLE);
 }
 
 
 static void sdcard_handle_command(void) {
   const u8_t command = self.command_buffer[0] & 0x3F;
 
+  /* Defaults: no error, R1 response. */
+  self.error           = E_ERROR_NONE;
+  self.response_length = 0;
+  self.response_index  = 0;
+
   switch (command) {
     case E_CMD_GO_IDLE_STATE:
-      self.state    = E_STATE_IDLE;
-      self.error    = E_ERROR_NONE;
-      self.response = E_RESPONSE_R1;
-      break;
+      self.state = E_STATE_IDLE;
+      return;
 
     case E_CMD_SEND_OP_COND:
-      self.state    = E_STATE_INITIALISED;
-      self.error    = E_ERROR_NONE;
-      self.response = E_RESPONSE_R1;
-      break;
-
+      self.state              = E_STATE_IDLE;
+      self.response_buffer[0] = 0x00;  /* Need to clear idle bit. */
+      self.response_length    = 1;
+      return;
+ 
     case E_CMD_SEND_IF_COND:
-      self.state    = E_STATE_IDLE;
-      self.error    = E_ERROR_ILLEGAL_COMMAND;
-      self.response = E_RESPONSE_R1;
-      break;
+      self.state = E_STATE_IDLE;
+      self.error = E_ERROR_ILLEGAL_COMMAND;
+      return;
  
     case E_CMD_STOP_TRANSMISSION:
-      self.state    = E_STATE_RESPONDING;
-      self.error    = E_ERROR_NONE;
-      self.response = E_RESPONSE_R1B_R1;
+      self.state              = E_STATE_IDLE;
+      self.response_buffer[0] = 0x01;
+      self.response_buffer[1] = 0xFF;  /* No longer busy. */
+      self.response_length    = 2;
+      return;
+
+    case E_CMD_APP_SEND_OP_COND:
+      if (self.state == E_STATE_APP_CMD) {
+        self.state              = E_STATE_IDLE;
+        self.response_buffer[0] = 0x00;  /* Need to indicate busy. */
+        self.response_length    = 1;
+        return;
+      }
       break;
+ 
+    case E_CMD_APP_CMD:
+      self.state = E_STATE_APP_CMD;  /* Expect a further CMD. */
+      return;
+
+    case E_CMD_READ_OCR:
+      self.state              = E_STATE_IDLE;
+      self.response_buffer[0] = 0;
+      self.response_buffer[1] = 0;
+      self.response_buffer[2] = 0;
+      self.response_buffer[3] = 0;
+      self.response_length    = 4;
+      return;
 
     default:
-      fprintf(stderr, "sdcard: received unimplemented command CMD%d ($%02X $%02X $%02X $%02X $%02X $%02X)\n", command, self.command_buffer[0], self.command_buffer[1], self.command_buffer[2], self.command_buffer[3], self.command_buffer[4], self.command_buffer[5]);
-      self.state    = E_STATE_IDLE;
-      self.error    = E_ERROR_ILLEGAL_COMMAND;
-      self.response = E_RESPONSE_R1;
       break;
   }
+
+  fprintf(stderr, "sdcard: received unimplemented command CMD%d ($%02X $%02X $%02X $%02X $%02X $%02X)\n", command, self.command_buffer[0], self.command_buffer[1], self.command_buffer[2], self.command_buffer[3], self.command_buffer[4], self.command_buffer[5]);
+  self.state = E_STATE_IDLE;
+  self.error = E_ERROR_ILLEGAL_COMMAND;
 }
 
 
