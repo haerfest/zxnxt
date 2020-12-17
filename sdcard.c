@@ -9,7 +9,9 @@ typedef enum {
   E_CMD_GO_IDLE_STATE     = 0,
   E_CMD_SEND_OP_COND      = 1,
   E_CMD_SEND_IF_COND      = 8,
+  E_CMD_SEND_CSD          = 9,
   E_CMD_STOP_TRANSMISSION = 12,
+  E_CMD_SET_BLOCKLEN      = 16,
   E_CMD_APP_SEND_OP_COND  = 41,  /* Prepended by E_CMD_APP_CMD */
   E_CMD_APP_CMD           = 55,
   E_CMD_READ_OCR          = 58
@@ -41,10 +43,11 @@ typedef struct {
   state_t    state;
   u8_t       command_buffer[6];
   int        command_length;
-  u8_t       response_buffer[4];
+  u8_t       response_buffer[1 + 16 + 2];  /* R1 + payload + CRC. */
   int        response_length;
   int        response_index;
   u8_t       error;
+  u32_t      block_length;
 } sdcard_t;
 
 
@@ -57,6 +60,7 @@ int sdcard_init(void) {
   self.command_length  = 0;
   self.response_length = 0;
   self.response_index  = 0;
+  self.block_length    = 512;
   return 0;
 }
 
@@ -66,6 +70,7 @@ void sdcard_finit(void) {
 
 
 u8_t sdcard_read(u16_t address) {
+  fprintf(stderr, "sdcard: read\n");
   if (self.response_index < self.response_length) {
     return self.response_buffer[self.response_index++];
   }
@@ -77,6 +82,9 @@ u8_t sdcard_read(u16_t address) {
 
 static void sdcard_handle_command(void) {
   const u8_t command = self.command_buffer[0] & 0x3F;
+  int        i;
+
+  fprintf(stderr, "sdcard: received CMD%u\n", command);
 
   /* Defaults: no error, R1 response. */
   self.error           = E_ERROR_NONE;
@@ -98,12 +106,28 @@ static void sdcard_handle_command(void) {
       self.state = E_STATE_IDLE;
       self.error = E_ERROR_ILLEGAL_COMMAND;
       return;
- 
+
+    case E_CMD_SEND_CSD:
+      self.state = E_STATE_IDLE;
+      self.response_buffer[0] = 0x00;
+      for (i = 1; i <= 16; i++) {
+        self.response_buffer[i] = 0x00;
+      }
+      self.response_buffer[17] = 0x00;  /* CRC */
+      self.response_buffer[18] = 0x00;
+      self.response_length     = 19;
+      return;
+      
     case E_CMD_STOP_TRANSMISSION:
       self.state              = E_STATE_IDLE;
       self.response_buffer[0] = 0x01;
       self.response_buffer[1] = 0xFF;  /* No longer busy. */
       self.response_length    = 2;
+      return;
+
+    case E_CMD_SET_BLOCKLEN:
+      self.block_length = self.command_buffer[1] << 24 | self.command_buffer[2] << 16 | self.command_buffer[3] << 8 | self.command_buffer[4];
+      fprintf(stderr, "sdcard: block length set to %u bytes\n", self.block_length);
       return;
 
     case E_CMD_APP_SEND_OP_COND:
