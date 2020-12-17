@@ -2,6 +2,7 @@
 #include "divmmc.h"
 #include "nextreg.h"
 #include "defs.h"
+#include "spi.h"
 #include "ula.h"
 
 
@@ -21,6 +22,13 @@ u8_t io_read(u16_t address) {
 
   if ((address & 0x00FF) == 0x00E3) {
     return divmmc_control_read(address);
+  }
+
+  if ((address & 0x00FF) == 0x00E7) {
+    return spi_cs_read(address);
+  }
+  if ((address & 0x00FF) == 0x00EB) {
+    return spi_data_read(address);
   }
 
   if (address == 0x243B) {
@@ -45,6 +53,14 @@ void io_write(u16_t address, u8_t value) {
   if ((address & 0x00FF) == 0x00E3) {
     divmmc_control_write(address, value);
     return;
+  }
+
+  if ((address & 0x00FF) == 0x00E7) {
+    return spi_cs_write(address, value);
+  }
+
+  if ((address & 0x00FF) == 0x00EB) {
+    return spi_data_write(address, value);
   }
 
   if (address == 0x243B) {
