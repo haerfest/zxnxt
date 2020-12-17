@@ -7,6 +7,7 @@
 
 typedef enum {
   E_CMD_GO_IDLE_STATE     = 0,
+  E_CMD_SEND_OP_COND      = 1,
   E_CMD_SEND_IF_COND      = 8,
   E_CMD_STOP_TRANSMISSION = 12
 } cmd_t;
@@ -26,6 +27,7 @@ typedef enum {
 
 typedef enum {
   E_STATE_IDLE = 0,
+  E_STATE_INITIALISED,
   E_STATE_BUSY,
   E_STATE_RESPONDING,
 } state_t;
@@ -61,6 +63,9 @@ u8_t sdcard_read(u16_t address) {
     case E_STATE_IDLE:
       return self.error | 0x01;
 
+    case E_STATE_INITIALISED:
+      return self.error;
+
     case E_STATE_BUSY:
       return 0x00;
  
@@ -90,6 +95,12 @@ static void sdcard_handle_command(void) {
   switch (command) {
     case E_CMD_GO_IDLE_STATE:
       self.state    = E_STATE_IDLE;
+      self.error    = E_ERROR_NONE;
+      self.response = E_RESPONSE_R1;
+      break;
+
+    case E_CMD_SEND_OP_COND:
+      self.state    = E_STATE_INITIALISED;
       self.error    = E_ERROR_NONE;
       self.response = E_RESPONSE_R1;
       break;
