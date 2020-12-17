@@ -98,7 +98,10 @@ void spi_cs_write(u16_t address, u8_t value) {
 
 u8_t spi_data_read(u16_t address) {
   if (self.device == E_SPI_DEVICE_SDCARD_0) {
-    return sdcard_read(address);
+    return sdcard_read(E_SDCARD_0, address);
+  }
+  if (self.device == E_SPI_DEVICE_SDCARD_1) {
+    return sdcard_read(E_SDCARD_1, address);
   }
 
   fprintf(stderr, "spi: unimplemented read from %s\n", spi_device_names[self.device]);
@@ -108,7 +111,11 @@ u8_t spi_data_read(u16_t address) {
 
 void spi_data_write(u16_t address, u8_t value) {
   if (self.device == E_SPI_DEVICE_SDCARD_0) {
-    sdcard_write(address, value);
+    sdcard_write(E_SDCARD_0, address, value);
+    return;
+  }
+  if (self.device == E_SPI_DEVICE_SDCARD_1) {
+    sdcard_write(E_SDCARD_1, address, value);
     return;
   }
 
