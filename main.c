@@ -8,6 +8,7 @@
 #include "mmu.h"
 #include "nextreg.h"
 #include "spi.h"
+#include "timex.h"
 #include "ula.h"
 #include "utils.h"
 
@@ -79,12 +80,18 @@ static int main_init(void) {
     goto exit_clock;
   }
 
-  if (cpu_init() != 0) {
+  if (timex_init() != 0) {
     goto exit_ula;
+  }
+
+  if (cpu_init() != 0) {
+    goto exit_timex;
   }
 
   return 0;
 
+exit_timex:
+  timex_finit();
 exit_ula:
   ula_finit();
 exit_clock:
@@ -145,6 +152,7 @@ static void main_eventloop(void) {
 
 static void main_finit(void) {
   cpu_finit();
+  timex_finit();
   ula_finit();
   clock_finit();
   memory_finit();
