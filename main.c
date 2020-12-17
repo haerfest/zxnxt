@@ -4,6 +4,7 @@
 #include "defs.h"
 #include "divmmc.h"
 #include "io.h"
+#include "layer2.h"
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
@@ -84,12 +85,18 @@ static int main_init(void) {
     goto exit_ula;
   }
 
-  if (cpu_init() != 0) {
+  if (layer2_init() != 0) {
     goto exit_timex;
+  }
+
+  if (cpu_init() != 0) {
+    goto exit_layer2;
   }
 
   return 0;
 
+exit_layer2:
+  layer2_finit();
 exit_timex:
   timex_finit();
 exit_ula:
@@ -152,6 +159,7 @@ static void main_eventloop(void) {
 
 static void main_finit(void) {
   cpu_finit();
+  layer2_finit();
   timex_finit();
   ula_finit();
   clock_finit();
