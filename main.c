@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
+#include "sdcard.h"
 #include "spi.h"
 #include "timex.h"
 #include "ula.h"
@@ -60,8 +61,12 @@ static int main_init(void) {
     goto exit_texture;
   }
 
-  if (spi_init() != 0) {
+  if (sdcard_init() != 0) {
     goto exit_utils;
+  }
+
+  if (spi_init() != 0) {
+    goto exit_sdcard;
   }
 
   if (nextreg_init() != 0) {
@@ -126,6 +131,8 @@ exit_nextreg:
   nextreg_finit();
 exit_spi:
   spi_finit();
+exit_sdcard:
+  sdcard_finit();
 exit_utils:
   utils_finit();
 exit_texture:
@@ -180,6 +187,7 @@ static void main_finit(void) {
   io_finit();
   nextreg_finit();
   spi_finit();
+  sdcard_finit();
   utils_finit();
 
   SDL_DestroyTexture(self.texture);
