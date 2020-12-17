@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "defs.h"
 #include "mmu.h"
@@ -45,7 +46,8 @@ static mmu_t self;
 
 
 int mmu_init(void) {
-  FILE *fp;
+  FILE*  fp;
+  size_t i;
 
   self.memory = malloc(MEMORY_SIZE);
   if (self.memory == NULL) {
@@ -53,7 +55,9 @@ int mmu_init(void) {
     return -1;
   }
 
-  memset(self.memory, 0x55, MEMORY_SIZE);
+  for (i = 0; i < MEMORY_SIZE; i++) {
+    self.memory[i] = rand() % 256;
+  }
 
   if (utils_load_rom("enNextZX.rom", 64 * 1024, &self.memory[ROM_START]) != 0) {
     goto exit;
