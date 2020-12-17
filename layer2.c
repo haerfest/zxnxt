@@ -18,5 +18,5 @@ u8_t layer2_read(u16_t address) {
 
 
 void layer2_write(u16_t address, u8_t value) {
-  fprintf(stderr, "timex: unimplemented write of $%02X to $%04X\n", value, address);
+  fprintf(stderr, "layer2: unimplemented write of $%02X to $%04X\n", value, address);
 }
