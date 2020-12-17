@@ -14,8 +14,14 @@
 #include "utils.h"
 
 
-#define WINDOW_WIDTH  (32 + 256 + 64)
-#define WINDOW_HEIGHT 312
+#define FRAME_BUFFER_WIDTH  (32 + 256 + 64)
+#define FRAME_BUFFER_HEIGHT 312
+
+#define RENDER_SCALE_X 2
+#define RENDER_SCALE_Y 2
+
+#define WINDOW_WIDTH  (FRAME_BUFFER_WIDTH  * RENDER_SCALE_X)
+#define WINDOW_HEIGHT (FRAME_BUFFER_HEIGHT * RENDER_SCALE_Y)
 
 
 typedef struct {
@@ -39,7 +45,12 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, WINDOW_WIDTH, WINDOW_HEIGHT);
+  if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
+    fprintf(stderr, "main: SDL_RenderSetScale error: %s\n", SDL_GetError());
+    goto exit_window_and_renderer;
+  }
+
+  self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
     fprintf(stderr, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
