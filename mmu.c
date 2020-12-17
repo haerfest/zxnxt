@@ -41,25 +41,25 @@ typedef struct  {
 } mmu_t;
 
 
-static mmu_t mmu;
+static mmu_t self;
 
 
 int mmu_init(void) {
   FILE *fp;
 
-  mmu.memory = malloc(MEMORY_SIZE);
-  if (mmu.memory == NULL) {
+  self.memory = malloc(MEMORY_SIZE);
+  if (self.memory == NULL) {
     fprintf(stderr, "mmu: out of memory\n");
     return -1;
   }
 
-  memset(mmu.memory, 0x55, MEMORY_SIZE);
+  memset(self.memory, 0x55, MEMORY_SIZE);
 
-  if (utils_load_rom("enNextZX.rom", 64 * 1024, &mmu.memory[ROM_START]) != 0) {
+  if (utils_load_rom("enNextZX.rom", 64 * 1024, &self.memory[ROM_START]) != 0) {
     goto exit;
   }
 
-  mmu.selected_rom = 0;
+  self.selected_rom = 0;
 
   /* TODO: Load in other ROMs:
    *       - EsxDOS
@@ -79,30 +79,30 @@ exit:
 
 
 void mmu_finit(void) {
-  if (mmu.memory != NULL) {
-    free(mmu.memory);
-    mmu.memory = NULL;
+  if (self.memory != NULL) {
+    free(self.memory);
+    self.memory = NULL;
   }
 }
 
 
 u8_t* mmu_divmmc_get(void) {
-  return &mmu.memory[DIVMMC_START];
+  return &self.memory[DIVMMC_START];
 }
 
 
 u8_t mmu_page_get(mmu_page_slot_t slot) {
-  return mmu.page[slot];
+  return self.page[slot];
 }
 
 
 void mmu_page_set(mmu_page_slot_t slot, mmu_page_t page) {
   if (page < N_PAGES) {
-    mmu.pointer[slot] = &mmu.memory[RAM_START + page * PAGE_SIZE];
-    mmu.page[slot]    = page;
+    self.pointer[slot] = &self.memory[RAM_START + page * PAGE_SIZE];
+    self.page[slot]    = page;
   } else if (page == ROM_PAGE && slot < 2) {
-    mmu.pointer[slot] = &mmu.memory[ROM_START + mmu.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
-    mmu.page[slot]    = page;
+    self.pointer[slot] = &self.memory[ROM_START + self.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
+    self.page[slot]    = page;
   }
 
   fprintf(stderr, "mmu: slot %u contains page %u\n", slot, page);
@@ -121,16 +121,16 @@ void mmu_bank_set(mmu_bank_slot_t slot, mmu_bank_t bank) {
 u8_t mmu_read(u16_t address) {
   const u8_t  slot   = address / PAGE_SIZE;
   const u16_t offset = address & (PAGE_SIZE - 1);
-  return mmu.pointer[slot][offset];
+  return self.pointer[slot][offset];
 }
 
 
 void mmu_write(u16_t address, u8_t value) {
   const u8_t slot = address / PAGE_SIZE;
-  if (mmu.page[slot] != ROM_PAGE) {
+  if (self.page[slot] != ROM_PAGE) {
     /* TODO: Layer 2 can be mapped for writing behind the ROMs. */
     const u16_t offset = address & (PAGE_SIZE - 1);
-    mmu.pointer[slot][offset] = value;
+    self.pointer[slot][offset] = value;
   }
 }
 
@@ -138,12 +138,12 @@ void mmu_write(u16_t address, u8_t value) {
 void mmu_rom_set(mmu_rom_t rom) {
   mmu_page_slot_t slot;
 
-  mmu.selected_rom = rom;
-  fprintf(stderr, "mmu: ROM %u selected\n", mmu.selected_rom);
+  self.selected_rom = rom;
+  fprintf(stderr, "mmu: ROM %u selected\n", self.selected_rom);
 
   for (slot = E_MMU_PAGE_SLOT_0; slot <= E_MMU_PAGE_SLOT_1; slot++) {
-    if (mmu.page[slot] == ROM_PAGE) {
-      mmu.pointer[slot] = &mmu.memory[ROM_START + mmu.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
+    if (self.page[slot] == ROM_PAGE) {
+      self.pointer[slot] = &self.memory[ROM_START + self.selected_rom * ROM_SIZE + slot * PAGE_SIZE];
     }
   }
 }
@@ -151,5 +151,5 @@ void mmu_rom_set(mmu_rom_t rom) {
 
 u8_t mmu_bank_read(mmu_bank_t bank, u16_t offset) {
   const mmu_page_t page = bank * 2;
-  return mmu.memory[RAM_START + page * PAGE_SIZE + offset];
+  return self.memory[RAM_START + page * PAGE_SIZE + offset];
 }

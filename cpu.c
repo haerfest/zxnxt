@@ -39,58 +39,58 @@
 #define CF      (F & CF_MASK)
 
 /* Convenient register shortcuts. */
-#define A    cpu.af.b.h
-#define F    cpu.af.b.l
-#define B    cpu.bc.b.h
-#define C    cpu.bc.b.l
-#define D    cpu.de.b.h
-#define E    cpu.de.b.l
-#define H    cpu.hl.b.h
-#define L    cpu.hl.b.l
-#define W    cpu.wz.b.h
-#define Z    cpu.wz.b.l
+#define A    self.af.b.h
+#define F    self.af.b.l
+#define B    self.bc.b.h
+#define C    self.bc.b.l
+#define D    self.de.b.h
+#define E    self.de.b.l
+#define H    self.hl.b.h
+#define L    self.hl.b.l
+#define W    self.wz.b.h
+#define Z    self.wz.b.l
 
-#define AF   cpu.af.w
-#define BC   cpu.bc.w
-#define DE   cpu.de.w
-#define HL   cpu.hl.w
-#define WZ   cpu.wz.w
+#define AF   self.af.w
+#define BC   self.bc.w
+#define DE   self.de.w
+#define HL   self.hl.w
+#define WZ   self.wz.w
 
-#define AF_  cpu.af_.w
-#define BC_  cpu.bc_.w
-#define DE_  cpu.de_.w
-#define HL_  cpu.hl_.w
+#define AF_  self.af_.w
+#define BC_  self.bc_.w
+#define DE_  self.de_.w
+#define HL_  self.hl_.w
 
-#define IX   cpu.ix.w
-#define IY   cpu.iy.w
+#define IX   self.ix.w
+#define IY   self.iy.w
 
-#define IXH  cpu.ix.b.h
-#define IXL  cpu.ix.b.l
-#define IYH  cpu.iy.b.h
-#define IYL  cpu.iy.b.l
+#define IXH  self.ix.b.h
+#define IXL  self.ix.b.l
+#define IYH  self.iy.b.h
+#define IYL  self.iy.b.l
 
-#define S    cpu.sp.b.h
-#define P    cpu.sp.b.l
-#define SP   cpu.sp.w
+#define S    self.sp.b.h
+#define P    self.sp.b.l
+#define SP   self.sp.w
 
-#define PC   cpu.pc.w
-#define PCH  cpu.pc.b.h
-#define PCL  cpu.pc.b.l
+#define PC   self.pc.w
+#define PCH  self.pc.b.h
+#define PCL  self.pc.b.l
 
-#define IFF1 cpu.iff1
-#define IFF2 cpu.iff2
+#define IFF1 self.iff1
+#define IFF2 self.iff2
 
-#define I    cpu.i
-#define R    cpu.r
-#define IM   cpu.im
+#define I    self.i
+#define R    self.r
+#define IM   self.im
 
 /* Not a register, but a shortcut for "clock tick". */
 #define T    clock_ticks
 
 
-#define SZ53(value)   cpu.sz53[value]
-#define SZ53P(value)  cpu.sz53p[value]
-#define PARITY(value) cpu.parity[value]
+#define SZ53(value)   self.sz53[value]
+#define SZ53P(value)  self.sz53p[value]
+#define PARITY(value) self.parity[value]
 
 
 /**
@@ -169,7 +169,7 @@ typedef struct {
 
 
 /* Local-global cpu for fast reference. */
-static cpu_t cpu;
+static cpu_t self;
 
 
 static u8_t parity(int value) {
@@ -188,9 +188,9 @@ static void cpu_fill_tables(void) {
   int value;
   
   for (value = 0; value < 256; value++) {
-    cpu.parity[value] = parity(value);
-    cpu.sz53[value]   = (value & 0x80) | (value == 0) << ZF_SHIFT | (value & 0x20) | (value & 0x08);
-    cpu.sz53p[value]  = cpu.sz53[value] | cpu.parity[value] << PF_SHIFT;
+    self.parity[value] = parity(value);
+    self.sz53[value]   = (value & 0x80) | (value == 0) << ZF_SHIFT | (value & 0x20) | (value & 0x08);
+    self.sz53p[value]  = self.sz53[value] | self.parity[value] << PF_SHIFT;
   }
 }
 

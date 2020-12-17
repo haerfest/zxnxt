@@ -90,7 +90,7 @@ typedef struct {
 } ula_t;
 
 
-static ula_t ula;
+static ula_t self;
 
 
 static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t spec) {
@@ -98,95 +98,95 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
 
   /* The ULA uses a 7 MHz clock to refresh the display, which is 28/4 MHz. */
   for (tick = 0; tick < delta; tick += 4) {
-    switch (ula.display_state) {
+    switch (self.display_state) {
       case E_ULA_DISPLAY_STATE_TOP_BORDER:
-        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
-        ula.display_column++;
-        if (ula.display_column == 32 + 256 + 64) {
-          ula.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+        self.display_column++;
+        if (self.display_column == 32 + 256 + 64) {
+          self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
         }
         break;
 
       case E_ULA_DISPLAY_STATE_LEFT_BORDER:
-        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
-        ula.display_column++;
-        if (ula.display_column == 32) {
-          ula.display_offset = ula.line_offsets[ula.display_line - spec.top_border_lines];
-          ula.display_state  = E_ULA_DISPLAY_STATE_DISPLAY;
+        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+        self.display_column++;
+        if (self.display_column == 32) {
+          self.display_offset = self.line_offsets[self.display_line - spec.top_border_lines];
+          self.display_state  = E_ULA_DISPLAY_STATE_DISPLAY;
         }
         break;
 
       case E_ULA_DISPLAY_STATE_DISPLAY:
-        if (ula.display_pixel_mask == 0x00) {
-          ula.display_byte = mmu_bank_read(ula.display_bank, ula.display_offset);
-          ula.display_offset++;
-          ula.display_pixel_mask = 0x80;
+        if (self.display_pixel_mask == 0x00) {
+          self.display_byte = mmu_bank_read(self.display_bank, self.display_offset);
+          self.display_offset++;
+          self.display_pixel_mask = 0x80;
         }
 
-        if (ula.display_byte & ula.display_pixel_mask) {
-          SDL_SetRenderDrawColor(ula.renderer, 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE);
+        if (self.display_byte & self.display_pixel_mask) {
+          SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE);
         } else {
-          SDL_SetRenderDrawColor(ula.renderer, 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE);
+          SDL_SetRenderDrawColor(self.renderer, 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE);
         }
-        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
+        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
 
-        ula.display_pixel_mask >>= 1;
-        ula.display_column++;
-        if (ula.display_column == 32 + 256) {
-          ula.display_state = E_ULA_DISPLAY_STATE_RIGHT_BORDER;
+        self.display_pixel_mask >>= 1;
+        self.display_column++;
+        if (self.display_column == 32 + 256) {
+          self.display_state = E_ULA_DISPLAY_STATE_RIGHT_BORDER;
         }
         break;
 
       case E_ULA_DISPLAY_STATE_HSYNC:
-        ula.display_column++;
-        if (ula.display_column == 32 + 256 + 64 + 96) {
-          ula.display_column = 0;
-          ula.display_line++;
-          if (ula.display_line < spec.top_border_lines) {
-            ula.display_state = E_ULA_DISPLAY_STATE_TOP_BORDER;
-          } else if (ula.display_line < spec.top_border_lines + spec.display_lines) {
-            ula.display_state = E_ULA_DISPLAY_STATE_LEFT_BORDER;
+        self.display_column++;
+        if (self.display_column == 32 + 256 + 64 + 96) {
+          self.display_column = 0;
+          self.display_line++;
+          if (self.display_line < spec.top_border_lines) {
+            self.display_state = E_ULA_DISPLAY_STATE_TOP_BORDER;
+          } else if (self.display_line < spec.top_border_lines + spec.display_lines) {
+            self.display_state = E_ULA_DISPLAY_STATE_LEFT_BORDER;
           } else {
-            ula.display_state = E_ULA_DISPLAY_STATE_BOTTOM_BORDER;
+            self.display_state = E_ULA_DISPLAY_STATE_BOTTOM_BORDER;
           }
         }
         break;
 
       case E_ULA_DISPLAY_STATE_RIGHT_BORDER:
-        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
-        ula.display_column++;
-        if (ula.display_column == 32 + 256 + 64) {
-          ula.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+        self.display_column++;
+        if (self.display_column == 32 + 256 + 64) {
+          self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
         }
         break;
 
       case E_ULA_DISPLAY_STATE_BOTTOM_BORDER:
-        SDL_SetRenderDrawColor(ula.renderer, colours[ula.border_colour].red, colours[ula.border_colour].green, colours[ula.border_colour].blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(ula.renderer, ula.display_column, ula.display_line);
-        ula.display_column++;
-        if (ula.display_column == 32 + 256 + 64) {
-          if (ula.display_line < spec.total_lines) {
-            ula.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+        self.display_column++;
+        if (self.display_column == 32 + 256 + 64) {
+          if (self.display_line < spec.total_lines) {
+            self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
           } else {
             /* TODO: Generate VSYNC interrupt. */
-            SDL_RenderPresent(ula.renderer);
-            ula.display_state = E_ULA_DISPLAY_STATE_VSYNC;
+            SDL_RenderPresent(self.renderer);
+            self.display_state = E_ULA_DISPLAY_STATE_VSYNC;
           }
         }
         break;
 
       case E_ULA_DISPLAY_STATE_VSYNC:
-        ula.display_column++;
-        if (ula.display_column == 32 + 256 + 64 + 96) {
-          ula.display_column = 0;
-          ula.display_line++;
-          if (ula.display_line == spec.total_lines + spec.blanking_period_lines) {
-            ula.display_line   = 0;
-            ula.display_offset = 0;
-            ula.display_state  = E_ULA_DISPLAY_STATE_TOP_BORDER;
+        self.display_column++;
+        if (self.display_column == 32 + 256 + 64 + 96) {
+          self.display_column = 0;
+          self.display_line++;
+          if (self.display_line == spec.total_lines + spec.blanking_period_lines) {
+            self.display_line   = 0;
+            self.display_offset = 0;
+            self.display_state  = E_ULA_DISPLAY_STATE_TOP_BORDER;
           }
         }
         break;
@@ -198,7 +198,7 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
 static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
   const unsigned int       i    = clock_display_timing_get() - E_CLOCK_DISPLAY_TIMING_ZX_48K;
   const unsigned int       j    = clock_video_timing_get() != E_CLOCK_VIDEO_TIMING_HDMI;
-  const unsigned int       k    = ula.display_frequency;
+  const unsigned int       k    = self.display_frequency;
   const ula_display_spec_t spec = ula_display_spec[i][j][k];
 
   ula_state_machine_run(delta, spec);
@@ -213,22 +213,22 @@ static void ula_fill_tables(void) {
     const u8_t  row    = line / 8;
     const u8_t  offset = (line % 8) * 8;
 
-    ula.line_offsets[line] = third + (row + offset) * 32;
+    self.line_offsets[line] = third + (row + offset) * 32;
   }
 }
 
 
 int ula_init(SDL_Renderer* renderer, SDL_Texture* texture) {
-  ula.renderer           = renderer;
-  ula.display_bank       = 5;
-  ula.display_offset     = 0;
-  ula.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
-  ula.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
-  ula.display_line       = 0;
-  ula.display_column     = 0;
-  ula.display_pixel_mask = 0;
-  ula.border_colour      = 0;
-  ula.speaker_state      = 0;
+  self.renderer           = renderer;
+  self.display_bank       = 5;
+  self.display_offset     = 0;
+  self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
+  self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
+  self.display_line       = 0;
+  self.display_column     = 0;
+  self.display_pixel_mask = 0;
+  self.border_colour      = 0;
+  self.speaker_state      = 0;
 
   ula_fill_tables();
 
@@ -251,8 +251,8 @@ u8_t ula_read(u16_t address) {
 
 
 void ula_write(u16_t address, u8_t value) {
-  ula.border_colour = value & 0x03;
-  ula.speaker_state = value & 0x04;
+  self.border_colour = value & 0x03;
+  self.speaker_state = value & 0x04;
 }
 
 
@@ -272,6 +272,6 @@ void ula_display_frequency_set(ula_display_frequency_t frequency) {
     "60"
   };
 
-  ula.display_frequency = frequency;
+  self.display_frequency = frequency;
   fprintf(stderr, "ula: display frequency set to %s Hz\n", descriptions[frequency]);
 }

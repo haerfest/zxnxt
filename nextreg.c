@@ -33,12 +33,12 @@ typedef struct {
 } nextreg_t;
 
 
-static nextreg_t nextreg;
+static nextreg_t self;
 
 
 int nextreg_init(void) {
-  nextreg.selected_register  = 0x55;
-  nextreg.configuration_mode = 0;
+  self.selected_register  = 0x55;
+  self.configuration_mode = 0;
   return 0;
 }
 
@@ -48,7 +48,7 @@ void nextreg_finit(void) {
 
 
 void nextreg_select_write(u16_t address, u8_t value) {
-  nextreg.selected_register = value;
+  self.selected_register = value;
 }
 
 
@@ -62,8 +62,8 @@ static void nextreg_machine_type_write(u8_t value) {
     ula_display_timing_set((value >> 4) & 0x03);
   }
 
-  nextreg.configuration_mode = (value & 0x03) == 0x00;
-  if (nextreg.configuration_mode) {
+  self.configuration_mode = (value & 0x03) == 0x00;
+  if (self.configuration_mode) {
     fprintf(stderr, "nextreg: configuration mode activated\n");
   }
 }
@@ -80,14 +80,14 @@ static void nextreg_cpu_speed_write(u8_t value) {
 
 
 static void nextreg_video_timing_write(u8_t value) {
-  if (nextreg.configuration_mode) {
+  if (self.configuration_mode) {
     ula_video_timing_set(value & 0x03);
   }
 }
 
 
 void nextreg_data_write(u16_t address, u8_t value) {
-  switch (nextreg.selected_register) {
+  switch (self.selected_register) {
     case REGISTER_MACHINE_TYPE:
       nextreg_machine_type_write(value);
       break;
@@ -112,7 +112,7 @@ void nextreg_data_write(u16_t address, u8_t value) {
     case REGISTER_MMU_SLOT5_CONTROL:
     case REGISTER_MMU_SLOT6_CONTROL:
     case REGISTER_MMU_SLOT7_CONTROL:
-      mmu_page_set(nextreg.selected_register - REGISTER_MMU_SLOT0_CONTROL, value);
+      mmu_page_set(self.selected_register - REGISTER_MMU_SLOT0_CONTROL, value);
       break;
 
     case REGISTER_SPECTRUM_MEMORY_MAPPING:
@@ -124,14 +124,14 @@ void nextreg_data_write(u16_t address, u8_t value) {
       break;
 
     default:
-      fprintf(stderr, "nextreg: unimplemented write of $%02X to Next register $%02X\n", value, nextreg.selected_register);
+      fprintf(stderr, "nextreg: unimplemented write of $%02X to Next register $%02X\n", value, self.selected_register);
       break;
   }
 }
 
 
 u8_t nextreg_data_read(u16_t address) {
-  switch (nextreg.selected_register) {
+  switch (self.selected_register) {
     case REGISTER_MMU_SLOT0_CONTROL:
     case REGISTER_MMU_SLOT1_CONTROL:
     case REGISTER_MMU_SLOT2_CONTROL:
@@ -140,10 +140,10 @@ u8_t nextreg_data_read(u16_t address) {
     case REGISTER_MMU_SLOT5_CONTROL:
     case REGISTER_MMU_SLOT6_CONTROL:
     case REGISTER_MMU_SLOT7_CONTROL:
-      return mmu_page_get(nextreg.selected_register - REGISTER_MMU_SLOT0_CONTROL);
+      return mmu_page_get(self.selected_register - REGISTER_MMU_SLOT0_CONTROL);
 
     default:
-      fprintf(stderr, "nextreg: unimplemented read from Next register $%02X\n", nextreg.selected_register);
+      fprintf(stderr, "nextreg: unimplemented read from Next register $%02X\n", self.selected_register);
       break;
   }
 

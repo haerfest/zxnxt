@@ -34,16 +34,16 @@ typedef struct {
 } clock_t;
 
 
-static clock_t clock;
+static clock_t self;
 
 
 int clock_init(void) {
-  clock.video_timing   = E_CLOCK_VIDEO_TIMING_VGA_BASE;
-  clock.display_timing = E_CLOCK_DISPLAY_TIMING_ZX_PLUS_2A;
-  clock.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
-  clock.ticks          = 0;
-  clock.n_callbacks    = 0;
-  clock.callbacks      = NULL;
+  self.video_timing   = E_CLOCK_VIDEO_TIMING_VGA_BASE;
+  self.display_timing = E_CLOCK_DISPLAY_TIMING_ZX_PLUS_2A;
+  self.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
+  self.ticks          = 0;
+  self.n_callbacks    = 0;
+  self.callbacks      = NULL;
 
   return 0;
 }
@@ -58,13 +58,13 @@ void clock_cpu_speed_set(clock_cpu_speed_t speed) {
     "3.5", "7", "14", "28"
   };
 
-  clock.cpu_speed = speed;
+  self.cpu_speed = speed;
   fprintf(stderr, "clock: CPU speed set to %s MHz\n", speeds[speed]);
 }
 
 
 clock_display_timing_t clock_display_timing_get(void) {
-  return clock.display_timing;
+  return self.display_timing;
 }
 
 
@@ -80,13 +80,13 @@ void clock_display_timing_set(clock_display_timing_t timing) {
     "invalid (7)"
   };
 
-  clock.display_timing = timing;
+  self.display_timing = timing;
   fprintf(stderr, "clock: display timing set to %s\n", descriptions[timing]);
 }
 
 
 clock_video_timing_t clock_video_timing_get(void) {
-  return clock.video_timing;
+  return self.video_timing;
 }
 
 
@@ -102,21 +102,21 @@ void clock_video_timing_set(clock_video_timing_t timing) {
     "HDMI"
   };
 
-  clock.video_timing = timing;
+  self.video_timing = timing;
   fprintf(stderr, "clock: video timing set to %s\n", descriptions[timing]);
 }
 
 
 int clock_register_callback(clock_callback_t callback) {
-  clock_callback_t* callbacks = realloc(clock.callbacks, (clock.n_callbacks + 1) * sizeof(clock_callback_t));
+  clock_callback_t* callbacks = realloc(self.callbacks, (self.n_callbacks + 1) * sizeof(clock_callback_t));
   if (callbacks == NULL) {
     fprintf(stderr, "clock: out of memory\n");
     return -1;
   }
 
-  clock.callbacks = callbacks;
-  clock.callbacks[clock.n_callbacks] = callback;
-  clock.n_callbacks++;
+  self.callbacks = callbacks;
+  self.callbacks[self.n_callbacks] = callback;
+  self.n_callbacks++;
 
   return 0;
 }
@@ -125,19 +125,19 @@ int clock_register_callback(clock_callback_t callback) {
 static void clock_invoke_callbacks(u64_t ticks, unsigned int delta) {
   unsigned int i;
   
-  for (i = 0; i < clock.n_callbacks; i++) {
-    (*clock.callbacks[i])(ticks, delta);
+  for (i = 0; i < self.n_callbacks; i++) {
+    (*self.callbacks[i])(ticks, delta);
   }
 }
 
 
 /* Called by the CPU, telling us how many of its ticks have passed. */
 void clock_ticks(unsigned int cpu_ticks) {
-  const unsigned int clock_frequency = clock_frequency_28mhz[clock.video_timing];
-  const unsigned     ticks_28mhz     = cpu_ticks * clock_divider[clock.cpu_speed];
+  const unsigned int clock_frequency = clock_frequency_28mhz[self.video_timing];
+  const unsigned     ticks_28mhz     = cpu_ticks * clock_divider[self.cpu_speed];
 
-  clock.ticks += ticks_28mhz;
-  clock_invoke_callbacks(clock.ticks, ticks_28mhz);
+  self.ticks += ticks_28mhz;
+  clock_invoke_callbacks(self.ticks, ticks_28mhz);
 
   /**
    * Fastest ~28 MHz clock runs at 33 MHz.
