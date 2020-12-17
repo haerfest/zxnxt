@@ -47,12 +47,12 @@ void nextreg_finit(void) {
 }
 
 
-void nextreg_select_write(u8_t value) {
+void nextreg_select_write(u16_t address, u8_t value) {
   nextreg.selected_register = value;
 }
 
 
-u8_t nextreg_select_read(void) {
+u8_t nextreg_select_read(u16_t address) {
   return 0xFF;
 }
 
@@ -86,7 +86,7 @@ static void nextreg_video_timing_write(u8_t value) {
 }
 
 
-void nextreg_data_write(u8_t value) {
+void nextreg_data_write(u16_t address, u8_t value) {
   switch (nextreg.selected_register) {
     case REGISTER_MACHINE_TYPE:
       nextreg_machine_type_write(value);
@@ -130,7 +130,7 @@ void nextreg_data_write(u8_t value) {
 }
 
 
-u8_t nextreg_data_read(void) {
+u8_t nextreg_data_read(u16_t address) {
   switch (nextreg.selected_register) {
     case REGISTER_MMU_SLOT0_CONTROL:
     case REGISTER_MMU_SLOT1_CONTROL:

@@ -2,6 +2,7 @@
 #include "divmmc.h"
 #include "nextreg.h"
 #include "defs.h"
+#include "layer2.h"
 #include "spi.h"
 #include "timex.h"
 #include "ula.h"
@@ -36,11 +37,15 @@ u8_t io_read(u16_t address) {
     return timex_read(address);
   }
 
+  if (address == 0x123B) {
+    return layer2_read(address);
+  }
+
   if (address == 0x243B) {
-    return nextreg_select_read();
+    return nextreg_select_read(address);
   }
   if (address == 0x253B) {
-    return nextreg_data_read();
+    return nextreg_data_read(address);
   } 
 
   fprintf(stderr, "io: unimplemented read from $%04X\n", address);
@@ -61,23 +66,31 @@ void io_write(u16_t address, u8_t value) {
   }
 
   if ((address & 0x00FF) == 0x00E7) {
-    return spi_cs_write(address, value);
+    spi_cs_write(address, value);
+    return;
   }
 
   if ((address & 0x00FF) == 0x00EB) {
-    return spi_data_write(address, value);
+    spi_data_write(address, value);
+    return;
   }
 
   if ((address & 0x00FF) == 0x00FF) {
-    return timex_write(address, value);
+    timex_write(address, value);
+    return;
+  }
+
+  if (address == 0x123B) {
+    layer2_write(address, value);
+    return;
   }
 
   if (address == 0x243B) {
-    nextreg_select_write(value);
+    nextreg_select_write(address, value);
     return;
   }
   if (address == 0x253B) {
-    nextreg_data_write(value);
+    nextreg_data_write(address, value);
     return;
   }
 
