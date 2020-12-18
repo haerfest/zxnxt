@@ -66,7 +66,7 @@ static const ula_colour_t colours[] = {
 typedef enum {
   E_ULA_DISPLAY_STATE_TOP_BORDER = 0,
   E_ULA_DISPLAY_STATE_LEFT_BORDER,
-  E_ULA_DISPLAY_STATE_DISPLAY,
+  E_ULA_DISPLAY_STATE_FRAME_BUFFER,
   E_ULA_DISPLAY_STATE_RIGHT_BORDER,
   E_ULA_DISPLAY_STATE_HSYNC,
   E_ULA_DISPLAY_STATE_BOTTOM_BORDER,
@@ -114,11 +114,11 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         self.display_column++;
         if (self.display_column == 32) {
           self.display_offset = self.line_offsets[self.display_line - spec.top_border_lines];
-          self.display_state  = E_ULA_DISPLAY_STATE_DISPLAY;
+          self.display_state  = E_ULA_DISPLAY_STATE_FRAME_BUFFER;
         }
         break;
 
-      case E_ULA_DISPLAY_STATE_DISPLAY:
+      case E_ULA_DISPLAY_STATE_FRAME_BUFFER:
         if (self.display_pixel_mask == 0x00) {
           self.display_byte = mmu_bank_read(self.display_bank, self.display_offset);
           self.display_offset++;
@@ -172,8 +172,8 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
             self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
           } else {
             /* TODO: Generate VSYNC interrupt. */
-            SDL_RenderPresent(self.renderer);
             self.display_state = E_ULA_DISPLAY_STATE_VSYNC;
+            SDL_RenderPresent(self.renderer);
           }
         }
         break;
@@ -209,11 +209,12 @@ static void ula_fill_tables(void) {
   int line;
 
   for (line = 0; line < 192; line++) {
-    const u16_t third = 2048 * (line / 64);
-    const u8_t  row    = line / 8;
-    const u8_t  offset = (line % 8) * 8;
+    const u8_t third         = line / 64;                /* Which third of the screen the line falls in: 0, 1 or 2. */
+    const u8_t line_rel      = line - third * 64;        /* Relative line within the third: 0 .. 63. */
+    const u8_t char_row      = line_rel / 8;             /* Which character row the line falls in: 0 .. 7. */
+    const u8_t char_row_line = line_rel - char_row * 8;  /* Which line within character row: 0 .. 7. */
 
-    self.line_offsets[line] = third + (row + offset) * 32;
+    self.line_offsets[line] = third * 2048 + (char_row_line * 8 + char_row) * 32;
   }
 }
 
