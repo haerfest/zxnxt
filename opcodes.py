@@ -1038,7 +1038,10 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
     prefix_str     = ''.join(f'${opcode:02X} ' for opcode in prefix)
     prefix_comment = f'/* {prefix_str}*/ ' if prefix else ''
 
-    if False:
+    debug = False
+
+    # Show registers before and ofter instruction execution.
+    if debug:
         if not prefix:
             f.write('''
 fprintf(stderr, "     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
@@ -1068,7 +1071,7 @@ fprintf(stderr, "%04X ", PC);
                 f.write(f'''
 case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
   {{
-    /* {disassembler} */
+    {disassembler if debug else ''}
     {c}
   }}
   break;
