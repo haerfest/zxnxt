@@ -10,7 +10,9 @@
  */
 
 
-#define N_SDCARDS 2
+#define N_SDCARDS                 2
+#define MAX_RESPONSE_PAYLOAD_SIZE 512
+#define SDCARD_IMAGE              "tbblue.mmc"
 
 
 typedef enum {
@@ -20,6 +22,7 @@ typedef enum {
   E_CMD_SEND_CSD          = 9,
   E_CMD_STOP_TRANSMISSION = 12,
   E_CMD_SET_BLOCKLEN      = 16,
+  E_CMD_READ_SINGLE_BLOCK = 17,
   E_CMD_APP_SEND_OP_COND  = 41,  /* Prepended by E_CMD_APP_CMD */
   E_CMD_APP_CMD           = 55,
   E_CMD_READ_OCR          = 58
@@ -53,7 +56,7 @@ typedef struct {
   state_t    state;
   u8_t       command_buffer[6];
   int        command_length;
-  u8_t       response_buffer[1 + 16 + 2];  /* R1 + payload + CRC. */
+  u8_t       response_buffer[1 + MAX_RESPONSE_PAYLOAD_SIZE + 2];  /* R1 + payload + CRC. */
   int        response_length;
   int        response_index;
   u8_t       error;
@@ -87,6 +90,8 @@ void sdcard_finit(void) {
 
 
 u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
+  fprintf(stderr, "sdcard: read\n");
+
   if (self[n].response_index < self[n].response_length) {
     return self[n].response_buffer[self[n].response_index++];
   }
@@ -98,6 +103,7 @@ u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
 
 static void sdcard_handle_command(sdcard_nr_t n) {
   const u8_t command = self[n].command_buffer[0] & 0x3F;
+  u32_t      block_length;
   int        i;
 
   fprintf(stderr, "sdcard: received CMD%u\n", command);
@@ -135,15 +141,57 @@ static void sdcard_handle_command(sdcard_nr_t n) {
       return;
       
     case E_CMD_STOP_TRANSMISSION:
-      self[n].state              = E_STATE_IDLE;
+      self[n].state              = E_STATE_TRANSFER;
       self[n].response_buffer[0] = 0x01;
       self[n].response_buffer[1] = 0xFF;  /* No longer busy. */
       self[n].response_length    = 2;
       return;
 
     case E_CMD_SET_BLOCKLEN:
-      self[n].block_length = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
-      fprintf(stderr, "sdcard: block length set to %u bytes\n", self[n].block_length);
+      block_length = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
+      if (block_length > MAX_RESPONSE_PAYLOAD_SIZE) {
+        fprintf(stderr, "sdcard: unsupported block length %u bytes\n", block_length);
+        break;
+      }
+      self[n].block_length = block_length;
+      return;
+
+    case E_CMD_READ_SINGLE_BLOCK:
+      /* Assume failure. */
+      self[n].response_buffer[0] = 0x01;
+      self[n].response_length    = 1;
+
+      if (n == E_SDCARD_0) {
+        FILE* fp;
+        long  offset;
+
+        fp = fopen(SDCARD_IMAGE, "rb");
+        if (fp == NULL) {
+          fprintf(stderr, "sdcard: error opening %s for reading\n", SDCARD_IMAGE);
+          return;
+        }
+
+        offset = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
+        if (fseek(fp, offset, SEEK_SET) != 0) {
+          fprintf(stderr, "sdcard: error seeking to position %ld in %s\n", offset, SDCARD_IMAGE);
+          fclose(fp);
+          return;
+        }
+
+        if (fread(&self[n].response_buffer[2], self[n].block_length, 1, fp) != 1) {
+          fprintf(stderr, "sdcard: error reading %u bytes from offset %ld in %s\n", self[n].block_length, offset, SDCARD_IMAGE);
+          fclose(fp);
+          return;
+        }
+
+        fclose(fp);
+
+        self[n].response_buffer[0]                            = 0x00;  /* R1. */
+        self[n].response_buffer[1]                            = 0xFE;  /* Start block token. */
+        self[n].response_buffer[2 + self[n].block_length + 0] = 0x00;  /* CRC. */
+        self[n].response_buffer[2 + self[n].block_length + 1] = 0x00;
+        self[n].response_length                               = 2 + self[n].block_length + 2;
+      }
       return;
 
     case E_CMD_APP_SEND_OP_COND:
