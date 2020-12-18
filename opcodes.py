@@ -583,11 +583,11 @@ def ed_table() -> Table:
                memory_write(HL, Z); T(4);
                HL++;
                B--;
-               R++;
-               if (BC == 0) {
+               if (B == 0) {
                  F |= ZF_MASK | NF_MASK;
                } else {
                  PC -= 2; T(5);
+                 R++;
                }
                '''),
         0xB8: ('LDDR', lambda: ldxr('-')),
