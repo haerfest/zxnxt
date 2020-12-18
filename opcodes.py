@@ -579,13 +579,14 @@ def ed_table() -> Table:
         0xB2: ('INIR',
                '''
                T(1);
-               Z = io_read(BC); T(3);
-               io_write(HL, Z); T(4);
-               F |= ZF_MASK | NF_MASK;
+               Z = io_read(BC);     T(3);
+               memory_write(HL, Z); T(4);
                HL++;
-               BC--;
+               B--;
                R++;
-               if (BC != 0) {
+               if (BC == 0) {
+                 F |= ZF_MASK | NF_MASK;
+               } else {
                  PC -= 2; T(5);
                }
                '''),
