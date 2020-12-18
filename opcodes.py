@@ -576,6 +576,19 @@ def ed_table() -> Table:
         0x94: ('PIXELAD', None), # using D,E (as Y,X) calculate the ULA screen address and store in HL
         0xA2: ('INI',  lambda: inx('+')),
         0xB0: ('LDIR', lambda: ldxr('+')),
+        0xB2: ('INIR',
+               '''
+               T(1);
+               Z = io_read(BC); T(3);
+               io_write(HL, Z); T(4);
+               F |= ZF_MASK | NF_MASK;
+               HL++;
+               BC--;
+               R++;
+               if (BC != 0) {
+                 PC -= 2; T(5);
+               }
+               '''),
         0xB8: ('LDDR', lambda: ldxr('-')),
     }
 
