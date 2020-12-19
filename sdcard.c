@@ -148,12 +148,13 @@ static void sdcard_handle_command(sdcard_nr_t n) {
     case E_CMD_SEND_CSD:
       self[n].state = E_STATE_IDLE;
       self[n].response_buffer[0] = 0x00;   /* R1. */
-      for (i = 1; i <= 16; i++) {          /* CSD. */
-        self[n].response_buffer[i] = 0x00;
+      self[n].response_buffer[1] = 0xFE;  /* Start block token. */
+      for (i = 0; i < 16; i++) {          /* CSD. */
+        self[n].response_buffer[2 + i] = 0x00;
       }
-      self[n].response_buffer[17] = 0x00;  /* CRC. */
-      self[n].response_buffer[18] = 0x00;
-      self[n].response_length     = 19;
+      self[n].response_buffer[2 + 16 + 0] = 0x00;  /* CRC. */
+      self[n].response_buffer[2 + 16 + 1] = 0x00;
+      self[n].response_length             = 2 + 16 + 2;
       return;
       
     case E_CMD_STOP_TRANSMISSION:
@@ -180,7 +181,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
       self[n].response_buffer[0] = 0x01;
       self[n].response_length    = 1;
 
-      if (n == E_SDCARD_0) {
+      if (self[n].fp != NULL) {
         const long offset = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
 
         fprintf(stderr, "sdcard: reading %u bytes from position %ld in %s\n", self[n].block_length, offset, SDCARD_IMAGE);
