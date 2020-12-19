@@ -1052,9 +1052,10 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
     prefix_str     = ''.join(f'${opcode:02X} ' for opcode in prefix)
     prefix_comment = f'/* {prefix_str}*/ ' if prefix else ''
 
+    # Show on stderr the registers before and after each instruction execution,
+    # as well as a disassembly of each executed instruction.
     debug = False
 
-    # Show registers before and ofter instruction execution.
     if debug:
         if not prefix:
             f.write('''
