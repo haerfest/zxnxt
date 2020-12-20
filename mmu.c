@@ -140,10 +140,17 @@ void mmu_write(u16_t address, u8_t value) {
 
 
 void mmu_rom_set(mmu_rom_t rom) {
+  const char* descriptions[] = {
+    "128K editor and menu",
+    "128K syntax checker",
+    "+3DOS",
+    "48K BASIC"
+  };
+
   mmu_page_slot_t slot;
 
-  self.selected_rom = rom;
-  fprintf(stderr, "mmu: ROM %u selected\n", self.selected_rom);
+  self.selected_rom = rom & 0x03;
+  fprintf(stderr, "mmu: ROM %u (%s) selected\n", self.selected_rom, descriptions[self.selected_rom]);
 
   for (slot = E_MMU_PAGE_SLOT_0; slot <= E_MMU_PAGE_SLOT_1; slot++) {
     if (self.page[slot] == ROM_PAGE) {

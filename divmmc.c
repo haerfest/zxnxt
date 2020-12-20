@@ -96,6 +96,8 @@ void divmmc_control_write(u16_t address, u8_t value) {
   self.bank_number    = value & 0x03;
   self.bank_pointer   = &self.memory_pointer[self.bank_number * BANK_SIZE];
 
+  fprintf(stderr, "divmmc: CONMEM %sabled\n", self.conmem_enabled ? "en" : "dis");
+
   if (value & 0x40) {
     fprintf(stderr, "divmmc: MAPRAM functionality not implemented\n");
   }
