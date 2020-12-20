@@ -1013,7 +1013,7 @@ instructions: Table = {
 }
 
 
-def make_disassembler(mnemonic: str) -> str:
+def make_disassembler(mnemonic: str) -> Tuple[str, int]:
     tokens = {
         'n'    : (2, lambda offset: f'memory_read(PC + {offset})'),
         'nn'   : (4, lambda offset: f'memory_read(PC + {offset} + 1) << 8 | memory_read(PC + {offset})'),
@@ -1021,7 +1021,7 @@ def make_disassembler(mnemonic: str) -> str:
         'e'    : (4, lambda offset: f'PC + {offset} + 1 + (s8_t) memory_read(PC + {offset})'),
         'd'    : (2, lambda offset: f'memory_read(PC + {offset})'),
         'reg'  : (2, lambda offset: f'memory_read(PC + {offset})'),
-        'value': (2, lambda offset: f'memory_read(PC + {offset} + 1)'),
+        'value': (2, lambda offset: f'memory_read(PC + {offset})'),
     }
 
     statement = 'fprintf(stderr, "'
@@ -1043,9 +1043,21 @@ def make_disassembler(mnemonic: str) -> str:
         statement += ', '.join(args)
     statement += ');'
 
-    return statement
-    
-    
+    return statement, offset
+
+
+def make_dumper(prefix: List[Opcode], opcode: Opcode, length: int) -> str:
+    s = 'fprintf(stderr, "'
+    s += ' '.join(f'{p:02X}' for p in prefix + [opcode])
+    s += ' %02X' * length
+    for i in range(4 - len(prefix) - length):
+        s += '   '
+    s += '"'
+    if length > 0:
+        s += ', ' + ', '.join(f'memory_read(PC + {i})' for i in range(length))
+    return s + ');'
+
+
 def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode]] = None) -> None:
     prefix         = prefix or []
     prefix_len     = len(prefix)
@@ -1054,7 +1066,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
 
     # Show on stderr the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
-    debug = False
+    debug = True
 
     if debug:
         if not prefix:
@@ -1079,13 +1091,15 @@ fprintf(stderr, "%04X ", PC);
     for opcode in sorted(instructions):
         item = instructions[opcode]
         if isinstance(item, tuple):
-            mnemonic, spec = item
-            disassembler   = make_disassembler(mnemonic)
+            mnemonic, spec       = item
+            disassembler, length = make_disassembler(mnemonic)
+            dumper               = make_dumper(prefix, opcode, length)
             c = spec() if callable(spec) else spec
             if c is not None:
                 f.write(f'''
 case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
   {{
+    {dumper       if debug else ''}
     {disassembler if debug else ''}
     {c}
   }}
