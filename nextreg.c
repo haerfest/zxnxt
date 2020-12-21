@@ -7,6 +7,7 @@
 
 
 /* See https://gitlab.com/thesmog358/tbblue/-/blob/master/docs/extra-hw/io-port-system/registers.txt */
+#define REGISTER_MACHINE_ID              0x01
 #define REGISTER_MACHINE_TYPE            0x03
 #define REGISTER_PERIPHERAL_1_SETTING    0x05
 #define REGISTER_PERIPHERAL_2_SETTING    0x06
@@ -132,6 +133,9 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
 u8_t nextreg_data_read(u16_t address) {
   switch (self.selected_register) {
+    case REGISTER_MACHINE_ID:
+      return 0x08;  /* Emulator. */
+
     case REGISTER_MMU_SLOT0_CONTROL:
     case REGISTER_MMU_SLOT1_CONTROL:
     case REGISTER_MMU_SLOT2_CONTROL:
