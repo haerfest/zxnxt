@@ -80,14 +80,17 @@ int sdcard_init(void) {
     self[n].response_index  = 0;
     self[n].block_length    = 512;
     self[n].in_app_cmd      = 0;
-    self[n].fp              = fopen(SDCARD_IMAGE, "rb");
+    self[n].fp              = NULL;
 
-    if (self[n].fp == NULL) {
-      fprintf(stderr, "sdcard%d: could not open %s for reading\n", n, SDCARD_IMAGE);
-      for (n--; n >= 0; n--) {
-        fclose(self[n].fp);
+    if (n == 0) {
+      self[n].fp = fopen(SDCARD_IMAGE, "rb");
+      if (self[n].fp == NULL) {
+        fprintf(stderr, "sdcard%d: could not open %s for reading\n", n, SDCARD_IMAGE);
+        for (n--; n >= 0; n--) {
+          fclose(self[n].fp);
+        }
+        return -1;
       }
-      return -1;
     }
   }
 
@@ -146,16 +149,19 @@ static void sdcard_handle_command(sdcard_nr_t n) {
       return;
 
     case E_CMD_SEND_CSD:
-      self[n].state = E_STATE_IDLE;
-      self[n].response_buffer[0] = 0x00;   /* R1. */
-      self[n].response_buffer[1] = 0xFE;  /* Start block token. */
-      for (i = 0; i < 16; i++) {          /* CSD. */
-        self[n].response_buffer[2 + i] = 0x00;
+      if (self[n].fp != NULL) {
+        self[n].state = E_STATE_IDLE;
+        self[n].response_buffer[0] = 0x00;   /* R1. */
+        self[n].response_buffer[1] = 0xFE;   /* Start block token. */
+        for (i = 0; i < 16; i++) {           /* CSD. */
+          self[n].response_buffer[2 + i] = 0x00;
+        }
+        self[n].response_buffer[2 + 16 + 0] = 0x00;  /* CRC. */
+        self[n].response_buffer[2 + 16 + 1] = 0x00;
+        self[n].response_length             = 2 + 16 + 2;
+        return;
       }
-      self[n].response_buffer[2 + 16 + 0] = 0x00;  /* CRC. */
-      self[n].response_buffer[2 + 16 + 1] = 0x00;
-      self[n].response_length             = 2 + 16 + 2;
-      return;
+      break;
       
     case E_CMD_STOP_TRANSMISSION:
       self[n].state              = E_STATE_TRANSFER;
