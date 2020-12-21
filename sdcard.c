@@ -220,7 +220,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
 
     case E_CMD_READ_OCR:
       self[n].state              = E_STATE_IDLE;
-      self[n].response_buffer[0] = 0;
+      self[n].response_buffer[0] = 0x80;  /* Indicate card ready, and SDSC. */
       self[n].response_buffer[1] = 0;
       self[n].response_buffer[2] = 0;
       self[n].response_buffer[3] = 0;
