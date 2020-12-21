@@ -16,6 +16,12 @@
 
 
 typedef enum {
+  E_CCS_SDSC = 0,
+  E_CCS_SDHC = 1,
+  E_CCS_SDXC = E_CCS_SDHC
+} ccs_t;
+
+typedef enum {
   E_CMD_GO_IDLE_STATE     = 0,
   E_CMD_SEND_OP_COND      = 1,
   E_CMD_SEND_IF_COND      = 8,
@@ -226,11 +232,12 @@ static void sdcard_handle_command(sdcard_nr_t n) {
 
     case E_CMD_READ_OCR:
       self[n].state              = E_STATE_IDLE;
-      self[n].response_buffer[0] = 0x80;  /* Indicate card ready, and SDSC. */
-      self[n].response_buffer[1] = 0;
+      self[n].response_buffer[0] = 0x00;                    /* R1. */
+      self[n].response_buffer[1] = 0x80 | E_CCS_SDSC << 6;  /* Powered-up + CCS. */
       self[n].response_buffer[2] = 0;
       self[n].response_buffer[3] = 0;
-      self[n].response_length    = 4;
+      self[n].response_buffer[4] = 0;
+      self[n].response_length    = 5;
       return;
 
     default:
