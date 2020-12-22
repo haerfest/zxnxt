@@ -358,9 +358,10 @@ def rlc_r(r: str) -> C:
 
 def rr_r(r: str) -> C:
     return f'''
-        const u8_t carry = {r} & 0x01;
-        {r} = (F & CF_MASK) >> CF_SHIFT << 7 | {r} >> 1;
-        F = SZ53P({r}) | carry << CF_SHIFT;
+        const u8_t old_carry  = (F & CF_MASK) >> CF_SHIFT;
+        const u8_t new_carry  = ({r} & 0x01)  >> CF_SHIFT;
+        {r} = {r} >> 1 | old_carry << 7;
+        F = SZ53P({r}) | new_carry;
     '''
 
 def rst(address: int) -> C:
@@ -407,7 +408,7 @@ def set_b_xy_d(b: int, xy: str) -> C:
 
 def srl_r(r: str) -> C:
     return f'''
-        const u8_t carry = {r} & 0x01;
+        const u8_t carry = ({r} & 0x01) << CF_SHIFT;
         {r} >>= 1;
         F = SZ53P({r}) | carry;
     '''
@@ -725,11 +726,11 @@ instructions: Table = {
     0x1E: ('LD E,n',     lambda: ld_r_n('E')),
     0x1F: ('RRA',
            '''
-           const u8_t carry = F & CF_MASK;
+           const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
            F &= ~(HF_MASK | NF_MASK | CF_MASK);
            F |= (A & 0x01) << CF_SHIFT;
            A >>= 1;
-           A |= carry;
+           A |= carry << 7;
            '''),
     0x20: ('JR NZ,e',    lambda: jr_c_e('!ZF')),
     0x21: ('LD HL,nn',   lambda: ld_dd_nn('HL')),
