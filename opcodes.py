@@ -25,7 +25,7 @@ def adc_hl_ss(ss: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
         const u32_t result = HL + {ss} + carry; T(4);
-        F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x40) | (result & 0x20) | HF_ADD(H, {hi(ss)}, result >> 8) | VF_ADD(H, {hi(ss)}, result >> 8) | (result & 0x10000) >> 16 << CF_MASK;
+        F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x20) | (result & 0x08) | HF_ADD(H, {hi(ss)}, result >> 8) | VF_ADD(H, {hi(ss)}, result >> 8) | (result & 0x10000) >> 16 << CF_SHIFT;
         HL = result & 0xFFFF; T(3);
     '''
 
@@ -374,7 +374,7 @@ def sbc_hl_ss(ss: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
         const u32_t result = HL - {ss} - carry; T(4);
-        F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x40) | (result & 0x20) | HF_SUB(H, {hi(ss)}, result >> 8) | VF_SUB(H, {hi(ss)}, result >> 8) | NF_MASK | (HL < {ss}) << CF_MASK;
+        F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x20) | (result & 0x08) | HF_SUB(H, {hi(ss)}, result >> 8) | VF_SUB(H, {hi(ss)}, result >> 8) | NF_MASK | (HL < {ss} + carry) << CF_SHIFT;
         HL = result & 0xFFFF; T(3);
     '''
 
