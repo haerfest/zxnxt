@@ -139,6 +139,11 @@ void mmu_write(u16_t address, u8_t value) {
 }
 
 
+mmu_rom_t mmu_rom_get(void) {
+  return self.selected_rom;
+}
+
+
 void mmu_rom_set(mmu_rom_t rom) {
   const char* descriptions[] = {
     "128K editor and menu",
