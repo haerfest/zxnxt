@@ -95,7 +95,7 @@ u8_t* mmu_divmmc_get(void) {
 }
 
 
-u8_t mmu_page_get(mmu_page_slot_t slot) {
+mmu_page_t mmu_page_get(mmu_page_slot_t slot) {
   return self.page[slot];
 }
 

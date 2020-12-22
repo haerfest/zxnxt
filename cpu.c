@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include "clock.h"
+#include "cpu.h"
 #include "defs.h"
 #include "io.h"
 #include "memory.h"
-
-#include "cpu.h"
+#include "mmu.h"
 
 
 /* Convenient flag shortcuts. */
