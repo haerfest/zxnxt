@@ -956,6 +956,7 @@ instructions: Table = {
            tmp = DE; DE = DE_; DE_ = tmp;
            tmp = HL; HL = HL_; HL_ = tmp;
            '''),
+    0xDA: ('JP C,nn', lambda: jp('F & CF_MASK')),
     0xDB: ('IN A,(n)',
            '''
            Z = memory_read(PC++);   T(3);
@@ -1063,7 +1064,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
 
     # Show on stderr the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
-    debug = True
+    debug = False
 
     if debug:
         if not prefix:
