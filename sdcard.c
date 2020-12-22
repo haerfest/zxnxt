@@ -133,7 +133,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
 
   if (self[n].fp != NULL) {
     u32_t      block_length;
-    long       offset;
+    long       block;
     int        i;
 
     /* Defaults: no error, R1 response. */
@@ -178,9 +178,9 @@ static void sdcard_handle_command(sdcard_nr_t n) {
 
       case E_CMD_SET_BLOCKLEN:
         block_length = self[n].command_buffer[1] << 24
-          | self[n].command_buffer[2] << 16
-          | self[n].command_buffer[3] << 8
-          | self[n].command_buffer[4];
+                     | self[n].command_buffer[2] << 16
+                     | self[n].command_buffer[3] << 8
+                     | self[n].command_buffer[4];
         if (block_length > MAX_RESPONSE_PAYLOAD_SIZE) {
           fprintf(stderr, "sdcard%d: unsupported block length %u bytes\n", n, block_length);
           break;
@@ -189,17 +189,17 @@ static void sdcard_handle_command(sdcard_nr_t n) {
         return;
 
       case E_CMD_READ_SINGLE_BLOCK:
-        offset = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
+        block = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
 
-        fprintf(stderr, "sdcard%d: reading %u bytes from position %ld in %s\n", n, self[n].block_length, offset, SDCARD_IMAGE);
+        fprintf(stderr, "sdcard%d: reading %u bytes from block %ld in %s\n", n, self[n].block_length, block, SDCARD_IMAGE);
 
-        if (fseek(self[n].fp, offset, SEEK_SET) != 0) {
-          fprintf(stderr, "sdcard%d: error seeking to position %ld in %s\n", n, offset, SDCARD_IMAGE);
+        if (fseek(self[n].fp, block * self[n].block_length, SEEK_SET) != 0) {
+          fprintf(stderr, "sdcard%d: error seeking to block %ld in %s\n", n, block, SDCARD_IMAGE);
           return;
         }
 
         if (fread(&self[n].response_buffer[2], self[n].block_length, 1, self[n].fp) != 1) {
-          fprintf(stderr, "sdcard%d: error reading %u bytes from offset %ld in %s\n", n, self[n].block_length, offset, SDCARD_IMAGE);
+          fprintf(stderr, "sdcard%d: error reading %u bytes from block %ld in %s\n", n, self[n].block_length, block, SDCARD_IMAGE);
           return;
         }
 
