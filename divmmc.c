@@ -87,7 +87,7 @@ void divmmc_write(u16_t address, u8_t value) {
 
 
 u8_t divmmc_control_read(u16_t address) {
-  return 0x55;
+  return self.conmem_enabled << 7 | self.bank_number;
 }
 
 

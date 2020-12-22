@@ -2,9 +2,10 @@
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"
+#include "divmmc.h"  /* For debugging. */
 #include "io.h"
 #include "memory.h"
-#include "mmu.h"
+#include "mmu.h"     /* For debugging. */
 
 
 /* Convenient flag shortcuts. */

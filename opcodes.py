@@ -1070,7 +1070,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
             f.write('''
 fprintf(stderr, "     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
 fprintf(stderr, "     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
-fprintf(stderr, "     PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
+fprintf(stderr, "     DIVMMC %02X  PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", divmmc_control_read(0xE3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
 fprintf(stderr, "%04X ", PC);
 ''')
 
