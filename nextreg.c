@@ -7,7 +7,7 @@
 
 
 /* See https://gitlab.com/thesmog358/tbblue/-/blob/master/docs/extra-hw/io-port-system/registers.txt */
-#define REGISTER_MACHINE_ID              0x01
+#define REGISTER_MACHINE_ID              0x00
 #define REGISTER_MACHINE_TYPE            0x03
 #define REGISTER_PERIPHERAL_1_SETTING    0x05
 #define REGISTER_PERIPHERAL_2_SETTING    0x06
