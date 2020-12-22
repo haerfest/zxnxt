@@ -128,34 +128,36 @@ u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
 
 static void sdcard_handle_command(sdcard_nr_t n) {
   const u8_t command = self[n].command_buffer[0] & 0x3F;
-  u32_t      block_length;
-  int        i;
 
   fprintf(stderr, "sdcard%d: received CMD%d ($%02X $%02X $%02X $%02X $%02X $%02X)\n", n, command, self[n].command_buffer[0], self[n].command_buffer[1], self[n].command_buffer[2], self[n].command_buffer[3], self[n].command_buffer[4], self[n].command_buffer[5]);
 
-  /* Defaults: no error, R1 response. */
-  self[n].error           = E_ERROR_NONE;
-  self[n].response_length = 0;
-  self[n].response_index  = 0;
+  if (self[n].fp != NULL) {
+    u32_t      block_length;
+    long       offset;
+    int        i;
 
-  switch (command) {
-    case E_CMD_GO_IDLE_STATE:
-      self[n].state = E_STATE_IDLE;
-      return;
+    /* Defaults: no error, R1 response. */
+    self[n].error           = E_ERROR_NONE;
+    self[n].response_length = 0;
+    self[n].response_index  = 0;
 
-    case E_CMD_SEND_OP_COND:
-      self[n].state              = E_STATE_IDLE;
-      self[n].response_buffer[0] = 0x00;  /* Need to clear idle bit. */
-      self[n].response_length    = 1;
-      return;
+    switch (command) {
+      case E_CMD_GO_IDLE_STATE:
+        self[n].state = E_STATE_IDLE;
+        return;
+
+      case E_CMD_SEND_OP_COND:
+        self[n].state              = E_STATE_IDLE;
+        self[n].response_buffer[0] = 0x00;  /* Need to clear idle bit. */
+        self[n].response_length    = 1;
+        return;
  
-    case E_CMD_SEND_IF_COND:
-      self[n].state = E_STATE_IDLE;
-      self[n].error = E_ERROR_ILLEGAL_COMMAND;
-      return;
+      case E_CMD_SEND_IF_COND:
+        self[n].state = E_STATE_IDLE;
+        self[n].error = E_ERROR_ILLEGAL_COMMAND;
+        return;
 
-    case E_CMD_SEND_CSD:
-      if (self[n].fp != NULL) {
+      case E_CMD_SEND_CSD:
         self[n].state = E_STATE_IDLE;
         self[n].response_buffer[0] = 0x00;   /* R1. */
         self[n].response_buffer[1] = 0xFE;   /* Start block token. */
@@ -166,35 +168,28 @@ static void sdcard_handle_command(sdcard_nr_t n) {
         self[n].response_buffer[2 + 16 + 1] = 0x00;
         self[n].response_length             = 2 + 16 + 2;
         return;
-      }
-      break;
       
-    case E_CMD_STOP_TRANSMISSION:
-      self[n].state              = E_STATE_TRANSFER;
-      self[n].response_buffer[0] = 0x01;
-      self[n].response_buffer[1] = 0xFF;  /* No longer busy. */
-      self[n].response_length    = 2;
-      return;
+      case E_CMD_STOP_TRANSMISSION:
+        self[n].state              = E_STATE_TRANSFER;
+        self[n].response_buffer[0] = 0x01;
+        self[n].response_buffer[1] = 0xFF;  /* No longer busy. */
+        self[n].response_length    = 2;
+        return;
 
-    case E_CMD_SET_BLOCKLEN:
-      block_length = self[n].command_buffer[1] << 24
-                   | self[n].command_buffer[2] << 16
-                   | self[n].command_buffer[3] << 8
-                   | self[n].command_buffer[4];
-      if (block_length > MAX_RESPONSE_PAYLOAD_SIZE) {
-        fprintf(stderr, "sdcard%d: unsupported block length %u bytes\n", n, block_length);
-        break;
-      }
-      self[n].block_length = block_length;
-      return;
+      case E_CMD_SET_BLOCKLEN:
+        block_length = self[n].command_buffer[1] << 24
+          | self[n].command_buffer[2] << 16
+          | self[n].command_buffer[3] << 8
+          | self[n].command_buffer[4];
+        if (block_length > MAX_RESPONSE_PAYLOAD_SIZE) {
+          fprintf(stderr, "sdcard%d: unsupported block length %u bytes\n", n, block_length);
+          break;
+        }
+        self[n].block_length = block_length;
+        return;
 
-    case E_CMD_READ_SINGLE_BLOCK:
-      /* Assume failure. */
-      self[n].response_buffer[0] = 0x01;
-      self[n].response_length    = 1;
-
-      if (self[n].fp != NULL) {
-        const long offset = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
+      case E_CMD_READ_SINGLE_BLOCK:
+        offset = self[n].command_buffer[1] << 24 | self[n].command_buffer[2] << 16 | self[n].command_buffer[3] << 8 | self[n].command_buffer[4];
 
         fprintf(stderr, "sdcard%d: reading %u bytes from position %ld in %s\n", n, self[n].block_length, offset, SDCARD_IMAGE);
 
@@ -213,38 +208,38 @@ static void sdcard_handle_command(sdcard_nr_t n) {
         self[n].response_buffer[2 + self[n].block_length + 0] = 0x00;  /* CRC. */
         self[n].response_buffer[2 + self[n].block_length + 1] = 0x00;
         self[n].response_length                               = 2 + self[n].block_length + 2;
-      }
-      return;
-
-    case E_CMD_APP_SEND_OP_COND:
-      if (self[n].in_app_cmd) {
-        self[n].in_app_cmd         = 0;
-        self[n].state              = E_STATE_IDLE;
-        self[n].response_buffer[0] = 0x00;  /* Need to indicate busy. */
-        self[n].response_length    = 1;
         return;
-      }
-      break;
+
+      case E_CMD_APP_SEND_OP_COND:
+        if (self[n].in_app_cmd) {
+          self[n].in_app_cmd         = 0;
+          self[n].state              = E_STATE_IDLE;
+          self[n].response_buffer[0] = 0x00;  /* Need to indicate busy. */
+          self[n].response_length    = 1;
+          return;
+        }
+        break;
  
-    case E_CMD_APP_CMD:
-      self[n].in_app_cmd = 1;
-      return;
+      case E_CMD_APP_CMD:
+        self[n].in_app_cmd = 1;
+        return;
 
-    case E_CMD_READ_OCR:
-      self[n].state              = E_STATE_IDLE;
-      self[n].response_buffer[0] = 0x00;                    /* R1. */
-      self[n].response_buffer[1] = 0x80 | E_CCS_SDSC << 6;  /* Powered-up + CCS. */
-      self[n].response_buffer[2] = 0;
-      self[n].response_buffer[3] = 0;
-      self[n].response_buffer[4] = 0;
-      self[n].response_length    = 5;
-      return;
+      case E_CMD_READ_OCR:
+        self[n].state              = E_STATE_IDLE;
+        self[n].response_buffer[0] = 0x00;                    /* R1. */
+        self[n].response_buffer[1] = 0x80 | E_CCS_SDXC << 6;  /* Powered-up + CCS. */
+        self[n].response_buffer[2] = 0;
+        self[n].response_buffer[3] = 0;
+        self[n].response_buffer[4] = 0;
+        self[n].response_length    = 5;
+        return;
 
-    default:
-      break;
+      default:
+        break;
+    }
   }
 
-  fprintf(stderr, "sdcard%d: illegal command\n", n);
+  fprintf(stderr, "sdcard%d: signalling error\n", n);
   self[n].state      = E_STATE_IDLE;
   self[n].error      = E_ERROR_ILLEGAL_COMMAND;
   self[n].in_app_cmd = 0;
