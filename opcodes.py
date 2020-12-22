@@ -321,8 +321,7 @@ def push_qq(qq: str) -> C:
 
 def res_b_phl(b: int) -> C:
     return f'''
-        Z = memory_read(WZ) & ~(1 << {b}); T(4);
-        memory_write(WZ, Z);               T(3);
+        memory_write(HL, memory_read(HL) & ~(1 << {b})); T(4 + 3);
     '''
 
 def res_b_xy_d(b: int, xy: str) -> C:
@@ -330,8 +329,7 @@ def res_b_xy_d(b: int, xy: str) -> C:
         T(1);
         WZ = {xy} + (s8_t) memory_read(PC++); T(3);
         PC++;
-        Z = memory_read(WZ) & ~(1 << {b});    T(4);
-        memory_write(WZ, Z);                  T(3);
+        memory_write(WZ, memory_read(WZ) & ~(1 << {b})); T(4 + 3);
     '''
 
 def ret(cond: Optional[str] = None) -> C:
@@ -390,8 +388,7 @@ def sbc_r(r: str) -> C:
     
 def set_b_phl(b: int) -> C:
     return f'''
-      Z = memory_read(HL) | 1 << {b}; T(4);
-      memory_write(HL, Z);            T(3);
+      memory_write(HL, memory_read(HL) | 1 << {b}); T(4 + 3);
     '''
 
 def set_b_r(b: int, r: str) -> C:
@@ -402,8 +399,7 @@ def set_b_xy_d(b: int, xy: str) -> C:
         T(1);
         WZ = {xy} + (s8_t) memory_read(PC++); T(3);
         PC++;
-        Z = memory_read(WZ) | 1 << {b}; T(4);
-        memory_write(WZ, Z);            T(3);
+        memory_write(WZ, memory_read(WZ) | 1 << {b}); T(4 + 3);
     '''
 
 def srl_r(r: str) -> C:
@@ -1074,6 +1070,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
             f.write('''
 fprintf(stderr, "     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
 fprintf(stderr, "     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
+fprintf(stderr, "     PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
 fprintf(stderr, "%04X ", PC);
 ''')
 
