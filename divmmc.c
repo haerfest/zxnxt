@@ -92,7 +92,7 @@ u8_t divmmc_control_read(u16_t address) {
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
-  self.conmem_enabled = value & 0x80;
+  self.conmem_enabled = value >> 7;
   self.bank_number    = value & 0x03;
   self.bank_pointer   = &self.memory_pointer[self.bank_number * BANK_SIZE];
 
