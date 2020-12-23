@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "defs.h"
 #include "sdcard.h"
 
@@ -10,16 +11,11 @@
  */
 
 
+#define SDSC_MAX_SIZE             (2L * 1024 * 1024 * 1024 - 1)
 #define N_SDCARDS                 2
 #define MAX_RESPONSE_PAYLOAD_SIZE 512
 #define SDCARD_IMAGE              "tbblue.mmc"
 
-
-typedef enum {
-  E_CCS_SDSC = 0,
-  E_CCS_SDHC = 1,
-  E_CCS_SDXC = E_CCS_SDHC
-} ccs_t;
 
 typedef enum {
   E_CMD_GO_IDLE_STATE     = 0,
@@ -69,6 +65,7 @@ typedef struct {
   u32_t      block_length;
   int        in_app_cmd;
   FILE*      fp;
+  long       size;
 } sdcard_t;
 
 
@@ -87,6 +84,7 @@ int sdcard_init(void) {
     self[n].block_length    = 512;
     self[n].in_app_cmd      = 0;
     self[n].fp              = NULL;
+    self[n].size            = 0;
 
     if (n == 0) {
       self[n].fp = fopen(SDCARD_IMAGE, "rb");
@@ -97,6 +95,17 @@ int sdcard_init(void) {
         }
         return -1;
       }
+
+      if (fseek(self[n].fp, 0L, SEEK_END) != 0) {
+        fprintf(stderr, "sdcard%d: error seeking to the end in %s\n", n, SDCARD_IMAGE);
+        for (n--; n >= 0; n--) {
+          fclose(self[n].fp);
+        }
+        return -1;
+      }
+
+      self[n].size = ftell(self[n].fp);
+      fprintf(stderr, "sdcard%d: %s capacity is %ld bytes\n", n, SDCARD_IMAGE, self[n].size);
     }
   }
 
@@ -123,6 +132,43 @@ u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
 
   /* Standard R1 response. */
   return self[n].error | (self[n].state == E_STATE_IDLE);
+}
+
+
+static void sdcard_fill_csd(sdcard_nr_t n, u8_t* csd) {
+  memset(csd, 0x00, 16);
+
+  if (self[n].size > SDSC_MAX_SIZE) {
+    /* CSD Version 2.0: only set C_SIZE. */
+    const u32_t c_size = self[n].size / (512 * 1024) - 1;
+    csd[7] = (c_size >> 16) & 0x3F;
+    csd[8] = (c_size >>  8) & 0xFF;
+    csd[9] = (c_size >>  0) & 0xFF;
+  } else {
+    /* CSD Version 1.0: set C_SIZE, C_SIZE_MULT, and READ_BL_LEN. */
+    const u16_t block_length = (self[n].size == SDSC_MAX_SIZE ? 1024 : 512);
+    const u32_t n_blocks     = self[n].size / block_length;
+    u32_t       c_size;
+
+    /* Invariant: multi = 2 ^ multi_log2. */    
+    u8_t        multi_log2   = 1;
+    u16_t       multi        = 2;
+
+    do {
+      multi_log2++;
+      multi *= 2;
+      c_size = n_blocks / multi - 1;
+    } while (c_size > 4095);
+
+    fprintf(stderr, "sdcard%d: block_length=%u multi=%u c_size=%u\n", n, block_length, multi, c_size);
+
+    csd[ 5] = (block_length == 1024 ? 10 : 9);
+    csd[ 6] = (c_size >> 10) & 0x03;
+    csd[ 7] = (c_size >>  2) & 0xFF;
+    csd[ 8] = (c_size & 0x03) << 6;
+    csd[ 9] = ((multi_log2 - 2) >> 1) & 0x03;
+    csd[10] = ((multi_log2 - 2) & 0x01) << 7;
+  }
 }
 
 
@@ -161,9 +207,9 @@ static void sdcard_handle_command(sdcard_nr_t n) {
         self[n].state = E_STATE_IDLE;
         self[n].response_buffer[0] = 0x00;   /* R1. */
         self[n].response_buffer[1] = 0xFE;   /* Start block token. */
-        for (i = 0; i < 16; i++) {           /* CSD. */
-          self[n].response_buffer[2 + i] = 0x00;
-        }
+        
+        sdcard_fill_csd(n, &self[n].response_buffer[2]);
+
         self[n].response_buffer[2 + 16 + 0] = 0x00;  /* CRC. */
         self[n].response_buffer[2 + 16 + 1] = 0x00;
         self[n].response_length             = 2 + 16 + 2;
@@ -226,8 +272,8 @@ static void sdcard_handle_command(sdcard_nr_t n) {
 
       case E_CMD_READ_OCR:
         self[n].state              = E_STATE_IDLE;
-        self[n].response_buffer[0] = 0x00;                    /* R1. */
-        self[n].response_buffer[1] = 0x80 | E_CCS_SDXC << 6;  /* Powered-up + CCS. */
+        self[n].response_buffer[0] = 0x00;                                        /* R1. */
+        self[n].response_buffer[1] = 0x80 | (self[n].size > SDSC_MAX_SIZE) << 6;  /* Powered-up + CCS. */
         self[n].response_buffer[2] = 0;
         self[n].response_buffer[3] = 0;
         self[n].response_buffer[4] = 0;
