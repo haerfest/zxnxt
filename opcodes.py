@@ -3,7 +3,9 @@
 
 import io
 import re
-from   typing import *
+from functools import partial
+from itertools import count
+from typing    import *
 
 
 Opcode      = int
@@ -370,6 +372,37 @@ def ret(cond: Optional[str] = None) -> C:
 
     return s
 
+def rl_phl() -> C:
+    return '''
+        u8_t carry;
+        Z = memory_read(HL);
+        carry = Z >> 7;
+        Z = Z << 1 | (F & CF_MASK) >> CF_SHIFT;
+        F = SZ53P(Z) | carry << CF_SHIFT;
+        T(4);
+        memory_write(HL, Z);
+        T(3);
+    '''
+
+def rl_r(r: str) -> C:
+    return f'''
+        const u8_t carry = {r} >> 7;
+        {r} = {r} << 1 | (F & CF_MASK) >> CF_SHIFT;
+        F = SZ53P({r}) | carry << CF_SHIFT;
+    '''
+
+def rlc_phl() -> C:
+    return '''
+        u8_t carry;
+        Z = memory_read(HL);
+        carry = Z >> 7;
+        Z = Z << 1 | carry;
+        F = SZ53P(Z) | carry << CF_SHIFT;
+        T(4);
+        memory_write(HL, Z);
+        T(3);
+    '''
+
 def rlc_r(r: str) -> C:
     return f'''
         const u8_t carry = {r} >> 7;
@@ -377,12 +410,42 @@ def rlc_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
+def rr_phl() -> C:
+    return '''
+        u8_t carry;
+        Z = memory_read(HL);
+        carry = Z & 0x01;
+        Z = Z >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
+        F = SZ53P(Z) | carry << CF_SHIFT;
+        T(4);
+        memory_write(HL, Z);
+        T(3);
+    '''
+
 def rr_r(r: str) -> C:
     return f'''
-        const u8_t old_carry  = (F & CF_MASK) >> CF_SHIFT;
-        const u8_t new_carry  = ({r} & 0x01)  >> CF_SHIFT;
-        {r} = {r} >> 1 | old_carry << 7;
-        F = SZ53P({r}) | new_carry;
+        const u8_t carry = {r} & 0x01;
+        {r} = {r} >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
+        F = SZ53P({r}) | carry << CF_SHIFT;
+    '''
+
+def rrc_phl() -> C:
+    return '''
+        u8_t carry;
+        Z = memory_read(HL);
+        carry = Z & 0x01;
+        Z = Z >> 1 | carry << 7;
+        F = SZ53P(Z) | carry << CF_SHIFT;
+        T(4);
+        memory_write(HL, Z);
+        T(3);
+    '''
+
+def rrc_r(r: str) -> C:
+    return f'''
+        const u8_t carry = {r} & 0x01;
+        {r} = {r} >> 1 | carry << 7;
+        F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
 def rst(address: int) -> C:
@@ -425,11 +488,61 @@ def set_b_xy_d(b: int, xy: str) -> C:
         memory_write(WZ, memory_read(WZ) | 1 << {b}); T(4 + 3);
     '''
 
+def sla_phl() -> C:
+    return '''
+        u8_t carry;
+        Z = memory_read(HL);
+        carry = Z >> 7;
+        Z <<= 1;
+        F = SZ53P(Z) | carry << CF_SHIFT;
+        T(4);
+        memory_write(HL, Z);
+        T(3);
+    '''
+
+def sla_r(r: str) -> C:
+    return f'''
+        const u8_t carry = {r} >> 7;
+        {r} <<= 1;
+        F = SZ53P({r}) | carry << CF_SHIFT;
+    '''
+
+def sra_phl() -> C:
+    return '''
+        u8_t carry;
+        Z = memory_read(HL);
+        carry = Z & 0x01;
+        Z = Z & 0x80 | Z >> 1;
+        F = SZ53P(Z) | carry << CF_SHIFT;
+        T(4);
+        memory_write(HL, Z);
+        T(3);
+    '''
+
+def sra_r(r: str) -> C:
+    return f'''
+        const u8_t carry = {r} & 0x01;
+        {r} = {r} & 0x80 | {r} >> 1;
+        F = SZ53P({r}) | carry << CF_SHIFT;
+    '''
+
+def srl_phl() -> C:
+    return '''
+        u8_t carry;
+        Z = memory_read(HL);
+        carry = Z & 0x01;
+        Z >>= 1;
+        F = SZ53P(Z) | carry << CF_SHIFT;
+        T(4);
+        memory_write(HL, Z);
+        T(3);
+    '''
+
 def srl_r(r: str) -> C:
     return f'''
-        const u8_t carry = ({r} & 0x01) << CF_SHIFT;
+        const u8_t carry = {r} & 0x01;
         {r} >>= 1;
-        F = SZ53P({r}) | carry;
+        F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
 def sub_r(r: str) -> C:
@@ -459,97 +572,48 @@ def xor_r(r: str) -> C:
 
 
 def cb_table() -> Table:
-    return {
-        0x02: ('RLC D',      lambda: rlc_r('D')),
-        0x18: ('RR B',       lambda: rr_r('B')),
-        0x19: ('RR C',       lambda: rr_r('C')),
-        0x1A: ('RR D',       lambda: rr_r('D')),
-        0x1B: ('RR E',       lambda: rr_r('E')),
-        0x1C: ('RR H',       lambda: rr_r('H')),
-        0x1D: ('RR L',       lambda: rr_r('L')),
-        0x38: ('SRL B',      lambda: srl_r('B')),
-        0x39: ('SRL B',      lambda: srl_r('C')),
-        0x3A: ('SRL D',      lambda: srl_r('D')),
-        0x3B: ('SRL E',      lambda: srl_r('E')),
-        0x3C: ('SRL H',      lambda: srl_r('H')),
-        0x3D: ('SRL L',      lambda: srl_r('L')),
-        0x3F: ('SRL A',      lambda: srl_r('A')),
-        0x40: ('BIT 0,B',    lambda: bit_b_r(0, 'B')),
-        0x45: ('BIT 0,L',    lambda: bit_b_r(0, 'L')),
-        0x46: ('BIT 0,(HL)', lambda: bit_b_phl(0)),
-        0x47: ('BIT 0,A',    lambda: bit_b_r(0, 'A')),
-        0x48: ('BIT 1,B',    lambda: bit_b_r(1, 'B')),
-        0x4D: ('BIT 1,L',    lambda: bit_b_r(1, 'L')),
-        0x4E: ('BIT 1,(HL)', lambda: bit_b_phl(1)),
-        0x50: ('BIT 2,B',    lambda: bit_b_r(2, 'B')),
-        0x55: ('BIT 2,L',    lambda: bit_b_r(2, 'L')),
-        0x56: ('BIT 2,(HL)', lambda: bit_b_phl(2)),
-        0x57: ('BIT 2,A',    lambda: bit_b_r(2, 'A')),
-        0x58: ('BIT 3,B',    lambda: bit_b_r(3, 'B')),
-        0x59: ('BIT 3,C',    lambda: bit_b_r(3, 'C')),
-        0x5D: ('BIT 3,L',    lambda: bit_b_r(3, 'L')),
-        0x5E: ('BIT 3,(HL)', lambda: bit_b_phl(3)),
-        0x5F: ('BIT 1,A',    lambda: bit_b_r(1, 'A')),
-        0x5F: ('BIT 3,A',    lambda: bit_b_r(3, 'A')),
-        0x60: ('BIT 4,B',    lambda: bit_b_r(4, 'B')),
-        0x65: ('BIT 4,L',    lambda: bit_b_r(4, 'L')),
-        0x66: ('BIT 4,(HL)', lambda: bit_b_phl(4)),
-        0x67: ('BIT 4,A',    lambda: bit_b_r(4, 'A')),
-        0x68: ('BIT 5,B',    lambda: bit_b_r(5, 'B')),
-        0x6D: ('BIT 5,L',    lambda: bit_b_r(5, 'L')),
-        0x6E: ('BIT 5,(HL)', lambda: bit_b_phl(5)),
-        0x6F: ('BIT 5,A',    lambda: bit_b_r(5, 'A')),
-        0x70: ('BIT 6,B',    lambda: bit_b_r(6, 'B')),
-        0x72: ('BIT 6,D',    lambda: bit_b_r(6, 'D')),
-        0x75: ('BIT 6,L',    lambda: bit_b_r(6, 'L')),
-        0x76: ('BIT 6,(HL)', lambda: bit_b_phl(6)),
-        0x77: ('BIT 6,A',    lambda: bit_b_r(6, 'A')),
-        0x78: ('BIT 7,B',    lambda: bit_b_r(7, 'B')),
-        0x7D: ('BIT 7,L',    lambda: bit_b_r(7, 'L')),
-        0x7E: ('BIT 7,(HL)', lambda: bit_b_phl(7)),
-        0x7F: ('BIT 7,A',    lambda: bit_b_r(7, 'A')),
-        0x81: ('RES 0,C',    lambda: res_b_r(0, 'C')),
-        0x86: ('RES 0,(HL)', lambda: res_b_phl(0)),
-        0x89: ('RES 1,C',    lambda: res_b_r(1, 'C')),
-        0x8E: ('RES 1,(HL)', lambda: res_b_phl(1)),
-        0x91: ('RES 2,C',    lambda: res_b_r(2, 'C')),
-        0x96: ('RES 2,(HL)', lambda: res_b_phl(2)),
-        0x99: ('RES 3,C',    lambda: res_b_r(3, 'C')),
-        0x9E: ('RES 3,(HL)', lambda: res_b_phl(3)),
-        0xA1: ('RES 4,C',    lambda: res_b_r(4, 'C')),
-        0xA6: ('RES 4,(HL)', lambda: res_b_phl(4)),
-        0xA9: ('RES 5,C',    lambda: res_b_r(5, 'C')),
-        0xAE: ('RES 5,(HL)', lambda: res_b_phl(5)),
-        0xB1: ('RES 6,C',    lambda: res_b_r(6, 'C')),
-        0xB6: ('RES 6,(HL)', lambda: res_b_phl(6)),
-        0xB9: ('RES 7,C',    lambda: res_b_r(7, 'C')),
-        0xBE: ('RES 7,(HL)', lambda: res_b_phl(7)),
-        0xC0: ('SET 0,B',    lambda: set_b_r(0, 'B')),
-        0xC1: ('SET 0,C',    lambda: set_b_r(0, 'C')),
-        0xC6: ('SET 0,(HL)', lambda: set_b_phl(0)),
-        0xC8: ('SET 1,B',    lambda: set_b_r(1, 'B')),
-        0xC9: ('SET 1,C',    lambda: set_b_r(1, 'C')),
-        0xCE: ('SET 1,(HL)', lambda: set_b_phl(1)),
-        0xD0: ('SET 2,B',    lambda: set_b_r(2, 'B')),
-        0xD1: ('SET 2,C',    lambda: set_b_r(2, 'C')),
-        0xD6: ('SET 2,(HL)', lambda: set_b_phl(2)),
-        0xD8: ('SET 3,B',    lambda: set_b_r(3, 'B')),        
-        0xD9: ('SET 3,C',    lambda: set_b_r(3, 'C')),
-        0xDE: ('SET 3,(HL)', lambda: set_b_phl(3)),
-        0xE0: ('SET 4,B',    lambda: set_b_r(4, 'B')),
-        0xE1: ('SET 4,C',    lambda: set_b_r(4, 'C')),
-        0xE6: ('SET 4,(HL)', lambda: set_b_phl(4)),
-        0xE8: ('SET 5,B',    lambda: set_b_r(5, 'B')),
-        0xE9: ('SET 5,C',    lambda: set_b_r(5, 'C')),
-        0xEE: ('SET 5,(HL)', lambda: set_b_phl(5)),
-        0xF0: ('SET 6,B',    lambda: set_b_r(6, 'B')),
-        0xF1: ('SET 6,C',    lambda: set_b_r(6, 'C')),
-        0xF2: ('SET 6,D',    lambda: set_b_r(6, 'D')),
-        0xF6: ('SET 6,(HL)', lambda: set_b_phl(6)),
-        0xF8: ('SET 7,B',    lambda: set_b_r(7, 'B')),
-        0xF9: ('SET 7,C',    lambda: set_b_r(7, 'C')),
-        0xFE: ('SET 7,(HL)', lambda: set_b_phl(7)),
-    }
+    table = {}
+
+    def _bit_twiddling(mnemonic: str, B_opcode: int, act_b_r: Callable[[int, str], C], act_b_phl: Callable[[int, str], C]) -> None:
+        for top_opcode, r in zip(range(B_opcode, B_opcode + 6), 'BCDEHL'):
+            for opcode, b in zip(count(top_opcode, 8), range(8)):
+                table[opcode] = (f'{mnemonic} {b},{r}', partial(act_b_r, b, r))
+
+        for opcode, b in zip(count(B_opcode + 6, 8), range(8)):
+            table[opcode] = (f'{mnemonic} {b},(HL)', partial(act_b_phl, b))
+
+        for opcode, b in zip(count(B_opcode + 7, 8), range(8)):
+            table[opcode] = (f'{mnemonic} {b},A', partial(act_b_r, b, 'A'))
+
+    def _rotates(B_opcode: int) -> None:
+        actions = [
+            ('RLC', rlc_r, rlc_phl),
+            ('RRC', rrc_r, rrc_phl),
+            ('RL',  rl_r,  rl_phl),
+            ('RR',  rr_r,  rr_phl),
+            ('SLA', sla_r, sla_phl),
+            ('SRA', sra_r, sra_phl),
+            ('SRL', srl_r, srl_phl)
+        ]
+
+        for top_opcode, r in zip(range(B_opcode, B_opcode + 6), 'BCDEHL'):
+            deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38]
+            for delta, (mnemonic, act_r, act_phl) in zip(deltas, actions):
+                table[top_opcode + delta] = (f'{mnemonic} {r}', partial(act_r, r))
+
+        for delta, (mnemonic, act_r, act_phl) in zip(deltas, actions):
+            table[B_opcode + 6 + delta] = (f'{mnemonic} (HL)', act_phl)
+
+        for delta, (mnemonic, act_r, act_phl) in zip(deltas, actions):
+            table[B_opcode + 7 + delta] = (f'{mnemonic} A', partial(act_r, 'A'))
+
+    _bit_twiddling('BIT', 0x40, bit_b_r, bit_b_phl)
+    _bit_twiddling('RES', 0x80, res_b_r, res_b_phl)
+    _bit_twiddling('SET', 0xC0, set_b_r, set_b_phl)
+
+    _rotates(0x00)
+
+    return table
 
 
 def ed_table() -> Table:
