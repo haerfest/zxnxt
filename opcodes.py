@@ -153,7 +153,7 @@ def cp_xy_d(xy: str) -> C:
 def dec_r(r: str) -> C:
     return f'''
         {r}--;
-        F = SZ53({r}) | HF_SUB({r} + 1, 1, {r}) | ({r} == 0x79) << VF_SHIFT | NF_MASK;
+        F = SZ53({r}) | HF_SUB({r} + 1, 1, {r}) | ({r} == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
     '''
 
 def dec_ss(ss: str) -> C:
@@ -165,7 +165,7 @@ def dec_xy_d(xy: str) -> C:
         WZ = {xy} + (s8_t) memory_read(PC++); T(3);
         m = memory_read(WZ) - 1;              T(5);
         memory_write(WZ, m);                  T(4);
-        F = SZ53(m) | HF_SUB(m + 1, 1, m) | (m == 0x79) << VF_SHIFT | NF_MASK;
+        F = SZ53(m) | HF_SUB(m + 1, 1, m) | (m == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
         T(3);
     '''
 
@@ -186,17 +186,26 @@ def ex_psp_dd(dd: str) -> C:
         {lo(dd)} = Z;
     '''
 
-def inc_r(r: str) -> C:
-    return f'''
-       const u8_t carry = F & CF_MASK;
-       {r}++;
-       F = SZ53({r}) | HF_ADD({r} - 1, 1, {r}) | ({r} == 0x80) << VF_SHIFT | carry;
-    '''
-
 def in_r_pc(r: str) -> C:
     return f'''
         {r} = io_read(BC); T(4);
         F = SZ53P({r});
+    '''
+
+def inc_r(r: str) -> C:
+    return f'''
+       {r}++;
+       F = SZ53({r}) | HF_ADD({r} - 1, 1, {r}) | ({r} == 0x80) << VF_SHIFT | (F & CF_MASK);
+    '''
+
+def inc_xy_d(xy: str) -> C:
+    return f'''
+        u8_t m;
+        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
+        m = memory_read(WZ) + 1;              T(5);
+        memory_write(WZ, m);                  T(4);
+        F = SZ53(m) | HF_ADD(m - 1, 1, m) | (m == 0x80) << VF_SHIFT | (F & CF_MASK);
+        T(3);
     '''
 
 def inc_ss(ss: str) -> C:
@@ -566,6 +575,7 @@ def ed_table() -> Table:
         0x4B: ('LD BC,(nn)', lambda: ld_dd_pnn('BC')),
         0x51: ('OUT (C),D',  lambda: out_c_r('D')),
         0x52: ('SBC HL,DE',  lambda: sbc_hl_ss('DE')),
+        0x53: ('LD (nn),DE', lambda: ld_pnn_dd('DE')),
         0x56: ('IM 1', 'IM = 1;'),
         0x57: ('LD A,I',
                '''
@@ -638,6 +648,7 @@ def xy_table(xy: str) -> Table:
         0x22: (f'LD (nn),{xy}',   lambda: ld_pnn_dd(xy)),
         0x23: (f'INC {xy}',       lambda: inc_ss(xy)),
         0x2A: (f'LD {xy},(nn)',   lambda: ld_dd_pnn(xy)),
+        0x34: (f'INC ({xy}+d)',   lambda: inc_xy_d(xy)),
         0x35: (f'DEC ({xy}+d)',   lambda: dec_xy_d(xy)),
         0x36: (f'LD ({xy}+d),n',  lambda: ld_xy_d_n(xy)),
         0x46: (f'LD B,({xy}+d)',  lambda: ld_r_xy_d('B', xy)),
