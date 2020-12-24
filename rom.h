@@ -9,7 +9,8 @@ int  rom_init(u8_t* rom, u8_t* altrom0, u8_t* altrom1);
 void rom_finit(void);
 int  rom_read(u16_t address, u8_t* value);
 int  rom_write(u16_t address, u8_t value);
-u8_t rom_get(void);
+u8_t rom_select(u8_t rom);
+u8_t rom_selected(void);
 
 
 #endif  /* __ROM_H */

@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "mmu.h"
 #include "defs.h"
+#include "rom.h"
 #include "ula.h"
 
 
@@ -87,6 +88,35 @@ static void nextreg_video_timing_write(u8_t value) {
 }
 
 
+static void nextreg_memory_all_ram(u8_t slot_1_bank_16k, u8_t slot_2_bank_16k, u8_t slot_3_bank_16k, u8_t slot_4_bank_16k) {
+  mmu_bank_set(1, slot_1_bank_16k);
+  mmu_bank_set(2, slot_2_bank_16k);
+  mmu_bank_set(3, slot_3_bank_16k);
+  mmu_bank_set(4, slot_4_bank_16k);
+}
+
+
+static void nextreg_spectrum_memory_mapping_write(u8_t value) {
+  const int change_bank = value & 0x08;
+  const int paging_mode = value & 0x04;
+  
+  if (change_bank) {
+    mmu_bank_set(4, value >> 4);
+  }
+
+  if (paging_mode == 0) {
+    rom_select(value & 0x03);
+  } else {
+    switch (value & 0x03) {
+      case 0: nextreg_memory_all_ram(0, 1, 2, 3); break;
+      case 1: nextreg_memory_all_ram(4, 5, 6, 7); break;
+      case 2: nextreg_memory_all_ram(4, 5, 6, 3); break;
+      case 3: nextreg_memory_all_ram(4, 7, 6, 3); break;
+    }
+  }
+}
+
+
 void nextreg_data_write(u16_t address, u8_t value) {
   switch (self.selected_register) {
     case REGISTER_MACHINE_TYPE:
@@ -117,11 +147,7 @@ void nextreg_data_write(u16_t address, u8_t value) {
       break;
 
     case REGISTER_SPECTRUM_MEMORY_MAPPING:
-      memory_spectrum_memory_mapping_write(value);
-      break;
-
-    case REGISTER_MEMORY_MAPPING_MODE:
-      memory_mapping_mode_write(value);
+      nextreg_spectrum_memory_mapping_write(value);
       break;
 
     default:
