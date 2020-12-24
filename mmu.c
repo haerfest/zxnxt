@@ -56,7 +56,7 @@ void mmu_bank_set(u8_t slot, u8_t bank) {
 }
 
 
-u32_t mmu_translate(u16_t address) {
+static u32_t mmu_translate(u16_t address) {
   const u8_t  slot   = address / PAGE_SIZE;
   const u16_t offset = address & (PAGE_SIZE - 1);
 

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "defs.h"
 #include "utils.h"
 
@@ -38,6 +39,7 @@ int rom_read(u16_t address, u8_t* value) {
 
 
 int rom_write(u16_t address, u8_t value) {
+  fprintf(stderr, "rom: unimplemented write to $%04X\n", address);
   return 0;
 }
 
