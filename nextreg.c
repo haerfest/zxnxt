@@ -25,6 +25,7 @@
 #define REGISTER_MMU_SLOT5_CONTROL       0x55
 #define REGISTER_MMU_SLOT6_CONTROL       0x56
 #define REGISTER_MMU_SLOT7_CONTROL       0x57
+#define REGISTER_ALTERNATE_ROM           0x8C
 #define REGISTER_SPECTRUM_MEMORY_MAPPING 0x8E
 #define REGISTER_MEMORY_MAPPING_MODE     0x8F
 
@@ -117,6 +118,15 @@ static void nextreg_spectrum_memory_mapping_write(u8_t value) {
 }
 
 
+static void nextreg_alternate_rom_write(u8_t value) {
+  const int  enable        = value & 0x80;
+  const int  during_writes = value & 0x40;
+  const u8_t lock_rom      = (value & 0x30) >> 4;
+
+  rom_configure_altrom(enable, during_writes, lock_rom);
+}
+
+
 void nextreg_data_write(u16_t address, u8_t value) {
   switch (self.selected_register) {
     case REGISTER_MACHINE_TYPE:
@@ -144,6 +154,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
     case REGISTER_MMU_SLOT6_CONTROL:
     case REGISTER_MMU_SLOT7_CONTROL:
       mmu_page_set(self.selected_register - REGISTER_MMU_SLOT0_CONTROL, value);
+      break;
+
+    case REGISTER_ALTERNATE_ROM:
+      nextreg_alternate_rom_write(value);
       break;
 
     case REGISTER_SPECTRUM_MEMORY_MAPPING:
