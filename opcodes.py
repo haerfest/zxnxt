@@ -222,7 +222,11 @@ def ex_psp_dd(dd: str) -> C:
         {lo(dd)} = Z;
     '''
 
-def in_r_pc(r: str) -> C:
+def halt() -> C:
+    # TODO: Wait for interrupt.
+    return ''
+
+def in_r_c(r: str) -> C:
     return f'''
         {r} = io_read(BC); T(4);
         F = SZ53P({r});
@@ -341,7 +345,17 @@ def ld_xy_d_r(xy: str, r: str) -> C:
         WZ = {xy} + (s8_t) memory_read(PC++); T(3 + 5);
         memory_write(WZ, {r}); T(3);
     '''
-    
+
+def ldi() -> C:
+    return '''
+        Z  = memory_read(HL++);
+        T(3);
+        memory_write(DE++, Z);
+        F &= ~(HF_MASK | VF_MASK | NF_MASK);
+        F |= (BC - 1 != 0) << VF_SHIFT;
+        T(5);
+    '''
+
 def ldxr(op: str) -> C:
     return f'''
         Z  = memory_read(HL{op}{op});
@@ -605,6 +619,12 @@ def sub_xy_d(xy: str) -> C:
         T(3);
     '''
 
+def swapnib() -> C:
+    return '''
+        A = A >> 4 | A << 4;
+        T(8);
+    '''
+
 def xor_r(r: str) -> C:
     return f'''
        A ^= {r};
@@ -659,6 +679,7 @@ def cb_table() -> Table:
 
 def ed_table() -> Table:
     return {
+        0x23: ('SWAPNIB', swapnib),
         0x30: ('MUL D,E', 'DE = D * E;'),
         0x31: ('ADD HL,A',   partial(add_dd_r, 'HL', 'A')),
         0x34: ('ADD HL,nn',  partial(add_dd_nn, 'HL')),
@@ -679,6 +700,7 @@ def ed_table() -> Table:
                '''),
         0x4A: ('ADC HL,BC',  partial(adc_hl_ss, 'BC')),
         0x4B: ('LD BC,(nn)', partial(ld_dd_pnn, 'BC')),
+        0x50: ('IN D,(C)',   partial(in_r_c, 'D')),
         0x51: ('OUT (C),D',  partial(out_c_r, 'D')),
         0x52: ('SBC HL,DE',  partial(sbc_hl_ss, 'DE')),
         0x53: ('LD (nn),DE', partial(ld_pnn_dd, 'DE')),
@@ -699,12 +721,14 @@ def ed_table() -> Table:
                F = SZ53(A) | (IFF2 << VF_SHIFT) | (F & CF_MASK) >> CF_SHIFT;
                '''),
         0x61: ('OUT (C),H',  partial(out_c_r, 'H')),
-        0x68: ('IN L,(C)',   partial(in_r_pc, 'L')),
+        0x68: ('IN L,(C)',   partial(in_r_c, 'L')),
         0x69: ('OUT (C),L',  partial(out_c_r, 'L')),
         0x6A: ('ADC HL,HL',  partial(adc_hl_ss, 'HL')),
+        0x72: ('SBC HL,SP',  partial(sbc_hl_ss, 'SP')),
         0x73: ('LD (nn),SP', partial(ld_pnn_dd, 'SP')),
-        0x78: ('IN A,(C)',   partial(in_r_pc, 'A')),
+        0x78: ('IN A,(C)',   partial(in_r_c, 'A')),
         0x79: ('OUT (C),A',  partial(out_c_r, 'A')),
+        0x7B: ('LD SP,(nn)', partial(ld_dd_pnn, 'SP')),
         0x8A: ('PUSH mm',
                '''
                W = memory_read(PC++);  /* High byte first. */
@@ -726,6 +750,7 @@ def ed_table() -> Table:
                T(4);
                '''),
         0x94: ('PIXELAD', None), # using D,E (as Y,X) calculate the ULA screen address and store in HL
+        0xA0: ('LDI',  ldi),
         0xA2: ('INI',  partial(inx,  '+')),
         0xB0: ('LDIR', partial(ldxr, '+')),
         0xB2: ('INIR',
@@ -922,6 +947,7 @@ instructions: Table = {
            W = memory_read(PC++); T(3);
            memory_write(WZ, A);   T(3);
            '''),
+    0x33: ('INC SP', inc_ss('SP')),
     0x34: ('INC (HL)', inc_phl),
     0x36: ('LD (HL),n',
            '''
@@ -1003,6 +1029,7 @@ instructions: Table = {
     0x72: ('LD (HL),D', partial(ld_pdd_r, 'HL', 'D')),
     0x73: ('LD (HL),E', partial(ld_pdd_r, 'HL', 'E')),
     0x75: ('LD (HL),L', partial(ld_pdd_r, 'HL', 'L')),
+    0x76: ('HALT',      halt),
     0x77: ('LD (HL),A', partial(ld_pdd_r, 'HL', 'A')),
     0x78: ('LD A,B',    partial(ld_r_r, 'A', 'B')),
     0x79: ('LD A,C',    partial(ld_r_r, 'A', 'C')),
@@ -1140,6 +1167,7 @@ instructions: Table = {
     0xDD: xy_table('IX'),
     0xDF: ('RST $18', partial(rst, 0x18)),
     0xE1: ('POP HL',  partial(pop_qq, 'HL')),
+    0xE2: ('JP PO,nn', partial(jp, '!(F & PF_MASK)')),
     0xE3: ('EX (SP),HL', partial(ex_psp_dd, 'HL')),
     0xE5: ('PUSH HL', partial(push_qq, 'HL')),
     0xE6: ('AND n',
@@ -1172,6 +1200,7 @@ instructions: Table = {
            '''
            SP = HL; T(2);
            '''),
+    0xFA: ('JP M,nn', partial(jp, 'F & SF_MASK')),
     0xFB: ('EI', 'IFF1 = IFF2 = 1;'),  # TODO: enabled maskable interrupt only AFTER NEXT instruction
     0xFD: xy_table('IY'),
     0xFE: ('CP n',
@@ -1181,7 +1210,8 @@ instructions: Table = {
            result = A - Z;
            F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
            T(3);
-           ''')
+           '''),
+    0xFF: ('RST $38', partial(rst, 0x38)),
 }
 
 
@@ -1238,7 +1268,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
 
     # Show on stderr the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
-    debug = True
+    debug = False
 
     if debug:
         if not prefix:
