@@ -3,24 +3,99 @@
 #include "divmmc.h"
 #include "mmu.h"
 #include "memory.h"
+#include "rom.h"
+#include "utils.h"
+
+
+/**
+ * See:
+ * - https://wiki.specnext.dev/Memory_map.
+ * - https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/zxnext.vhd
+ */
+
+
+#define RAM_SIZE  (2 * 1024 * 1024)
+
+
+typedef struct {
+  u8_t* ram;
+} memory_t;
+
+
+static memory_t self;
 
 
 int memory_init(void) {
+  FILE*  fp;
+  size_t i;
+
+  self.ram = malloc(RAM_SIZE);
+  if (self.ram == NULL) {
+    fprintf(stderr, "memory: out of memory\n");
+    return -1;
+  }
+
+  for (i = 0; i < RAM_SIZE; i++) {
+    self.ram[i] = rand() % 256;
+  }
+
   return 0;
 }
 
 
 void memory_finit(void) {
+  if (self.ram != NULL) {
+    free(self.ram);
+    self.ram = NULL;
+  }
 }
 
 
 u8_t memory_read(u16_t address) {
-  return divmmc_read(address);
+  u8_t value;
+  
+  if (address < 0x4000) {
+    if (divmmc_read(address, &value) == 0 ||
+        mmu_read(address, &value)    == 0 ||
+        rom_read(address, &value)    == 0) {
+      return value;
+    }
+  } else if (address < 0xC000) {
+    if (mmu_read(address, &value) == 0) {
+      return value;
+    }
+  } else {
+    if (mmu_read(address, &value) == 0) {
+      return value;
+    }
+  }
+
+  fprintf(stderr, "memory: cannot read from $%04X\n", address);
+  return 0xFF;
 }
 
 
 void memory_write(u16_t address, u8_t value) {
-  divmmc_write(address, value);
+  if (address < 0x4000) {
+    if (divmmc_write(address, value) == 0 ||
+        mmu_write(address, value)    == 0 ||
+        rom_write(address, value)    == 0) {
+      return;
+    }
+  } else if (address < 0xC000) {
+    if (mmu_write(address, value) == 0) {
+      return;
+    }
+  } else {
+    if (mmu_write(address, value) == 0) {
+      return;
+    }
+  }
+}
+
+
+u8_t* memory_pointer(u32_t address) {
+  return &self.ram[address];
 }
 
 
@@ -68,7 +143,7 @@ void memory_spectrum_memory_mapping_write(u8_t value) {
   }
 
   if (paging_mode == 0) {
-    mmu_rom_set(value & 0x03);
+    /* mmu_rom_set(value & 0x03); */
   } else {
     switch (value & 0x03) {
       case 0: memory_all_ram(0, 1, 2, 3); break;

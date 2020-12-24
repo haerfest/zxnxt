@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include "defs.h"
-#include "mmu.h"
 #include "utils.h"
 
 
@@ -10,79 +9,64 @@
  */
 
 
-#define BANK_SIZE  (8 * 1024)
-#define BANK_START 0x2000
-#define ROM_SIZE   (8 * 1024)
-
-
 typedef struct {
+  u8_t* rom;
+  u8_t* ram;
   int   conmem_enabled;
   int   bank_number;
-  u8_t* bank_pointer;
-  u8_t* memory_pointer;
-  u8_t* rom;
 } divmmc_t;
 
 
 static divmmc_t self;
 
 
-int divmmc_init(void) {
-  self.rom = malloc(ROM_SIZE);
-  if (self.rom == NULL) {
-    fprintf(stderr, "divmmc: out of memory\n");
-    return -1;
-  }
-
-  if (utils_load_rom("enNxtmmc.rom", ROM_SIZE, self.rom) != 0) {
-    return -1;
-  }
-
+int divmmc_init(u8_t* rom, u8_t* ram) {
+  self.rom            = rom;
+  self.ram            = ram;
   self.conmem_enabled = 0;
-  self.memory_pointer = mmu_divmmc_get();
   self.bank_number    = 0;
-  self.bank_pointer   = &self.memory_pointer[self.bank_number * BANK_SIZE];
+
+  if (utils_load_rom("enNxtmmc.rom", 8 * 1024, self.rom) != 0) {
+    return -1;
+  }
 
   return 0;
 }
 
 
 void divmmc_finit(void) {
-  if (self.rom != NULL) {
-    free(self.rom);
-    self.rom = NULL;
-  }
 }
 
 
-u8_t divmmc_read(u16_t address) {
-  if (self.conmem_enabled) {
-    if (address < ROM_SIZE) {
-      return self.rom[address];
-    }
+int divmmc_read(u16_t address, u8_t* value) {
+  u32_t offset;
 
-    if (address >= BANK_START && address < BANK_START + BANK_SIZE) {
-      return self.bank_pointer[address - BANK_START];
-    }
+  if (!self.conmem_enabled) {
+    return -1;
   }
 
-  return mmu_read(address);
+  if (address < 0x2000) {
+    *value = self.rom[address];
+  } else {
+    *value = self.ram[self.bank_number * 8 * 1024 + address - 0x2000];
+  }
+
+  return 0;
 }
 
 
-void divmmc_write(u16_t address, u8_t value) {
-  if (self.conmem_enabled) {
-    if (address < ROM_SIZE) {
-      return;
-    }
+int divmmc_write(u16_t address, u8_t value) {
+  u32_t offset;
 
-    if (address >= BANK_START && address < BANK_START + BANK_SIZE) {
-      self.bank_pointer[address - BANK_START] = value;
-      return;
-    }
+  if (!self.conmem_enabled) {
+    return -1;
   }
 
-  mmu_write(address, value);
+  if (address >= 0x2000) {
+    self.ram[self.bank_number * 8 * 1024 + address - 0x2000] = value;
+  }
+
+  return 0;
 }
 
 
@@ -94,7 +78,6 @@ u8_t divmmc_control_read(u16_t address) {
 void divmmc_control_write(u16_t address, u8_t value) {
   self.conmem_enabled = value >> 7;
   self.bank_number    = value & 0x03;
-  self.bank_pointer   = &self.memory_pointer[self.bank_number * BANK_SIZE];
 
   fprintf(stderr, "divmmc: CONMEM %sabled\n", self.conmem_enabled ? "en" : "dis");
 

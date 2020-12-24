@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
+#include "rom.h"
 #include "sdcard.h"
 #include "spi.h"
 #include "timex.h"
@@ -77,23 +78,27 @@ static int main_init(void) {
     goto exit_nextreg;
   }
 
-  if (mmu_init() != 0) {
+  if (memory_init() != 0) {
     goto exit_io;
   }
 
-  if (divmmc_init() != 0) {
-    goto exit_mmu;
-  }
-
-  if (memory_init() != 0) {
-    goto exit_divmmc;
-  }
-
-  if (clock_init() != 0) {
+  if (rom_init(memory_pointer(MEMORY_RAM_OFFSET_ZX_SPECTRUM_ROM), memory_pointer(MEMORY_RAM_OFFSET_ALTROM0_128K), memory_pointer(MEMORY_RAM_OFFSET_ALTROM1_48K)) != 0) {
     goto exit_memory;
   }
 
-  if (ula_init(self.renderer, self.texture) != 0) {
+  if (mmu_init(memory_pointer(MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM)) != 0) {
+    goto exit_rom;
+  }
+
+  if (divmmc_init(memory_pointer(MEMORY_RAM_OFFSET_DIVMMC_ROM), memory_pointer(MEMORY_RAM_OFFSET_DIVMMC_RAM)) != 0) {
+    goto exit_mmu;
+  }
+
+  if (clock_init() != 0) {
+    goto exit_divmmc;
+  }
+
+  if (ula_init(self.renderer, self.texture, memory_pointer(MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM)) != 0) {
     goto exit_clock;
   }
 
@@ -119,12 +124,14 @@ exit_ula:
   ula_finit();
 exit_clock:
   clock_finit();
-exit_memory:
-  memory_finit();
 exit_divmmc:
   divmmc_finit();
 exit_mmu:
   mmu_finit();
+exit_rom:
+  rom_finit();
+exit_memory:
+  memory_finit();
 exit_io:
   io_finit();
 exit_nextreg:
@@ -181,9 +188,10 @@ static void main_finit(void) {
   timex_finit();
   ula_finit();
   clock_finit();
-  memory_finit();
   divmmc_finit();
   mmu_finit();
+  rom_finit();
+  memory_finit();
   io_finit();
   nextreg_finit();
   spi_finit();

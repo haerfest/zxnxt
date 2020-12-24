@@ -6,6 +6,7 @@
 #include "io.h"
 #include "memory.h"
 #include "mmu.h"     /* For debugging. */
+#include "rom.h"     /* For debugging. */
 
 
 /* Convenient flag shortcuts. */

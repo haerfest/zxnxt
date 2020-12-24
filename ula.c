@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include "defs.h"
 #include "memory.h"
-#include "mmu.h"
 #include "ula.h"
 
 
@@ -77,7 +76,7 @@ typedef enum {
 typedef struct {
   SDL_Renderer*           renderer;
   u16_t                   line_offsets[192];
-  mmu_bank_t              display_bank;
+  u8_t*                   display_ram;
   u16_t                   display_offset;
   ula_display_frequency_t display_frequency;
   ula_display_state_t     display_state;
@@ -120,7 +119,7 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
 
       case E_ULA_DISPLAY_STATE_FRAME_BUFFER:
         if (self.display_pixel_mask == 0x00) {
-          self.display_byte = mmu_bank_read(self.display_bank, self.display_offset);
+          self.display_byte = self.display_ram[self.display_offset];
           self.display_offset++;
           self.display_pixel_mask = 0x80;
         }
@@ -219,9 +218,9 @@ static void ula_fill_tables(void) {
 }
 
 
-int ula_init(SDL_Renderer* renderer, SDL_Texture* texture) {
+int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* ram) {
   self.renderer           = renderer;
-  self.display_bank       = 5;
+  self.display_ram        = &ram[5 * 16 * 1024];  /* Always bank 5. */
   self.display_offset     = 0;
   self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
   self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;

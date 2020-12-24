@@ -5,13 +5,21 @@
 #include "defs.h"
 
 
-int  memory_init(void);
-void memory_finit(void);
-u8_t memory_read(u16_t address);
-void memory_write(u16_t address, u8_t value);
+#define MEMORY_RAM_OFFSET_ZX_SPECTRUM_ROM   0x00000
+#define MEMORY_RAM_OFFSET_DIVMMC_ROM        0X10000
+#define MEMORY_RAM_OFFSET_ALTROM0_128K      0x18000
+#define MEMORY_RAM_OFFSET_ALTROM1_48K       0x1C000
+#define MEMORY_RAM_OFFSET_DIVMMC_RAM        0x20000
+#define MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM   0x40000
 
-void memory_mapping_mode_write(u8_t value);
-void memory_spectrum_memory_mapping_write(u8_t value);
+
+int   memory_init(void);
+void  memory_finit(void);
+u8_t  memory_read(u16_t address);
+void  memory_write(u16_t address, u8_t value);
+u8_t* memory_pointer(u32_t address);
+void  memory_mapping_mode_write(u8_t value);
+void  memory_spectrum_memory_mapping_write(u8_t value);
 
 
 #endif  /* __MEMORY_H */
