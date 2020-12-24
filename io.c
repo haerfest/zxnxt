@@ -3,6 +3,7 @@
 #include "nextreg.h"
 #include "defs.h"
 #include "layer2.h"
+#include "i2c.h"
 #include "spi.h"
 #include "timex.h"
 #include "ula.h"
@@ -35,6 +36,10 @@ u8_t io_read(u16_t address) {
 
   if ((address & 0x00FF) == 0x00FF) {
     return timex_read(address);
+  }
+
+  if (address == 0x113B) {
+    return i2c_sda_read(address);
   }
 
   if (address == 0x123B) {
@@ -77,6 +82,16 @@ void io_write(u16_t address, u8_t value) {
 
   if ((address & 0x00FF) == 0x00FF) {
     timex_write(address, value);
+    return;
+  }
+
+  if (address == 0x103B) {
+    i2c_scl_write(address, value);
+    return;
+  }
+
+  if (address == 0x113B) {
+    i2c_sda_write(address, value);
     return;
   }
 

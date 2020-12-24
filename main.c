@@ -3,6 +3,7 @@
 #include "cpu.h"
 #include "defs.h"
 #include "divmmc.h"
+#include "i2c.h"
 #include "io.h"
 #include "layer2.h"
 #include "memory.h"
@@ -62,8 +63,12 @@ static int main_init(void) {
     goto exit_texture;
   }
 
-  if (sdcard_init() != 0) {
+  if (i2c_init() != 0) {
     goto exit_utils;
+  }
+
+  if (sdcard_init() != 0) {
+    goto exit_i2c;
   }
 
   if (spi_init() != 0) {
@@ -140,6 +145,8 @@ exit_spi:
   spi_finit();
 exit_sdcard:
   sdcard_finit();
+exit_i2c:
+  i2c_finit();
 exit_utils:
   utils_finit();
 exit_texture:
@@ -196,6 +203,7 @@ static void main_finit(void) {
   nextreg_finit();
   spi_finit();
   sdcard_finit();
+  i2c_finit();
   utils_finit();
 
   SDL_DestroyTexture(self.texture);
