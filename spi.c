@@ -88,7 +88,7 @@ void spi_cs_write(u16_t address, u8_t value) {
     n_devices_selected++;
   }
 
-  if (n_devices_selected > 1) {
+  if (n_devices_selected != 1) {
     self.device = E_SPI_DEVICE_NONE;
   }
 
