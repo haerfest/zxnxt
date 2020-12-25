@@ -2,6 +2,7 @@
 #include "clock.h"
 #include "memory.h"
 #include "mmu.h"
+#include "nextreg.h"
 #include "defs.h"
 #include "rom.h"
 #include "ula.h"
@@ -31,8 +32,8 @@
 
 
 typedef struct {
-  u8_t selected_register;
-  int  configuration_mode;
+  u8_t                   selected_register;
+  nextreg_machine_type_t machine_type;
 } nextreg_t;
 
 
@@ -41,7 +42,7 @@ static nextreg_t self;
 
 int nextreg_init(void) {
   self.selected_register  = 0x55;
-  self.configuration_mode = 0;
+  self.machine_type       = E_NEXTREG_MACHINE_TYPE_ZX_PLUS2A_PLUS2B_PLUS3;
   return 0;
 }
 
@@ -60,15 +61,29 @@ u8_t nextreg_select_read(u16_t address) {
 }
 
 
+nextreg_machine_type_t nextreg_get_machine_type(void) {
+  return self.machine_type;
+}
+
+
 static void nextreg_machine_type_write(u8_t value) {
+  const char* types[8] = {
+    "configuration mode",
+    "ZX 48K",
+    "ZX 128K/+2",
+    "ZX +2A/+2B/+3",
+    "Pentagon",
+    "invalid (5)",
+    "invalid (6)",
+    "invalid (7)"
+  };
+
   if (value & 0x80) {
     ula_display_timing_set((value >> 4) & 0x03);
   }
 
-  self.configuration_mode = (value & 0x03) == 0x00;
-  if (self.configuration_mode) {
-    fprintf(stderr, "nextreg: configuration mode activated\n");
-  }
+  self.machine_type = value & 0x03;
+  fprintf(stderr, "nextreg: machine type set to %s\n", types[self.machine_type]);
 }
 
 
@@ -83,7 +98,7 @@ static void nextreg_cpu_speed_write(u8_t value) {
 
 
 static void nextreg_video_timing_write(u8_t value) {
-  if (self.configuration_mode) {
+  if (self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIGURATION_MODE) {
     ula_video_timing_set(value & 0x03);
   }
 }
