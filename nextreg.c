@@ -74,6 +74,7 @@ u8_t nextreg_select_read(u16_t address) {
 static void nextreg_config_mapping_write(u8_t value) {
   /* Only bits 4:0 are specified, but FPGA uses bits 6:0. */
   self.rom_ram_bank = value & 0x7F;
+  fprintf(stderr, "nextreg: ROM/RAM bank in lower 16 KiB set to %u\n", self.rom_ram_bank);
 }
 
 
@@ -176,11 +177,7 @@ int nextreg_is_config_mode_active(void) {
 void nextreg_data_write(u16_t address, u8_t value) {
   switch (self.selected_register) {
     case REGISTER_CONFIG_MAPPING:
-      if (nextreg_is_config_mode_active() && !self.is_bootrom_active) {
-        nextreg_config_mapping_write(value);
-      } else {
-        fprintf(stderr, "nextreg: write to $%02X requires configuration mode and bootrom disabled\n", self.selected_register);
-      }
+      nextreg_config_mapping_write(value);
       break;
 
     case REGISTER_MACHINE_TYPE:
