@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "defs.h"
+#include "rom.h"
 #include "utils.h"
 
 
@@ -44,13 +45,11 @@ void rom_finit(void) {
 
 
 int rom_read(u16_t address, u8_t* value) {
-  const u8_t selected = (self.lock_rom == 0) ? self.selected        : self.lock_rom;
-  const u8_t altrom   = (self.lock_rom == 0) ? self.selected & 0x01 : 1 - (self.lock_rom >> 1);
-
   if (self.altrom_enabled && self.altrom_active == E_ALTROM_ACTIVE_READ) {
-    *value = self.altroms[altrom][address];
+    const u8_t select128 = (self.lock_rom == 0) ? 1 - (self.selected & 0x01) : 1 - (self.lock_rom >> 1);
+    *value = self.altroms[1 - select128][address];
   } else {
-    *value = self.rom[selected * 16 * 1024 + address];
+    *value = self.rom[rom_selected() * 16 * 1024 + address];
   }
 
   return 0;
@@ -58,11 +57,9 @@ int rom_read(u16_t address, u8_t* value) {
 
 
 int rom_write(u16_t address, u8_t value) {
-  const u8_t selected = (self.lock_rom == 0) ? self.selected        : self.lock_rom;
-  const u8_t altrom   = (self.lock_rom == 0) ? self.selected & 0x01 : 1 - (self.lock_rom >> 1);
-
   if (self.altrom_enabled && self.altrom_active == E_ALTROM_ACTIVE_WRITE) {
-    self.altroms[altrom][address] = value;
+    const u8_t select128 = (self.lock_rom == 0) ? 1 - (self.selected & 0x01) : 1 - (self.lock_rom >> 1);
+    self.altroms[1 - select128][address] = value;
   } else {
     fprintf(stderr, "rom: unimplemented write to $%04X\n", address);
   }
@@ -77,12 +74,12 @@ void rom_select(u8_t rom) {
 
 
 u8_t rom_selected(void) {
-  return self.selected;
+  return (self.lock_rom == 0) ? self.selected : self.lock_rom;
 }
 
 
 void rom_configure_altrom(int enable, int during_writes, u8_t lock_rom) {
   self.altrom_enabled = enable;
   self.altrom_active  = during_writes ? E_ALTROM_ACTIVE_WRITE : E_ALTROM_ACTIVE_READ;
-  self.lock_rom       = lock_rom;
+  self.lock_rom       = lock_rom & 0x03;
 }
