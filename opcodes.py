@@ -119,7 +119,7 @@ def add_xy_rr(xy: str, rr: str) -> C:
         F |= HF_ADD({xy} >> 8, {rr} >> 8, result >> 8) | (result >> 16) << CF_SHIFT;
         {xy} = result & 0xFFFF;
     '''
-    
+
 def and_r(r: str) -> C:
     return f'''
         A &= {r};
@@ -139,7 +139,7 @@ def bit_b_phl(b: int) -> C:
         F |= (memory_read(HL) & 1 << {b} ? 0 : ZF_MASK) | HF_MASK; T(4);
         T(4);
     '''
-    
+
 def bit_b_xy_d(b: int, xy: str) -> C:
     return f'''
         T(1);
@@ -155,7 +155,7 @@ def call(cond: Optional[str] = None) -> C:
         Z = memory_read(PC++);   T(3);
         W = memory_read(PC++);   T(4);
     '''
-    
+
     if cond:
         s += f'if ({cond}) {{\n'
 
@@ -184,6 +184,30 @@ def cp_xy_d(xy: str) -> C:
         tmp    = memory_read(WZ);                 T(5);
         result = A - tmp;
         F      = SZ53(result & 0xFF) | HF_SUB(A, tmp, result) | VF_SUB(A, tmp, result) | NF_MASK | (A < tmp) << CF_SHIFT;
+    '''
+
+def cpir() -> C:
+    return '''
+      u16_t result;
+      Z      = memory_read(HL);
+      T(3);
+      result = A - Z;
+      F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | (BC - 1 != 0) << VF_SHIFT | NF_MASK;
+      HL++;
+      BC--;
+      R++;
+      T(5);
+      if (BC != 0 && !(F & ZF_MASK)) {
+        PC -= 2;
+        T(5);
+      }
+    '''
+
+def dec_phl() -> C:
+    return '''
+      Z = memory_read(HL) - 1; T(4);
+      memory_write(HL, Z);     T(3);
+      F = SZ53(Z) | HF_SUB(Z + 1, 1, Z) | (Z == 0x79) << VF_SHIFT | (F & CF_MASK);
     '''
 
 def dec_r(r: str) -> C:
@@ -306,6 +330,11 @@ def ld_dd_pnn(dd: str) -> C:
       W = memory_read(PC++);          T(3);
       {lo(dd)} = memory_read(WZ);     T(3);
       {hi(dd)} = memory_read(WZ + 1); T(3);
+    '''
+
+def ld_dd_ss(dd: str, ss: str) -> C:
+    return f'''
+        {dd} = {ss}; T(2);
     '''
 
 def ld_pdd_r(dd: str, r: str) -> C:
@@ -511,6 +540,34 @@ def rst(address: int) -> C:
         PC = 0x{address:02X};    T(3);
     '''
 
+def sbc_a_n() -> C:
+    return '''
+        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
+        u16_t      result;
+        Z = memory_read(PC++); T(3);
+        result = A - Z - carry;
+        F = SZ53(A) | HF_SUB(A, Z + carry, result) | VF_SUB(A, Z + carry, result) | NF_MASK | (A < Z + carry) << CF_SHIFT;
+        A = result & 0xFF;
+    '''
+
+def sbc_a_phl() -> C:
+    return '''
+        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
+        u16_t      result;
+        Z = memory_read(HL); T(3);
+        result = A - Z - carry;
+        F = SZ53(A) | HF_SUB(A, Z + carry, result) | VF_SUB(A, Z + carry, result) | NF_MASK | (A < Z + carry) << CF_SHIFT;
+        A = result & 0xFF;
+    '''
+
+def sbc_a_r(r: str) -> C:
+    return f'''
+        const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
+        const u16_t result = A - {r} - carry;
+        F = SZ53(A) | HF_SUB(A, {r} + carry, result) | VF_SUB(A, {r} + carry, result) | NF_MASK | (A < {r} + carry) << CF_SHIFT;
+        A = result & 0xFF;
+    '''
+
 def sbc_hl_ss(ss: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
@@ -519,14 +576,6 @@ def sbc_hl_ss(ss: str) -> C:
         HL = result & 0xFFFF; T(3);
     '''
 
-def sbc_r(r: str) -> C:
-    return f'''
-        const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
-        const u16_t result = A - {r} - carry;
-        F = SZ53(A) | HF_SUB(A, {r} + carry, result) | VF_SUB(A, {r} + carry, result) | NF_MASK | (A < {r} + carry) << CF_SHIFT;
-        A = result & 0xFF;
-    '''
-    
 def set_b_phl(b: int) -> C:
     return f'''
       memory_write(HL, memory_read(HL) | 1 << {b}); T(4 + 3);
@@ -604,6 +653,15 @@ def sub_r(r: str) -> C:
     return f'''
         const u16_t result = A - {r};
         F = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
+        A = result & 0xFF;
+    '''
+
+def sub_phl() -> C:
+    return f'''
+        u16_t result;
+        Z = memory_read(HL); T(3);
+        result = A - Z;
+        F = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | (A < Z) << CF_SHIFT;
         A = result & 0xFF;
     '''
 
@@ -753,6 +811,7 @@ def ed_table() -> Table:
         0xA0: ('LDI',  ldi),
         0xA2: ('INI',  partial(inx,  '+')),
         0xB0: ('LDIR', partial(ldxr, '+')),
+        0xB1: ('CPIR', cpir),
         0xB2: ('INIR',
                '''
                T(1);
@@ -783,6 +842,7 @@ def xy_table(xy: str) -> Table:
         0x34: (f'INC ({xy}+d)',   partial(inc_xy_d, xy)),
         0x35: (f'DEC ({xy}+d)',   partial(dec_xy_d, xy)),
         0x36: (f'LD ({xy}+d),n',  partial(ld_xy_d_n, xy)),
+        0x39: (f'ADD {xy},SP',    partial(add_xy_rr, xy, 'SP')),
         0x46: (f'LD B,({xy}+d)',  partial(ld_r_xy_d, 'B', xy)),
         0x4E: (f'LD C,({xy}+d)',  partial(ld_r_xy_d, 'C', xy)),
         0x54: (f'LD D,{hi(xy)}',  partial(ld_r_r, 'D', hi(xy))),
@@ -839,6 +899,7 @@ def xy_table(xy: str) -> Table:
         0xE1: (f'POP {xy}',     partial(pop_qq, xy)),
         0xE3: (f'EX (SP),{xy}', partial(ex_psp_dd, xy)),
         0xE9: (f'JP ({xy})',    f'PC = {xy};'),
+        0xF9: (f'LD SP,{xy}',   partial(ld_dd_ss, 'SP', xy)),
     }
 
 # See https://wiki.specnext.dev/Extended_Z80_instruction_set.
@@ -949,6 +1010,7 @@ instructions: Table = {
            '''),
     0x33: ('INC SP', inc_ss('SP')),
     0x34: ('INC (HL)', inc_phl),
+    0x35: ('DEC (HL)', dec_phl),
     0x36: ('LD (HL),n',
            '''
            Z = memory_read(PC++); T(3);
@@ -1060,7 +1122,9 @@ instructions: Table = {
     0x93: ('SUB E',     partial(sub_r, 'E')),
     0x94: ('SUB H',     partial(sub_r, 'H')),
     0x95: ('SUB L',     partial(sub_r, 'L')),
-    0x9F: ('SBC A,A',   partial(sbc_r, 'A')),
+    0x96: ('SUB (HL)',  sub_phl),
+    0x9E: ('SBC A,(HL)', sbc_a_phl),
+    0x9F: ('SBC A,A',   partial(sbc_a_r, 'A')),
     0xA0: ('AND B',     partial(and_r, 'B')),
     0xA1: ('AND C',     partial(and_r, 'C')),
     0xA2: ('AND D',     partial(and_r, 'D')),
@@ -1165,6 +1229,7 @@ instructions: Table = {
            '''),
     0xDC: ('CALL C,nn', partial(call, 'F & CF_MASK')),
     0xDD: xy_table('IX'),
+    0xDE: ('SBC A,n', sbc_a_n),
     0xDF: ('RST $18', partial(rst, 0x18)),
     0xE1: ('POP HL',  partial(pop_qq, 'HL')),
     0xE2: ('JP PO,nn', partial(jp, '!(F & PF_MASK)')),
@@ -1196,10 +1261,7 @@ instructions: Table = {
            F = SZ53P(A);
            '''),
     0xF7: ('RST $30', partial(rst, 0x30)),
-    0xF9: ('LD SP,HL',
-           '''
-           SP = HL; T(2);
-           '''),
+    0xF9: ('LD SP,HL', partial(ld_dd_ss, 'SP', 'HL')),
     0xFA: ('JP M,nn', partial(jp, 'F & SF_MASK')),
     0xFB: ('EI', 'IFF1 = IFF2 = 1;'),  # TODO: enabled maskable interrupt only AFTER NEXT instruction
     0xFD: xy_table('IY'),
