@@ -1,5 +1,7 @@
 #include <SDL2/SDL.h>
+#include "bootrom.h"
 #include "clock.h"
+#include "config.h"
 #include "cpu.h"
 #include "defs.h"
 #include "divmmc.h"
@@ -87,8 +89,16 @@ static int main_init(void) {
     goto exit_io;
   }
 
-  if (rom_init(memory_pointer(MEMORY_RAM_OFFSET_ZX_SPECTRUM_ROM), memory_pointer(MEMORY_RAM_OFFSET_ALTROM0_128K), memory_pointer(MEMORY_RAM_OFFSET_ALTROM1_48K)) != 0) {
-    goto exit_memory;
+  if (bootrom_init(memory_pointer(0)) != 0) {
+    goto exit_io;
+  }
+
+  if (config_init(memory_pointer(0)) != 0) {
+    goto exit_bootrom;
+  }
+
+  if (rom_init(memory_pointer(0)) != 0) {
+    goto exit_config;
   }
 
   if (mmu_init(memory_pointer(MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM)) != 0) {
@@ -135,6 +145,10 @@ exit_mmu:
   mmu_finit();
 exit_rom:
   rom_finit();
+exit_config:
+  config_finit();
+exit_bootrom:
+  bootrom_finit();
 exit_memory:
   memory_finit();
 exit_io:
@@ -198,6 +212,8 @@ static void main_finit(void) {
   divmmc_finit();
   mmu_finit();
   rom_finit();
+  config_finit();
+  bootrom_finit();
   memory_finit();
   io_finit();
   nextreg_finit();

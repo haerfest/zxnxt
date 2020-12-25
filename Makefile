@@ -1,19 +1,25 @@
 INCS=-I/usr/local/include
 LIBS=-lsdl2
 
-twatwa: main.o clock.o cpu.o divmmc.o i2c.o io.o layer2.o memory.o mmu.o nextreg.o rom.o sdcard.o spi.o timex.o ula.o utils.o
-	cc -Wall $(INCS) $(LIBS) -o twatwa main.o clock.o cpu.o divmmc.o i2c.o io.o layer2.o memory.o mmu.o nextreg.o rom.o sdcard.o spi.o timex.o ula.o utils.o
+twatwa: main.o bootrom.o clock.o config.o copper.o cpu.o divmmc.o i2c.o io.o layer2.o memory.o mmu.o nextreg.o rom.o sdcard.o spi.o timex.o ula.o utils.o
+	cc -Wall $(INCS) $(LIBS) -o twatwa main.o bootrom.o clock.o config.o copper.o cpu.o divmmc.o i2c.o io.o layer2.o memory.o mmu.o nextreg.o rom.o sdcard.o spi.o timex.o ula.o utils.o
 
-main.o: main.c clock.c copper.h cpu.h defs.h
+main.o: main.c cpu.h defs.h
 	cc $(INCS) -c main.c
 
-clock.o: clock.c defs.h
+bootrom.o: bootrom.c bootrom.h defs.h
+	cc $(INCS) -c bootrom.c
+
+clock.o: clock.c clock.h defs.h
 	cc $(INCS) -c clock.c
 
-copper.o: copper.c clock.h defs.h
+config.o: config.c config.h defs.h
+	cc $(INCS) -c config.c
+
+copper.o: copper.c copper.h defs.h
 	cc $(INCS) -c copper.c
 
-cpu.o: cpu.c opcodes.c clock.h defs.h
+cpu.o: cpu.c opcodes.c cpu.h defs.h
 	cc $(INCS) -c cpu.c
 
 divmmc.o: divmmc.c divmmc.h defs.h

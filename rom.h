@@ -5,7 +5,7 @@
 #include "defs.h"
 
 
-int  rom_init(u8_t* rom, u8_t* altrom0, u8_t* altrom1);
+int  rom_init(u8_t* sram);
 void rom_finit(void);
 int  rom_read(u16_t address, u8_t* value);
 int  rom_write(u16_t address, u8_t value);

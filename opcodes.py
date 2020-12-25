@@ -1268,7 +1268,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
 
     # Show on stderr the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
-    debug = False
+    debug = True
 
     if debug:
         if not prefix:

@@ -11,6 +11,7 @@
 /* See https://gitlab.com/thesmog358/tbblue/-/blob/master/docs/extra-hw/io-port-system/registers.txt */
 #define REGISTER_MACHINE_ID              0x00
 #define REGISTER_MACHINE_TYPE            0x03
+#define REGISTER_CONFIG_MAPPING          0x04
 #define REGISTER_PERIPHERAL_1_SETTING    0x05
 #define REGISTER_PERIPHERAL_2_SETTING    0x06
 #define REGISTER_CPU_SPEED               0x07
@@ -33,7 +34,9 @@
 
 typedef struct {
   u8_t                   selected_register;
+  u8_t                   rom_ram_bank;
   nextreg_machine_type_t machine_type;
+  int                    is_bootrom_active;
 } nextreg_t;
 
 
@@ -42,12 +45,19 @@ static nextreg_t self;
 
 int nextreg_init(void) {
   self.selected_register  = 0x55;
-  self.machine_type       = E_NEXTREG_MACHINE_TYPE_ZX_PLUS2A_PLUS2B_PLUS3;
+  self.rom_ram_bank       = 0;
+  self.machine_type       = E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+  self.is_bootrom_active = 1;
   return 0;
 }
 
 
 void nextreg_finit(void) {
+}
+
+
+int nextreg_is_bootrom_active(void) {
+  return self.is_bootrom_active;
 }
 
 
@@ -61,29 +71,45 @@ u8_t nextreg_select_read(u16_t address) {
 }
 
 
+static void nextreg_config_mapping_write(u8_t value) {
+  /* Only bits 4:0 are specified, but FPGA uses bits 6:0. */
+  self.rom_ram_bank = value & 0x7F;
+}
+
+
+u8_t nextreg_get_rom_ram_bank(void) {
+  return self.rom_ram_bank;
+}
+
+
 nextreg_machine_type_t nextreg_get_machine_type(void) {
   return self.machine_type;
 }
 
 
 static void nextreg_machine_type_write(u8_t value) {
-  const char* types[8] = {
+  const char* descriptions[8] = {
     "configuration mode",
     "ZX 48K",
     "ZX 128K/+2",
     "ZX +2A/+2B/+3",
-    "Pentagon",
-    "invalid (5)",
-    "invalid (6)",
-    "invalid (7)"
+    "Pentagon"
   };
+  u8_t machine_type;
+
+  self.is_bootrom_active = 0;
+  fprintf(stderr, "nextreg: bootrom disabled\n");
 
   if (value & 0x80) {
     ula_display_timing_set((value >> 4) & 0x03);
   }
 
-  self.machine_type = value & 0x03;
-  fprintf(stderr, "nextreg: machine type set to %s\n", types[self.machine_type]);
+  machine_type      = value & 0x03;
+  self.machine_type = (machine_type <= E_NEXTREG_MACHINE_TYPE_PENTAGON)
+                    ? machine_type
+                    : E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+
+  fprintf(stderr, "nextreg: machine type set to %s\n", descriptions[self.machine_type]);
 }
 
 
@@ -98,7 +124,7 @@ static void nextreg_cpu_speed_write(u8_t value) {
 
 
 static void nextreg_video_timing_write(u8_t value) {
-  if (self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIGURATION_MODE) {
+  if (nextreg_is_config_mode_active()) {
     ula_video_timing_set(value & 0x03);
   }
 }
@@ -142,10 +168,27 @@ static void nextreg_alternate_rom_write(u8_t value) {
 }
 
 
+int nextreg_is_config_mode_active(void) {
+  return self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+}
+
+
 void nextreg_data_write(u16_t address, u8_t value) {
   switch (self.selected_register) {
+    case REGISTER_CONFIG_MAPPING:
+      if (nextreg_is_config_mode_active() && !self.is_bootrom_active) {
+        nextreg_config_mapping_write(value);
+      } else {
+        fprintf(stderr, "nextreg: write to $%02X requires configuration mode and bootrom disabled\n", self.selected_register);
+      }
+      break;
+
     case REGISTER_MACHINE_TYPE:
-      nextreg_machine_type_write(value);
+      if (nextreg_is_config_mode_active()) {
+        nextreg_machine_type_write(value);
+      } else {
+        fprintf(stderr, "nextreg: write to $%02X requires configuration mode\n", self.selected_register);
+      }
       break;
 
     case REGISTER_PERIPHERAL_1_SETTING:
