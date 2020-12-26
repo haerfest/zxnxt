@@ -123,7 +123,7 @@ def add_xy_rr(xy: str, rr: str) -> C:
 def and_r(r: str) -> C:
     return f'''
         A &= {r};
-        F = SZ53P(A) | (1 << HF_SHIFT);
+        F = SZ53P(A) | HF_MASK;
     '''
 
 def bit_b_r(b: int, r: str) -> C:
@@ -993,7 +993,7 @@ instructions: Table = {
     0x2F: ('CPL',
            '''
            A = ~A;
-           F |= (1 << HF_SHIFT) | (1 << NF_SHIFT);
+           F |= HF_MASK | NF_MASK;
            '''),
     0x30: ('JR NC,e',   partial(jr_c_e, '!CF')),
     0x31: ('LD SP,nn',  partial(ld_dd_nn, 'SP')),
@@ -1233,7 +1233,7 @@ instructions: Table = {
     0xE6: ('AND n',
            '''
            A &= memory_read(PC++); T(3);
-           F = SZ53P(A) | (1 << HF_SHIFT);
+           F = SZ53P(A) | HF_MASK;
            '''),
     0xE7: ('RST $20', partial(rst, 0x20)),
     0xE8: ('RET PE',  partial(ret, 'F & PF_MASK')),
