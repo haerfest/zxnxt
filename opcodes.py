@@ -189,17 +189,12 @@ def cp_xy_d(xy: str) -> C:
 def cpir() -> C:
     return '''
       u16_t result;
-      Z      = memory_read(HL);
-      T(3);
+      Z      = memory_read(HL); T(3);
       result = A - Z;
       F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | (BC - 1 != 0) << VF_SHIFT | NF_MASK;
-      HL++;
-      BC--;
-      R++;
-      T(5);
-      if (BC != 0 && !(F & ZF_MASK)) {
-        PC -= 2;
-        T(5);
+      HL++; BC--; R++; T(5);
+      if (!(BC == 0 || result == 0)) {
+        PC -= 2; T(5);
       }
     '''
 
@@ -207,7 +202,7 @@ def dec_phl() -> C:
     return '''
       Z = memory_read(HL) - 1; T(4);
       memory_write(HL, Z);     T(3);
-      F = SZ53(Z) | HF_SUB(Z + 1, 1, Z) | (Z == 0x79) << VF_SHIFT | (F & CF_MASK);
+      F = SZ53(Z) | HF_SUB(Z + 1, 1, Z) | (Z == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
     '''
 
 def dec_r(r: str) -> C:
