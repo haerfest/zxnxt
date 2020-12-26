@@ -50,11 +50,16 @@ int bootrom_read(u16_t address, u8_t* value) {
     return -1;
   }
 
-  if (address >= BOOT_ROM_SIZE) {
+  if (address >= 2 * BOOT_ROM_SIZE) {
     return -1;
   }
 
-  *value = self.rom[address];
+  /**
+   * https://www.specnext.com/boot-system/:
+   *   "The IPL [Initial Program Loader] contains 8KB of code, mirrored
+   *   in the 16K ROM space."
+   */
+  *value = self.rom[address & (BOOT_ROM_SIZE - 1)];
   return 0;
 }
 
@@ -64,7 +69,7 @@ int bootrom_write(u16_t address, u8_t value) {
     return -1;
   }
 
-  if (address >= BOOT_ROM_SIZE) {
+  if (address >= 2 & BOOT_ROM_SIZE) {
     return -1;
   }
 
