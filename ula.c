@@ -75,15 +75,19 @@ typedef enum {
 
 typedef struct {
   SDL_Renderer*           renderer;
-  u16_t                   line_offsets[192];
+  u16_t                   display_offsets[192];
   u8_t*                   display_ram;
   u16_t                   display_offset;
+  u8_t                    display_byte;
+  u8_t                    display_pixel_mask;
   ula_display_frequency_t display_frequency;
   ula_display_state_t     display_state;
   unsigned int            display_line;
-  unsigned int            display_column;
-  u8_t                    display_byte;
-  u8_t                    display_pixel_mask;
+  unsigned int            display_column;  
+  u16_t                   attribute_offsets[192];
+  u8_t*                   attribute_ram;
+  u16_t                   attribute_offset;
+  u8_t                    attribute_byte;
   u8_t                    border_colour;
   u8_t                    speaker_state;
 } ula_t;
@@ -94,6 +98,7 @@ static ula_t self;
 
 static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t spec) {
   unsigned int tick;
+  ula_colour_t colour;
 
   /* The ULA uses a 7 MHz clock to refresh the display, which is 28/4 MHz. */
   for (tick = 0; tick < delta; tick += 4) {
@@ -112,23 +117,27 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
         if (self.display_column == 32) {
-          self.display_offset = self.line_offsets[self.display_line - spec.top_border_lines];
-          self.display_state  = E_ULA_DISPLAY_STATE_FRAME_BUFFER;
+          const u16_t line = self.display_line - spec.top_border_lines;
+          self.display_offset   = self.display_offsets[line];
+          self.attribute_offset = self.attribute_offsets[line];
+          self.display_state    = E_ULA_DISPLAY_STATE_FRAME_BUFFER;
         }
         break;
 
       case E_ULA_DISPLAY_STATE_FRAME_BUFFER:
         if (self.display_pixel_mask == 0x00) {
-          self.display_byte = self.display_ram[self.display_offset];
-          self.display_offset++;
           self.display_pixel_mask = 0x80;
+          self.display_byte       = self.display_ram[self.display_offset++];
+          self.attribute_byte     = self.attribute_ram[self.attribute_offset++];
         }
 
-        if (self.display_byte & self.display_pixel_mask) {
-          SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, SDL_ALPHA_OPAQUE);
-        } else {
-          SDL_SetRenderDrawColor(self.renderer, 0x00, 0x00, 0x00, SDL_ALPHA_OPAQUE);
-        }
+        /* TODO: blinking colours. */
+        colour = colours[
+          (self.display_byte & self.display_pixel_mask ? self.attribute_byte : self.attribute_byte >> 3) & 0x07
+          + (self.attribute_byte & 0x20) * 7
+        ];
+        
+        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
 
         self.display_pixel_mask >>= 1;
@@ -183,9 +192,10 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
           self.display_column = 0;
           self.display_line++;
           if (self.display_line == spec.total_lines + spec.blanking_period_lines) {
-            self.display_line   = 0;
-            self.display_offset = 0;
-            self.display_state  = E_ULA_DISPLAY_STATE_TOP_BORDER;
+            self.display_line     = 0;
+            self.display_offset   = 0;
+            self.attribute_offset = 0;
+            self.display_state    = E_ULA_DISPLAY_STATE_TOP_BORDER;
           }
         }
         break;
@@ -213,7 +223,8 @@ static void ula_fill_tables(void) {
     const u8_t char_row      = line_rel / 8;             /* Which character row the line falls in: 0 .. 7. */
     const u8_t char_row_line = line_rel - char_row * 8;  /* Which line within character row: 0 .. 7. */
 
-    self.line_offsets[line] = third * 2048 + (char_row_line * 8 + char_row) * 32;
+    self.display_offsets[line]   = third * 2048 + (char_row_line * 8 + char_row) * 32;
+    self.attribute_offsets[line] = (line / 8) * 32;
   }
 }
 
@@ -221,7 +232,9 @@ static void ula_fill_tables(void) {
 int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.renderer           = renderer;
   self.display_ram        = &sram[5 * 16 * 1024];  /* Always bank 5. */
+  self.attribute_ram      = &sram[5 * 16 * 1024 + 192 * 32];
   self.display_offset     = 0;
+  self.attribute_offset   = 0;
   self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
   self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
   self.display_line       = 0;
