@@ -263,7 +263,7 @@ void ula_finit(void) {
 
 u8_t ula_read(u16_t address) {
   fprintf(stderr, "ula: unimplemented read from $%04X\n", address);
-  return 0xFF;  /* No keys pressed. */
+  return 0x1F;  /* No keys pressed. */
 }
 
 
