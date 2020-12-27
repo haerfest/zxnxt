@@ -104,7 +104,8 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
   for (tick = 0; tick < delta; tick += 4) {
     switch (self.display_state) {
       case E_ULA_DISPLAY_STATE_TOP_BORDER:
-        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        colour = colours[self.border_colour];
+        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
         if (self.display_column == 32 + 256 + 64) {
@@ -113,7 +114,8 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         break;
 
       case E_ULA_DISPLAY_STATE_LEFT_BORDER:
-        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        colour = colours[self.border_colour];
+        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
         if (self.display_column == 32) {
@@ -163,7 +165,8 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         break;
 
       case E_ULA_DISPLAY_STATE_RIGHT_BORDER:
-        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        colour = colours[self.border_colour];
+        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
         if (self.display_column == 32 + 256 + 64) {
@@ -172,7 +175,8 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         break;
 
       case E_ULA_DISPLAY_STATE_BOTTOM_BORDER:
-        SDL_SetRenderDrawColor(self.renderer, colours[self.border_colour].red, colours[self.border_colour].green, colours[self.border_colour].blue, SDL_ALPHA_OPAQUE);
+        colour = colours[self.border_colour];
+        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
         if (self.display_column == 32 + 256 + 64) {
