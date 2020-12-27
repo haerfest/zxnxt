@@ -470,6 +470,23 @@ def rl_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
+def rl_xy_d(xy: str) -> C:
+    return f'''
+        u8_t carry;
+        u8_t tmp;
+        WZ = {xy} + (s8_t) memory_read(PC++);
+        PC++;
+        T(3);
+        tmp   = memory_read(WZ);
+        T(5);
+        carry = tmp >> 7;
+        tmp   = tmp << 1 | (F & CF_MASK) >> CF_SHIFT;
+        F     = SZ53P(tmp) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, tmp);
+        T(3);
+    '''
+
 def rlc_phl() -> C:
     return '''
         u8_t carry;
@@ -487,6 +504,23 @@ def rlc_r(r: str) -> C:
         const u8_t carry = {r} >> 7;
         {r} = {r} << 1 | carry;
         F = SZ53P({r}) | carry << CF_SHIFT;
+    '''
+
+def rlc_xy_d(xy: str) -> C:
+    return f'''
+        u8_t carry;
+        u8_t tmp;
+        WZ    = {xy} + (s8_t) memory_read(PC++);
+        PC++;
+        T(3);
+        tmp   = memory_read(WZ);
+        T(5);
+        carry = tmp >> 7;
+        tmp   = tmp << 1 | carry;
+        F     = SZ53P(tmp) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, tmp);
+        T(3);
     '''
 
 def rr_phl() -> C:
@@ -508,6 +542,23 @@ def rr_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
+def rr_xy_d(xy: str) -> C:
+    return f'''
+        u8_t carry;
+        u8_t tmp;
+        WZ = {xy} + (s8_t) memory_read(PC++);
+        PC++;
+        T(3);
+        tmp = memory_read(WZ);
+        T(5);
+        carry = tmp & 0x01;
+        tmp   = tmp >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
+        F     = SZ53P(tmp) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, tmp);
+        T(3);
+    '''
+
 def rrc_phl() -> C:
     return '''
         u8_t carry;
@@ -527,6 +578,23 @@ def rrc_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
+def rrc_xy_d(xy: str) -> C:
+    return f'''
+        u8_t carry;
+        u8_t tmp;
+        WZ    = {xy} + (s8_t) memory_read(PC++);
+        PC++;
+        T(3);
+        tmp   = memory_read(WZ);
+        T(5);
+        carry = tmp & 0x01;
+        tmp   = tmp >> 1 | carry << 7;
+        F     = SZ53P(tmp) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, tmp);
+        T(3);
+    '''
+    
 def rst(address: int) -> C:
     return f'''
         T(1);
@@ -611,6 +679,23 @@ def sla_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
+def sla_xy_d(xy: str) -> C:
+    return f'''
+        u8_t carry;
+        u8_t tmp;
+        WZ    = {xy} + (s8_t) memory_read(PC++);
+        PC++;
+        T(3);
+        tmp   = memory_read(WZ);
+        T(5);
+        carry = tmp >> 7;
+        tmp <<= 1;
+        F     = SZ53P(tmp) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, tmp);
+        T(3);
+    '''
+
 def sra_phl() -> C:
     return '''
         u8_t carry;
@@ -630,6 +715,23 @@ def sra_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
+def sra_xy_d(xy: str) -> C:
+    return f'''
+        u8_t carry;
+        u8_t tmp;
+        WZ    = {xy} + (s8_t) memory_read(PC++);
+        PC++;
+        T(3);
+        tmp   = memory_read(WZ);
+        T(5);
+        carry = tmp & 0x01;
+        tmp   = tmp & 0x80 | tmp >> 1;
+        F     = SZ53P(tmp) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, tmp);
+        T(3);
+    '''
+
 def srl_phl() -> C:
     return '''
         u8_t carry;
@@ -647,6 +749,23 @@ def srl_r(r: str) -> C:
         const u8_t carry = {r} & 0x01;
         {r} >>= 1;
         F = SZ53P({r}) | carry << CF_SHIFT;
+    '''
+
+def srl_xy_d(xy: str) -> C:
+    return f'''
+        u8_t carry;
+        u8_t tmp;
+        WZ    = {xy} + (s8_t) memory_read(PC++);
+        PC++;
+        T(3);
+        tmp   = memory_read(WZ);
+        T(5);
+        carry = tmp & 0x01;
+        tmp >>= 1;
+        F     = SZ53P(tmp) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, tmp);
+        T(3);
     '''
 
 def sub_r(r: str) -> C:
@@ -832,6 +951,37 @@ def ed_table() -> Table:
     }
 
 
+def xy_cb_table(xy: str) -> Table:
+    table = {}
+
+    def _bit_twiddling(mnemonic: str, top_opcode: int, act: Callable[[int, str], C]) -> None:
+        for opcode, b in zip(count(top_opcode, 8), range(8)):
+            table[opcode] = (f'{mnemonic} {b},({xy}+d)', partial(act, b, xy))
+
+    def _rotates(top_opcode: int) -> None:
+        actions = [
+            ('RLC', rlc_xy_d),
+            ('RRC', rrc_xy_d),
+            ('RL',  rl_xy_d),
+            ('RR',  rr_xy_d),
+            ('SLA', sla_xy_d),
+            ('SRA', sra_xy_d),
+            ('SRL', srl_xy_d),
+        ]
+
+        deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38]
+        for delta, (mnemonic, act) in zip(deltas, actions):
+            table[top_opcode + delta] = (f'{mnemonic} ({xy}+d)', partial(act, xy))
+
+    # This is on the 4th byte, not the 3rd! PC remains at 3rd.
+    _bit_twiddling('BIT', 0x46, bit_b_xy_d)
+    _bit_twiddling('RES', 0x86, res_b_xy_d)
+    _bit_twiddling('SET', 0xC6, set_b_xy_d)
+
+    _rotates(0x06)
+
+    return table
+
 def xy_table(xy: str) -> Table:
     return {
         0x09: (f'ADD {xy},BC',    partial(add_xy_rr, xy, 'BC')),
@@ -871,33 +1021,7 @@ def xy_table(xy: str) -> Table:
         0xB6: (f'OR ({xy}+d)',    partial(or_xy_d, xy)),
         0xBE: (f'CP ({xy}+d)',    partial(cp_xy_d, xy)),
         0xE5: (f'PUSH {xy}',      partial(push_qq, xy)),
-        0xCB: {
-            # This is on the 4th byte, not the 3rd! PC remains at 3rd.
-            0x46: (f'BIT 0,({xy}+d)', partial(bit_b_xy_d, 0, xy)),
-            0x4E: (f'BIT 1,({xy}+d)', partial(bit_b_xy_d, 1, xy)),
-            0x56: (f'BIT 2,({xy}+d)', partial(bit_b_xy_d, 2, xy)),
-            0x5E: (f'BIT 3,({xy}+d)', partial(bit_b_xy_d, 3, xy)),
-            0x66: (f'BIT 4,({xy}+d)', partial(bit_b_xy_d, 4, xy)),
-            0x6E: (f'BIT 5,({xy}+d)', partial(bit_b_xy_d, 5, xy)),
-            0x76: (f'BIT 6,({xy}+d)', partial(bit_b_xy_d, 6, xy)),
-            0x7E: (f'BIT 7,({xy}+d)', partial(bit_b_xy_d, 7, xy)),
-            0x86: (f'RES 0,({xy}+d)', partial(res_b_xy_d, 0, xy)),
-            0x8E: (f'RES 1,({xy}+d)', partial(res_b_xy_d, 1, xy)),
-            0x96: (f'RES 2,({xy}+d)', partial(res_b_xy_d, 2, xy)),
-            0x9E: (f'RES 3,({xy}+d)', partial(res_b_xy_d, 3, xy)),
-            0xA6: (f'RES 4,({xy}+d)', partial(res_b_xy_d, 4, xy)),
-            0xAE: (f'RES 5,({xy}+d)', partial(res_b_xy_d, 5, xy)),
-            0xB6: (f'RES 6,({xy}+d)', partial(res_b_xy_d, 6, xy)),
-            0xBE: (f'RES 7,({xy}+d)', partial(res_b_xy_d, 7, xy)),
-            0xC6: (f'SET 0,({xy}+d)', partial(set_b_xy_d, 0, xy)),
-            0xCE: (f'SET 1,({xy}+d)', partial(set_b_xy_d, 1, xy)),
-            0xD6: (f'SET 2,({xy}+d)', partial(set_b_xy_d, 2, xy)),
-            0xDE: (f'SET 3,({xy}+d)', partial(set_b_xy_d, 3, xy)),
-            0xE6: (f'SET 4,({xy}+d)', partial(set_b_xy_d, 4, xy)),
-            0xEE: (f'SET 5,({xy}+d)', partial(set_b_xy_d, 5, xy)),
-            0xF6: (f'SET 6,({xy}+d)', partial(set_b_xy_d, 6, xy)),
-            0xFE: (f'SET 7,({xy}+d)', partial(set_b_xy_d, 7, xy)),
-        },
+        0xCB: xy_cb_table(xy),
         0xE1: (f'POP {xy}',     partial(pop_qq, xy)),
         0xE3: (f'EX (SP),{xy}', partial(ex_psp_dd, xy)),
         0xE9: (f'JP ({xy})',    f'PC = {xy};'),
@@ -1165,6 +1289,7 @@ instructions: Table = {
            const u16_t result = A - n;
            F                  = SZ53(result & 0xFF) | HF_SUB(A, n, result) | VF_SUB(A, n, result) | NF_MASK | (A < n) << CF_SHIFT;
            '''),
+    0xBF: ('CP A',      partial(cp_r, 'A')),
     0xC0: ('RET NZ',    partial(ret, '!(F & ZF_MASK)')),
     0xC1: ('POP BC',    partial(pop_qq, 'BC')),
     0xC2: ('JP NZ,nn',  partial(jp, '!(F & ZF_MASK)')),
