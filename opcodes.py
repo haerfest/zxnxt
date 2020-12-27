@@ -126,6 +126,14 @@ def and_r(r: str) -> C:
         F = SZ53P(A) | HF_MASK;
     '''
 
+def and_xy_d(xy: str) -> C:
+    return f'''
+        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
+        A &=  memory_read(WZ);                T(5);
+        F = SZ53P(A) | HF_MASK;
+        T(3);
+    '''
+
 def bit_b_r(b: int, r: str) -> C:
     return f'''
         F &= ~(ZF_MASK | NF_MASK);
@@ -397,6 +405,12 @@ def or_r(r: str) -> C:
         F = SZ53P(A);
     '''
 
+def or_phl() -> C:
+    return f'''
+        A |= memory_read(HL); T(4);
+        F = SZ53P(A);         T(3);
+    '''
+    
 def or_xy_d(xy: str) -> C:
     return f'''
         WZ = {xy} + (s8_t) memory_read(PC++); T(3);
@@ -1018,6 +1032,7 @@ def xy_table(xy: str) -> Table:
         0x86: (f'ADD A,({xy}+d)', partial(add_a_xy_d, xy)),
         0x8E: (f'ADC A,({xy}+d)', partial(adc_a_xy_d, xy)),
         0x96: (f'SUB ({xy}+d)',   partial(sub_xy_d, xy)),
+        0xA6: (f'AND ({xy}+d)',   partial(and_xy_d, xy)),
         0xB6: (f'OR ({xy}+d)',    partial(or_xy_d, xy)),
         0xBE: (f'CP ({xy}+d)',    partial(cp_xy_d, xy)),
         0xE5: (f'PUSH {xy}',      partial(push_qq, xy)),
@@ -1155,6 +1170,7 @@ instructions: Table = {
            W = memory_read(PC++); T(3);
            A = memory_read(WZ);   T(3);
            '''),
+    0x3B: ('DEC SP',    partial(dec_ss, 'SP')),
     0x3C: ('INC A',     partial(inc_r, 'A')),
     0x3D: ('DEC A',     partial(dec_r, 'A')),
     0x3E: ('LD A,n',    partial(ld_r_n, 'A')),
@@ -1276,6 +1292,7 @@ instructions: Table = {
     0xB3: ('OR E',      partial(or_r, 'E')),
     0xB4: ('OR H',      partial(or_r, 'H')),
     0xB5: ('OR L',      partial(or_r, 'L')),
+    0xB6: ('OR (HL)',   or_phl),
     0xB7: ('OR A',      partial(or_r, 'A')),
     0xB8: ('CP B',      partial(cp_r, 'B')),
     0xB9: ('CP C',      partial(cp_r, 'C')),
