@@ -538,29 +538,34 @@ def rst(address: int) -> C:
 def sbc_a_n() -> C:
     return '''
         const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
-        u16_t      result;
-        Z = memory_read(PC++); T(3);
-        result = A - Z - carry;
-        F = SZ53(A) | HF_SUB(A, Z + carry, result) | VF_SUB(A, Z + carry, result) | NF_MASK | (A < Z + carry) << CF_SHIFT;
-        A = result & 0xFF;
+        const u8_t a     = A;
+        s16_t      result;
+        Z      = memory_read(PC++) + carry; T(3);
+        result = A - Z;
+        A      = result & 0xFF;
+        F  = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sbc_a_phl() -> C:
     return '''
-        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
-        u16_t      result;
-        Z = memory_read(HL); T(3);
-        result = A - Z - carry;
-        F = SZ53(A) | HF_SUB(A, Z + carry, result) | VF_SUB(A, Z + carry, result) | NF_MASK | (A < Z + carry) << CF_SHIFT;
-        A = result & 0xFF;
+        const u8_t  carry = (F & CF_MASK) >> CF_SHIFT;
+        const u8_t  a     = A;
+        s16_t       result;
+        Z      = memory_read(HL) + carry; T(3);
+        result = A - Z;
+        A      = result & 0xFF;
+        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sbc_a_r(r: str) -> C:
     return f'''
-        const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
-        const u16_t result = A - {r} - carry;
-        F = SZ53(A) | HF_SUB(A, {r} + carry, result) | VF_SUB(A, {r} + carry, result) | NF_MASK | (A < {r} + carry) << CF_SHIFT;
-        A = result & 0xFF;
+        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
+        const u8_t a     = A;
+        s16_t      result;
+        Z      = {r} + carry;
+        result = A - Z;
+        A      = result & 0xFF;
+        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sbc_hl_ss(ss: str) -> C:
@@ -646,29 +651,31 @@ def srl_r(r: str) -> C:
 
 def sub_r(r: str) -> C:
     return f'''
-        const u16_t result = A - {r};
-        F = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
-        A = result & 0xFF;
+        const u8_t  a      = A;
+        const s16_t result = A - {r};
+        A                  = result & 0xFF;
+        F                  = SZ53(A) | HF_SUB(a, {r}, A) | VF_SUB(a, {r}, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sub_phl() -> C:
-    return f'''
-        u16_t result;
-        Z = memory_read(HL); T(3);
+    return '''
+        const u8_t a = A;
+        s16_t      result;
+        Z      = memory_read(HL); T(3);
         result = A - Z;
-        F = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | (A < Z) << CF_SHIFT;
-        A = result & 0xFF;
+        A      = result & 0xFF;
+        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sub_xy_d(xy: str) -> C:
     return f'''
-        u16_t result;
-        u8_t  tmp;
+        const u8_t a = A;
+        s16_t      result;
         WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
-        tmp    = memory_read(WZ);                 T(5);
-        result = A - tmp;
-        F      = SZ53(result & 0xFF) | HF_SUB(A, tmp, result) | VF_SUB(A, tmp, result) | NF_MASK | (A < tmp) << CF_SHIFT;
+        Z      = memory_read(WZ);                 T(5);
+        result = A - Z;
         A      = result & 0xFF;
+        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
         T(3);
     '''
 
