@@ -1175,7 +1175,7 @@ instructions: Table = {
     0x48: ('LD C,B',    partial(ld_r_r, 'C', 'B')),
     0x49: ('LD C,C',    partial(ld_r_r, 'C', 'C')),
     0x4A: ('LD C,D',    partial(ld_r_r, 'C', 'D')),
-    0x4B: ('LD C,E',    partial(ld_r_r, 'C', 'B')),
+    0x4B: ('LD C,E',    partial(ld_r_r, 'C', 'E')),
     0x4C: ('LD C,H',    partial(ld_r_r, 'C', 'H')),
     0x4D: ('LD C,L',    partial(ld_r_r, 'C', 'L')),
     0x4E: ('LD C,(HL)', partial(ld_r_pdd, 'C', 'HL')),
