@@ -92,7 +92,6 @@
 
 #define SZ53(value)   self.sz53[value]
 #define SZ53P(value)  self.sz53p[value]
-#define PARITY(value) self.parity[value]
 
 
 /**
@@ -112,6 +111,16 @@ static const u8_t hf_add[8] = { 0, HF_MASK, HF_MASK, HF_MASK,       0, 0,       
 static const u8_t hf_sub[8] = { 0,       0, HF_MASK,       0, HF_MASK, 0, HF_MASK, HF_MASK };
 static const u8_t vf_add[8] = { 0,       0,       0, VF_MASK, VF_MASK, 0,       0,       0 };
 static const u8_t vf_sub[8] = { 0, VF_MASK,       0,       0,       0, 0, VF_MASK,       0 };
+
+
+/* http://graphics.stanford.edu/~seander/bithacks.html#ParityLookupTable */
+#define P2(n) n, n^1, n^1, n
+#define P4(n) P2(n), P2(n^1), P2(n^1), P2(n)
+#define P6(n) P4(n), P4(n^1), P4(n^1), P4(n)
+
+static const u8_t parity[256] = {
+    P6(0), P6(1), P6(1), P6(0)
+};
 
 
 /* Simple way to combine two 8-bit registers into a 16-bit one.
@@ -164,9 +173,6 @@ typedef struct {
    * calculate things every time. */
   u8_t sz53[256];
   u8_t sz53p[256];
-
-  /* Further look-up tables to prevent calculations. */
-  u8_t parity[256];
 } cpu_t;
 
 
@@ -174,25 +180,12 @@ typedef struct {
 static cpu_t self;
 
 
-static u8_t parity(int value) {
-  u8_t parity;
-  u8_t bit;
-
-  for (parity = 1, bit = 0; bit < 8; bit++, value >>= 1) {
-    parity ^= value & 1;
-  }
-
-  return parity;
-}
-
-
 static void cpu_fill_tables(void) {
   int value;
   
   for (value = 0; value < 256; value++) {
-    self.parity[value] = parity(value);
     self.sz53[value]   = (value & 0x80) | (value == 0) << ZF_SHIFT | (value & 0x20) | (value & 0x08);
-    self.sz53p[value]  = self.sz53[value] | self.parity[value] << PF_SHIFT;
+    self.sz53p[value]  = self.sz53[value] | (1 - parity[value]) << PF_SHIFT;
   }
 }
 
