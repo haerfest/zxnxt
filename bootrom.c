@@ -69,7 +69,7 @@ int bootrom_write(u16_t address, u8_t value) {
     return -1;
   }
 
-  if (address >= 2 & BOOT_ROM_SIZE) {
+  if (address >= 2 * BOOT_ROM_SIZE) {
     return -1;
   }
 
