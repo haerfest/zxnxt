@@ -20,7 +20,7 @@
 
 
 typedef struct {
-  u8_t* ram;
+  u8_t* sram;
 } memory_t;
 
 
@@ -31,14 +31,14 @@ int memory_init(void) {
   FILE*  fp;
   size_t i;
 
-  self.ram = malloc(RAM_SIZE);
-  if (self.ram == NULL) {
+  self.sram = malloc(RAM_SIZE);
+  if (self.sram == NULL) {
     fprintf(stderr, "memory: out of memory\n");
     return -1;
   }
 
   for (i = 0; i < RAM_SIZE; i++) {
-    self.ram[i] = rand() % 256;
+    self.sram[i] = rand() % 256;
   }
 
   return 0;
@@ -46,9 +46,9 @@ int memory_init(void) {
 
 
 void memory_finit(void) {
-  if (self.ram != NULL) {
-    free(self.ram);
-    self.ram = NULL;
+  if (self.sram != NULL) {
+    free(self.sram);
+    self.sram = NULL;
   }
 }
 
@@ -120,6 +120,6 @@ void memory_write(u16_t address, u8_t value) {
 }
 
 
-u8_t* memory_pointer(u32_t address) {
-  return &self.ram[address];
+u8_t* memory_sram(void) {
+  return self.sram;
 }

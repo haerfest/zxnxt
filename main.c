@@ -40,6 +40,8 @@ static main_t self;
 
 
 static int main_init(void) {
+  u8_t* sram;
+
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     SDL_Log("SDL_Init: %s\n", SDL_GetError());
     goto exit;
@@ -89,23 +91,24 @@ static int main_init(void) {
     goto exit_io;
   }
 
-  if (bootrom_init(memory_pointer(0)) != 0) {
+  sram = memory_sram();
+  if (bootrom_init(sram) != 0) {
     goto exit_io;
   }
 
-  if (config_init(memory_pointer(0)) != 0) {
+  if (config_init(sram) != 0) {
     goto exit_bootrom;
   }
 
-  if (rom_init(memory_pointer(0)) != 0) {
+  if (rom_init(sram) != 0) {
     goto exit_config;
   }
 
-  if (mmu_init(memory_pointer(MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM)) != 0) {
+  if (mmu_init(sram + MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM) != 0) {
     goto exit_rom;
   }
 
-  if (divmmc_init(memory_pointer(MEMORY_RAM_OFFSET_DIVMMC_ROM), memory_pointer(MEMORY_RAM_OFFSET_DIVMMC_RAM)) != 0) {
+  if (divmmc_init(sram + MEMORY_RAM_OFFSET_DIVMMC_ROM, sram + MEMORY_RAM_OFFSET_DIVMMC_RAM) != 0) {
     goto exit_mmu;
   }
 
@@ -113,7 +116,7 @@ static int main_init(void) {
     goto exit_divmmc;
   }
 
-  if (ula_init(self.renderer, self.texture, memory_pointer(MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM)) != 0) {
+  if (ula_init(self.renderer, self.texture, sram + MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM) != 0) {
     goto exit_clock;
   }
 

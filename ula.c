@@ -218,9 +218,9 @@ static void ula_fill_tables(void) {
 }
 
 
-int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* ram) {
+int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.renderer           = renderer;
-  self.display_ram        = &ram[5 * 16 * 1024];  /* Always bank 5. */
+  self.display_ram        = &sram[5 * 16 * 1024];  /* Always bank 5. */
   self.display_offset     = 0;
   self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
   self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
