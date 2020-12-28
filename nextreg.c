@@ -8,8 +8,15 @@
 #include "ula.h"
 
 
-/* See https://gitlab.com/thesmog358/tbblue/-/blob/master/docs/extra-hw/io-port-system/registers.txt */
+#define MACHINE_ID              8  /* Emulator. */
+
+#define CORE_VERSION_MAJOR      3
+#define CORE_VERSION_MINOR      1
+#define CORE_VERSION_SUB_MINOR  9
+
+/* See https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt */
 #define REGISTER_MACHINE_ID              0x00
+#define REGISTER_CORE_VERSION            0x01
 #define REGISTER_MACHINE_TYPE            0x03
 #define REGISTER_CONFIG_MAPPING          0x04
 #define REGISTER_PERIPHERAL_1_SETTING    0x05
@@ -17,6 +24,7 @@
 #define REGISTER_CPU_SPEED               0x07
 #define REGISTER_PERIPHERAL_3_SETTING    0x08
 #define REGISTER_PERIPHERAL_4_SETTING    0x09
+#define REGISTER_CORE_VERSION_SUB_MINOR  0x0E
 #define REGISTER_PERIPHERAL_5_SETTING    0x10
 #define REGISTER_VIDEO_TIMING            0x11
 #define REGISTER_MMU_SLOT0_CONTROL       0x50
@@ -229,7 +237,13 @@ void nextreg_data_write(u16_t address, u8_t value) {
 u8_t nextreg_data_read(u16_t address) {
   switch (self.selected_register) {
     case REGISTER_MACHINE_ID:
-      return 0x08;  /* Emulator. */
+      return MACHINE_ID;
+
+    case REGISTER_CORE_VERSION:
+      return CORE_VERSION_MAJOR << 4 | CORE_VERSION_MINOR;
+
+    case REGISTER_CORE_VERSION_SUB_MINOR:
+      return CORE_VERSION_SUB_MINOR;
 
     case REGISTER_MMU_SLOT0_CONTROL:
     case REGISTER_MMU_SLOT1_CONTROL:
