@@ -17,7 +17,7 @@ typedef struct {
 
 static const ula_display_spec_t ula_display_spec[5][2][2] = {
   /* ZX Spectrum 48K */ {
-    /* VGA  */ { /* 50 Hz */ { 312, 192, 57, 14, 49 }, /* 50 Hz */ { 262, 192, 33, 14, 23 } },
+    /* VGA  */ { /* 50 Hz */ { 312, 192, 57, 14, 49 }, /* 60 Hz */ { 262, 192, 33, 14, 23 } },
     /* HDMI */ { /* 50 Hz */ { 312, 192, 40, 40, 40 }, /* 60 Hz */ { 262, 192, 20, 33, 17 } }
   },
   /* ZX Spectrum 128K/+2 */ {
@@ -291,4 +291,9 @@ void ula_display_frequency_set(ula_display_frequency_t frequency) {
 
   self.display_frequency = frequency;
   fprintf(stderr, "ula: display frequency set to %s Hz\n", descriptions[frequency]);
+
+  self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
+  self.display_line       = 0;
+  self.display_column     = 0;
+  self.display_pixel_mask = 0;
 }
