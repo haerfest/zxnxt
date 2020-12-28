@@ -95,7 +95,10 @@ static void nextreg_reset_write(u8_t value) {
     if (self.is_hard_reset) {
       self.is_bootrom_active = 1;
     }
+
     cpu_reset();
+
+    fprintf(stderr, "nextreg: %s reset\n", self.is_hard_reset ? "hard" : "soft");
   }
 }
 
@@ -144,7 +147,7 @@ static void nextreg_machine_type_write(u8_t value) {
 
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
-  ula_display_frequency_set(value & 0x04);
+  ula_display_frequency_set((value & 0x04) >> 2);
 }
 
 
