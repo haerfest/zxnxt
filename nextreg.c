@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "clock.h"
+#include "cpu.h"
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
@@ -17,6 +18,7 @@
 /* See https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt */
 #define REGISTER_MACHINE_ID              0x00
 #define REGISTER_CORE_VERSION            0x01
+#define REGISTER_RESET                   0x02
 #define REGISTER_MACHINE_TYPE            0x03
 #define REGISTER_CONFIG_MAPPING          0x04
 #define REGISTER_PERIPHERAL_1_SETTING    0x05
@@ -45,6 +47,7 @@ typedef struct {
   u8_t                   rom_ram_bank;
   nextreg_machine_type_t machine_type;
   int                    is_bootrom_active;
+  int                    is_hard_reset;
 } nextreg_t;
 
 
@@ -55,7 +58,8 @@ int nextreg_init(void) {
   self.selected_register  = 0x55;
   self.rom_ram_bank       = 0;
   self.machine_type       = E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
-  self.is_bootrom_active = 1;
+  self.is_bootrom_active  = 1;
+  self.is_hard_reset      = 1;
   return 0;
 }
 
@@ -76,6 +80,23 @@ void nextreg_select_write(u16_t address, u8_t value) {
 
 u8_t nextreg_select_read(u16_t address) {
   return 0xFF;
+}
+
+
+static u8_t nextreg_reset_read(void) {
+  return self.is_hard_reset ? 0x02 : 0x01;
+}
+
+
+static void nextreg_reset_write(u8_t value) {
+  if (value & 0x03) {
+    /* Hard or soft reset. */
+    self.is_hard_reset = value & 0x02;
+    if (self.is_hard_reset) {
+      self.is_bootrom_active = 1;
+    }
+    cpu_reset();
+  }
 }
 
 
@@ -188,6 +209,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
       nextreg_config_mapping_write(value);
       break;
 
+    case REGISTER_RESET:
+      nextreg_reset_write(value);
+      break;
+
     case REGISTER_MACHINE_TYPE:
       if (nextreg_is_config_mode_active()) {
         nextreg_machine_type_write(value);
@@ -244,6 +269,9 @@ u8_t nextreg_data_read(u16_t address) {
 
     case REGISTER_CORE_VERSION_SUB_MINOR:
       return CORE_VERSION_SUB_MINOR;
+
+    case REGISTER_RESET:
+      return nextreg_reset_read();
 
     case REGISTER_MMU_SLOT0_CONTROL:
     case REGISTER_MMU_SLOT1_CONTROL:
