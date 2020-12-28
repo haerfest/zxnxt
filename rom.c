@@ -40,10 +40,6 @@ int rom_init(u8_t* sram) {
   self.lock_rom       = 0;
   self.selected       = 0;
 
-  if (utils_load_rom("enNextZX.rom", 64 * 1024, self.sram) != 0) {
-    return -1;
-  }
-
   return 0;
 }
 
