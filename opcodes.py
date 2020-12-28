@@ -23,6 +23,15 @@ def hi(dd: str) -> str:
 def lo(dd: str) -> str:
     return f'{dd}L' if dd in ['IX', 'IY'] else dd[1]
 
+def adc_a_n() -> C:
+    return '''
+        const u8_t  n      = memory_read(PC++); T(3);
+        const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
+        const u16_t result = A + n + carry;
+        F = SZ53(A) | HF_ADD(A, n + carry, result) | VF_ADD(A, n + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
+        A = result & 0xFF;
+    '''
+
 def adc_a_r(r: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
@@ -62,6 +71,15 @@ def adc_hl_ss(ss: str) -> C:
         const u32_t result = HL + {ss} + carry; T(4);
         F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x20) | (result & 0x08) | HF_ADD(H, {hi(ss)}, result >> 8) | VF_ADD(H, {hi(ss)}, result >> 8) | (result & 0x10000) >> 16 << CF_SHIFT;
         HL = result & 0xFFFF; T(3);
+    '''
+
+def add_a_n() -> C:
+    return '''
+        const u8_t n       = memory_read(PC++); T(3);
+        const u16_t result = A + n;
+        const u8_t  carry  = A > 255 - n;
+        F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | carry;
+        A = result & 0xFF;
     '''
 
 def add_a_r(r: str) -> C:
@@ -120,19 +138,6 @@ def add_xy_rr(xy: str, rr: str) -> C:
         {xy} = result & 0xFFFF;
     '''
 
-def and_r(r: str) -> C:
-    return f'''
-        A &= {r};
-        F = SZ53P(A) | HF_MASK;
-    '''
-
-def and_xy_d(xy: str) -> C:
-    return f'''
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        A &=  memory_read(WZ);                T(5);
-        F = SZ53P(A) | HF_MASK;
-        T(3);
-    '''
 
 def bit_b_r(b: int, r: str) -> C:
     return f'''
@@ -178,10 +183,33 @@ def call(cond: Optional[str] = None) -> C:
 
     return s
 
+def ccf() -> C:
+    return '''
+        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
+        F &= ~(HF_MASK | CF_MASK);
+        F |= carry << HF_SHIFT | (1 - carry) << CF_SHIFT;
+    '''
+
+def cp_n() -> C:
+    return '''
+        u16_t result;
+        Z      = memory_read(PC++); T(3);
+        result = A - Z;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
+        T(3);
+    '''
+
 def cp_r(r: str) -> C:
     return f'''
         const u16_t result = A - {r};
         F                  = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
+    '''
+
+def cp_phl() -> C:
+    return '''
+        const u8_t  n      = memory_read(HL); T(3);
+        const u16_t result = A - n;
+        F                  = SZ53(result & 0xFF) | HF_SUB(A, n, result) | VF_SUB(A, n, result) | NF_MASK | (A < n) << CF_SHIFT;
     '''
 
 def cp_xy_d(xy: str) -> C:
@@ -205,6 +233,16 @@ def cpir() -> C:
         PC -= 2; T(5);
       }
     '''
+
+def cpl() -> C:
+    return '''
+        A = ~A;
+        F |= HF_MASK | NF_MASK;
+    '''
+
+def daa() -> C:
+    # TODO: implement DAA.
+    return None
 
 def dec_phl() -> C:
     return '''
@@ -232,6 +270,15 @@ def dec_xy_d(xy: str) -> C:
         T(3);
     '''
 
+def djnz() -> C:
+    return f'''
+        T(1);
+        Z = memory_read(PC++); T(3);
+        if (--B) {{
+            PC += (s8_t) Z; T(5);
+        }}
+    '''
+
 def ex(r1: str, r2: str) -> C:
     return f'''
         const u16_t tmp = {r1};
@@ -249,9 +296,24 @@ def ex_psp_dd(dd: str) -> C:
         {lo(dd)} = Z;
     '''
 
+def exx() -> C:
+    return '''
+        u16_t tmp;
+        tmp = BC; BC = BC_; BC_ = tmp;
+        tmp = DE; DE = DE_; DE_ = tmp;
+        tmp = HL; HL = HL_; HL_ = tmp;
+    '''
+
 def halt() -> C:
     # TODO: Wait for interrupt.
     return ''
+
+def in_a_n() -> C:
+    return '''
+        Z = memory_read(PC++);   T(3);
+        A = io_read(A << 8 | Z); T(4);
+        F = SZ53P(A);
+    '''
 
 def in_r_c(r: str) -> C:
     return f'''
@@ -297,13 +359,20 @@ def inx(op: str) -> C:
         F |= (B == 0) << ZF_SHIFT | NF_MASK;
     '''
 
-def jr_c_e(c: str) -> C:
-    return f'''
+def jr_c_e(cond: Optional[str] = None) -> C:
+    s = '''
         Z = memory_read(PC++); T(3);
-        if ({c}) {{
-          PC += (s8_t) Z; T(5);
-        }}
     '''
+
+    if cond:
+        s += f'if ({cond}) {{\n'
+    
+    s += 'PC += (s8_t) Z; T(5);'
+
+    if cond:
+        s += '}'
+
+    return s
 
 def jp(cond: Optional[str] = None) -> C:
     s = '''
@@ -320,6 +389,13 @@ def jp(cond: Optional[str] = None) -> C:
         s += '}'
 
     return s
+
+def ld_a_pnn() -> C:
+    return '''
+        Z = memory_read(PC++); T(3);
+        W = memory_read(PC++); T(3);
+        A = memory_read(WZ);   T(3);
+    '''
 
 def ld_dd_nn(dd: str) -> C:
     return f'''
@@ -342,6 +418,19 @@ def ld_dd_ss(dd: str, ss: str) -> C:
 
 def ld_pdd_r(dd: str, r: str) -> C:
     return f'memory_write({dd}, {r}); T(3);'
+
+def ld_phl_n() -> C:
+    return '''
+        Z = memory_read(PC++); T(3);
+        memory_write(HL, Z);   T(3);
+    '''
+
+def ld_pnn_a() -> C:
+    return '''
+        Z = memory_read(PC++); T(3);
+        W = memory_read(PC++); T(3);
+        memory_write(WZ, A);   T(3);
+    '''
 
 def ld_pnn_dd(dd: str) -> C:
     return f'''
@@ -399,27 +488,39 @@ def ldxr(op: str) -> C:
         if (--BC) {{ PC -= 2; T(5); }}
     '''
 
-def or_r(r: str) -> C:
+def logical_n(op: str) -> C:
     return f'''
-        A |= {r};
-        F = SZ53P(A);
+        A {op}= memory_read(PC++); T(3);
+        F = SZ53P(A) | HF_MASK;
     '''
 
-def or_phl() -> C:
+def logical_r(op: str, r: str) -> C:
     return f'''
-        A |= memory_read(HL); T(4);
-        F = SZ53P(A);         T(3);
+       A {op}= {r};
+       F = SZ53P(A);
     '''
-    
-def or_xy_d(xy: str) -> C:
+
+def logical_phl(op: str) -> C:
+    return f'''
+        A {op}= memory_read(HL); T(4);
+        F = SZ53P(A);            T(3);
+    '''
+
+def logical_xy_d(op: str, xy: str) -> C:
     return f'''
         WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        A |= memory_read(WZ);                 T(5);
+        A {op}= memory_read(WZ);              T(5);
         F = SZ53P(A);                         T(3);
     '''
 
 def out_c_r(r: str) -> C:
     return f'io_write(BC, {r}); T(4);'
+
+def out_n_a() -> C:
+    return '''
+        WZ = A << 8 | memory_read(PC++); T(3);
+        io_write(WZ, A);                 T(4);
+    '''
 
 def pop_qq(qq: str) -> C:
     return f'''
@@ -501,6 +602,15 @@ def rl_xy_d(xy: str) -> C:
         T(3);
     '''
 
+def rla() -> C:
+    return '''
+        const u8_t carry = F & CF_MASK;
+        F &= ~(HF_MASK | NF_MASK | CF_MASK);
+        F |= (A & 0x80) >> 7 << CF_SHIFT;
+        A <<= 1;
+        A |= carry;
+    '''
+
 def rlc_phl() -> C:
     return '''
         u8_t carry;
@@ -535,6 +645,15 @@ def rlc_xy_d(xy: str) -> C:
         T(4);
         memory_write(WZ, tmp);
         T(3);
+    '''
+
+def rlca() -> C:
+    return '''
+        const u8_t carry = A >> 7;
+        F &= ~(NF_MASK | CF_MASK);
+        F |= HF_MASK | carry << CF_SHIFT;
+        A <<= 1;
+        A |= carry;
     '''
 
 def rr_phl() -> C:
@@ -573,6 +692,15 @@ def rr_xy_d(xy: str) -> C:
         T(3);
     '''
 
+def rra() -> C:
+    return '''
+        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
+        F &= ~(HF_MASK | NF_MASK | CF_MASK);
+        F |= (A & 0x01) << CF_SHIFT;
+        A >>= 1;
+        A |= carry << 7;
+    '''
+
 def rrc_phl() -> C:
     return '''
         u8_t carry;
@@ -608,7 +736,16 @@ def rrc_xy_d(xy: str) -> C:
         memory_write(WZ, tmp);
         T(3);
     '''
-    
+
+def rrca() -> C:
+    return '''
+        const u8_t carry = A & 0x01;
+        F &= ~(NF_MASK | HF_MASK | CF_MASK);
+        F |= carry << CF_SHIFT;
+        A >>= 1;
+        A |= carry << 7;
+    '''
+
 def rst(address: int) -> C:
     return f'''
         T(1);
@@ -669,6 +806,12 @@ def sbc_hl_ss(ss: str) -> C:
         const u32_t result = HL - {ss} - carry; T(4);
         F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x20) | (result & 0x08) | HF_SUB(H, {hi(ss)}, result >> 8) | VF_SUB(H, {hi(ss)}, result >> 8) | NF_MASK | (HL < {ss} + carry) << CF_SHIFT;
         HL = result & 0xFFFF; T(3);
+    '''
+
+def scf() -> C:
+    return '''
+        F &= ~(HF_MASK | NF_MASK);
+        F |= CF_MASK;
     '''
 
 def set_b_phl(b: int) -> C:
@@ -795,6 +938,15 @@ def srl_xy_d(xy: str) -> C:
         T(3);
     '''
 
+def sub_n() -> C:
+    return '''
+        u16_t result;
+        Z      = memory_read(PC++); T(3);
+        result = A - Z;
+        F     = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
+        A     = result & 0xFF;
+    '''
+
 def sub_r(r: str) -> C:
     return f'''
         const u8_t  a      = A;
@@ -830,13 +982,6 @@ def swapnib() -> C:
         A = A >> 4 | A << 4;
         T(8);
     '''
-
-def xor_r(r: str) -> C:
-    return f'''
-       A ^= {r};
-       F = SZ53P(A);
-    '''
-
 
 def cb_table() -> Table:
     table = {}
@@ -1046,8 +1191,8 @@ def xy_table(xy: str) -> Table:
         0x8E: (f'ADC A,({xy}+d)', partial(adc_a_xy_d, xy)),
         0x96: (f'SUB ({xy}+d)',   partial(sub_xy_d, xy)),
         0x9E: (f'SBC ({xy}+d)',   partial(sbc_a_xy_d, xy)),
-        0xA6: (f'AND ({xy}+d)',   partial(and_xy_d, xy)),
-        0xB6: (f'OR ({xy}+d)',    partial(or_xy_d, xy)),
+        0xA6: (f'AND ({xy}+d)',   partial(logical_xy_d, '&', xy)),
+        0xB6: (f'OR ({xy}+d)',    partial(logical_xy_d, '|', xy)),
         0xBE: (f'CP ({xy}+d)',    partial(cp_xy_d, xy)),
         0xE5: (f'PUSH {xy}',      partial(push_qq, xy)),
         0xCB: xy_cb_table(xy),
@@ -1059,77 +1204,42 @@ def xy_table(xy: str) -> Table:
 
 # See https://wiki.specnext.dev/Extended_Z80_instruction_set.
 instructions: Table = {
-    0x00: ('NOP',       ''),
-    0x01: ('LD BC,nn',  partial(ld_dd_nn, 'BC')),
-    0x02: ('LD (BC),A', partial(ld_pdd_r, 'BC', 'A')),
-    0x03: ('INC BC',    partial(inc_ss, 'BC')),
-    0x04: ('INC B',     partial(inc_r, 'B')),
-    0x05: ('DEC B',     partial(dec_r, 'B')),
-    0x06: ('LD B,n',    partial(ld_r_n, 'B')),
-    0x07: ('RLCA',
-           '''
-           const u8_t carry = A >> 7;
-           F &= ~(NF_MASK | CF_MASK);
-           F |= HF_MASK | carry << CF_SHIFT;
-           A <<= 1;
-           A |= carry;
-           '''),
-    0x08: ("EX AF,AF'", partial(ex, 'AF', 'AF_')),
-    0x09: ('ADD HL,BC', partial(add_hl_ss, 'BC')),
-    0x0A: ('LD A,(BC)', partial(ld_r_pdd, 'A', 'BC')),
-    0x0B: ('DEC BC',    partial(dec_ss, 'BC')),
-    0x0C: ('INC C',     partial(inc_r, 'C')),
-    0x0D: ('DEC C',     partial(dec_r, 'C')),
-    0x0E: ('LD C,n',    partial(ld_r_n, 'C')),
-    0x0F: ('RRCA',
-           '''
-           const u8_t carry = A & 0x01;
-           F &= ~(NF_MASK | HF_MASK | CF_MASK);
-           F |= carry << CF_SHIFT;
-           A >>= 1;
-           A |= carry << 7;
-           '''),
-    0x10: ('DJNZ e',
-           f'''
-           T(1);
-           Z = memory_read(PC++); T(3);
-           if (--B) {{
-             PC += (s8_t) Z; T(5);
-           }}
-           '''),
-    0x11: ('LD DE,nn',  partial(ld_dd_nn, 'DE')),
-    0x12: ('LD (DE),A', partial(ld_pdd_r, 'DE', 'A')),
-    0x13: ('INC DE',    partial(inc_ss, 'DE')),
-    0x14: ('INC D',     partial(inc_r, 'D')),
-    0x15: ('DEC D',     partial(dec_r, 'D')),
-    0x16: ('LD D,n',    partial(ld_r_n, 'D')),
-    0x17: ('RLA',
-           '''
-           const u8_t carry = F & CF_MASK;
-           F &= ~(HF_MASK | NF_MASK | CF_MASK);
-           F |= (A & 0x80) >> 7 << CF_SHIFT;
-           A <<= 1;
-           A |= carry;
-           '''),
-    0x18: ('JR e',
-           '''
-           Z = memory_read(PC++); T(3);
-           PC += (s8_t) Z;        T(5);
-           '''),
+
+    # 1x: complete.
+    0x00: ('NOP',        ''),
+    0x01: ('LD BC,nn',   partial(ld_dd_nn, 'BC')),
+    0x02: ('LD (BC),A',  partial(ld_pdd_r, 'BC', 'A')),
+    0x03: ('INC BC',     partial(inc_ss, 'BC')),
+    0x04: ('INC B',      partial(inc_r, 'B')),
+    0x05: ('DEC B',      partial(dec_r, 'B')),
+    0x06: ('LD B,n',     partial(ld_r_n, 'B')),
+    0x07: ('RLCA',       rlca),
+    0x08: ("EX AF,AF'",  partial(ex, 'AF', 'AF_')),
+    0x09: ('ADD HL,BC',  partial(add_hl_ss, 'BC')),
+    0x0A: ('LD A,(BC)',  partial(ld_r_pdd, 'A', 'BC')),
+    0x0B: ('DEC BC',     partial(dec_ss, 'BC')),
+    0x0C: ('INC C',      partial(inc_r, 'C')),
+    0x0D: ('DEC C',      partial(dec_r, 'C')),
+    0x0E: ('LD C,n',     partial(ld_r_n, 'C')),
+    0x0F: ('RRCA',       rrca),
+    0x10: ('DJNZ e',     djnz),
+    0x11: ('LD DE,nn',   partial(ld_dd_nn, 'DE')),
+    0x12: ('LD (DE),A',  partial(ld_pdd_r, 'DE', 'A')),
+    0x13: ('INC DE',     partial(inc_ss, 'DE')),
+    0x14: ('INC D',      partial(inc_r, 'D')),
+    0x15: ('DEC D',      partial(dec_r, 'D')),
+    0x16: ('LD D,n',     partial(ld_r_n, 'D')),
+    0x17: ('RLA',        rla),
+    0x18: ('JR e',       jr_c_e),
     0x19: ('ADD HL,DE',  partial(add_hl_ss, 'DE')),
     0x1A: ('LD A,(DE)',  partial(ld_r_pdd, 'A', 'DE')),
     0x1B: ('DEC DE',     partial(dec_ss, 'DE')),
     0x1C: ('INC E',      partial(inc_r, 'E')),
     0x1D: ('DEC E',      partial(dec_r, 'E')),
     0x1E: ('LD E,n',     partial(ld_r_n, 'E')),
-    0x1F: ('RRA',
-           '''
-           const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
-           F &= ~(HF_MASK | NF_MASK | CF_MASK);
-           F |= (A & 0x01) << CF_SHIFT;
-           A >>= 1;
-           A |= carry << 7;
-           '''),
+    0x1F: ('RRA',        rra),
+
+    # 2x: complete.
     0x20: ('JR NZ,e',    partial(jr_c_e, '!ZF')),
     0x21: ('LD HL,nn',   partial(ld_dd_nn, 'HL')),
     0x22: ('LD (nn),HL', partial(ld_pnn_dd, 'HL')),
@@ -1137,301 +1247,249 @@ instructions: Table = {
     0x24: ('INC H',      partial(inc_r, 'H')),
     0x25: ('DEC H',      partial(dec_r, 'H')),
     0x26: ('LD H,n',     partial(ld_r_n, 'H')),
+    0x27: ('DAA',        daa),
     0x28: ('JR Z,e',     partial(jr_c_e, 'ZF')),
     0x29: ('ADD HL,HL',  partial(add_hl_ss, 'HL')),
-    0x2A: ('LD HL,(nn)',
-           '''
-           Z = memory_read(PC++);   T(3);
-           W = memory_read(PC++);   T(3);
-           L = memory_read(WZ);     T(3);
-           H = memory_read(WZ + 1); T(3);
-           '''),
+    0x2A: ('LD HL,(nn)', partial(ld_dd_pnn, 'HL')),
     0x2B: ('DEC HL',     partial(dec_ss, 'HL')),
     0x2C: ('INC L',      partial(inc_r, 'L')),
     0x2D: ('DEC L',      partial(dec_r, 'L')),
     0x2E: ('LD L,n',     partial(ld_r_n, 'L')),
-    0x2F: ('CPL',
-           '''
-           A = ~A;
-           F |= HF_MASK | NF_MASK;
-           '''),
+    0x2F: ('CPL',        cpl),
+
+    # 3x: complete.
     0x30: ('JR NC,e',   partial(jr_c_e, '!CF')),
     0x31: ('LD SP,nn',  partial(ld_dd_nn, 'SP')),
-    0x32: ('LD nn,A',
-           '''
-           Z = memory_read(PC++); T(3);
-           W = memory_read(PC++); T(3);
-           memory_write(WZ, A);   T(3);
-           '''),
-    0x33: ('INC SP', inc_ss('SP')),
-    0x34: ('INC (HL)', inc_phl),
-    0x35: ('DEC (HL)', dec_phl),
-    0x36: ('LD (HL),n',
-           '''
-           Z = memory_read(PC++); T(3);
-           memory_write(HL, Z);   T(3);
-           '''),
-    0x37: ('SCF',
-           '''
-           F &= ~(HF_MASK | NF_MASK);
-           F |= CF_MASK;
-           '''),
+    0x32: ('LD (nn),A', ld_pnn_a),
+    0x33: ('INC SP',    inc_ss('SP')),
+    0x34: ('INC (HL)',  inc_phl),
+    0x35: ('DEC (HL)',  dec_phl),
+    0x36: ('LD (HL),n', ld_phl_n),
+    0x37: ('SCF',       scf),
     0x38: ('JR C,e',    partial(jr_c_e, 'CF')),
     0x39: ('ADD HL,SP', partial(add_hl_ss, 'SP')),
-    0x3A: ('LD A,(nn)',
-           '''
-           Z = memory_read(PC++); T(3);
-           W = memory_read(PC++); T(3);
-           A = memory_read(WZ);   T(3);
-           '''),
+    0x3A: ('LD A,(nn)', ld_a_pnn),
     0x3B: ('DEC SP',    partial(dec_ss, 'SP')),
     0x3C: ('INC A',     partial(inc_r, 'A')),
     0x3D: ('DEC A',     partial(dec_r, 'A')),
     0x3E: ('LD A,n',    partial(ld_r_n, 'A')),
-    0x3F: ('CCF',
-           '''
-           const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
-           F &= ~(HF_MASK | CF_MASK);
-           F |= carry << HF_SHIFT | (1 - carry) << CF_SHIFT;
-           '''),
-    0x40: ('LD B,B',    partial(ld_r_r, 'B', 'B')),
-    0x41: ('LD B,C',    partial(ld_r_r, 'B', 'C')),
-    0x42: ('LD B,D',    partial(ld_r_r, 'B', 'D')),
-    0x43: ('LD B,E',    partial(ld_r_r, 'B', 'E')),
-    0x44: ('LD B,H',    partial(ld_r_r, 'B', 'H')),
-    0x45: ('LD B,L',    partial(ld_r_r, 'B', 'L')),
+    0x3F: ('CCF',       ccf),
+
+    # 4x: complete.
+    0x40: ('LD B,B',    partial(ld_r_r,   'B', 'B')),
+    0x41: ('LD B,C',    partial(ld_r_r,   'B', 'C')),
+    0x42: ('LD B,D',    partial(ld_r_r,   'B', 'D')),
+    0x43: ('LD B,E',    partial(ld_r_r,   'B', 'E')),
+    0x44: ('LD B,H',    partial(ld_r_r,   'B', 'H')),
+    0x45: ('LD B,L',    partial(ld_r_r,   'B', 'L')),
     0x46: ('LD B,(HL)', partial(ld_r_pdd, 'B', 'HL')),
-    0x47: ('LD B,A',    partial(ld_r_r, 'B', 'A')),
-    0x48: ('LD C,B',    partial(ld_r_r, 'C', 'B')),
-    0x49: ('LD C,C',    partial(ld_r_r, 'C', 'C')),
-    0x4A: ('LD C,D',    partial(ld_r_r, 'C', 'D')),
-    0x4B: ('LD C,E',    partial(ld_r_r, 'C', 'E')),
-    0x4C: ('LD C,H',    partial(ld_r_r, 'C', 'H')),
-    0x4D: ('LD C,L',    partial(ld_r_r, 'C', 'L')),
+    0x47: ('LD B,A',    partial(ld_r_r,   'B', 'A')),
+    0x48: ('LD C,B',    partial(ld_r_r,   'C', 'B')),
+    0x49: ('LD C,C',    partial(ld_r_r,   'C', 'C')),
+    0x4A: ('LD C,D',    partial(ld_r_r,   'C', 'D')),
+    0x4B: ('LD C,E',    partial(ld_r_r,   'C', 'E')),
+    0x4C: ('LD C,H',    partial(ld_r_r,   'C', 'H')),
+    0x4D: ('LD C,L',    partial(ld_r_r,   'C', 'L')),
     0x4E: ('LD C,(HL)', partial(ld_r_pdd, 'C', 'HL')),
-    0x4F: ('LD C,A',    partial(ld_r_r, 'C', 'A')),
-    0x50: ('LD D,B',    partial(ld_r_r, 'D', 'B')),
-    0x51: ('LD D,C',    partial(ld_r_r, 'D', 'C')),
-    0x52: ('LD D,D',    partial(ld_r_r, 'D', 'D')),
-    0x53: ('LD D,E',    partial(ld_r_r, 'D', 'E')),
-    0x54: ('LD D,H',    partial(ld_r_r, 'D', 'H')),
-    0x55: ('LD D,L',    partial(ld_r_r, 'D', 'L')),
+    0x4F: ('LD C,A',    partial(ld_r_r,   'C', 'A')),
+
+    # 5x: complete.
+    0x50: ('LD D,B',    partial(ld_r_r,   'D', 'B')),
+    0x51: ('LD D,C',    partial(ld_r_r,   'D', 'C')),
+    0x52: ('LD D,D',    partial(ld_r_r,   'D', 'D')),
+    0x53: ('LD D,E',    partial(ld_r_r,   'D', 'E')),
+    0x54: ('LD D,H',    partial(ld_r_r,   'D', 'H')),
+    0x55: ('LD D,L',    partial(ld_r_r,   'D', 'L')),
     0x56: ('LD D,(HL)', partial(ld_r_pdd, 'D', 'HL')),
-    0x57: ('LD D,A',    partial(ld_r_r, 'D', 'A')),
-    0x58: ('LD E,B',    partial(ld_r_r, 'E', 'B')),
-    0x59: ('LD E,C',    partial(ld_r_r, 'E', 'C')),
-    0x5A: ('LD E,D',    partial(ld_r_r, 'E', 'D')),
-    0x5B: ('LD E,E',    partial(ld_r_r, 'E', 'E')),
-    0x5C: ('LD E,H',    partial(ld_r_r, 'E', 'H')),
-    0x5D: ('LD E,L',    partial(ld_r_r, 'E', 'L')),
+    0x57: ('LD D,A',    partial(ld_r_r,   'D', 'A')),
+    0x58: ('LD E,B',    partial(ld_r_r,   'E', 'B')),
+    0x59: ('LD E,C',    partial(ld_r_r,   'E', 'C')),
+    0x5A: ('LD E,D',    partial(ld_r_r,   'E', 'D')),
+    0x5B: ('LD E,E',    partial(ld_r_r,   'E', 'E')),
+    0x5C: ('LD E,H',    partial(ld_r_r,   'E', 'H')),
+    0x5D: ('LD E,L',    partial(ld_r_r,   'E', 'L')),
     0x5E: ('LD E,(HL)', partial(ld_r_pdd, 'E', 'HL')),
-    0x5F: ('LD E,A',    partial(ld_r_r, 'E', 'A')),
-    0x60: ('LD H,B',    partial(ld_r_r, 'H', 'B')),
-    0x61: ('LD H,C',    partial(ld_r_r, 'H', 'C')),
-    0x62: ('LD H,D',    partial(ld_r_r, 'H', 'D')),
-    0x63: ('LD H,E',    partial(ld_r_r, 'H', 'E')),
-    0x64: ('LD H,H',    partial(ld_r_r, 'H', 'H')),
-    0x65: ('LD H,L',    partial(ld_r_r, 'H', 'L')),
+    0x5F: ('LD E,A',    partial(ld_r_r,   'E', 'A')),
+
+    # 6x: complete.
+    0x60: ('LD H,B',    partial(ld_r_r,   'H', 'B')),
+    0x61: ('LD H,C',    partial(ld_r_r,   'H', 'C')),
+    0x62: ('LD H,D',    partial(ld_r_r,   'H', 'D')),
+    0x63: ('LD H,E',    partial(ld_r_r,   'H', 'E')),
+    0x64: ('LD H,H',    partial(ld_r_r,   'H', 'H')),
+    0x65: ('LD H,L',    partial(ld_r_r,   'H', 'L')),
     0x66: ('LD H,(HL)', partial(ld_r_pdd, 'H', 'HL')),
-    0x67: ('LD H,A',    partial(ld_r_r, 'H', 'A')),
-    0x68: ('LD L,B',    partial(ld_r_r, 'L', 'B')),
-    0x69: ('LD L,C',    partial(ld_r_r, 'L', 'C')),
-    0x6A: ('LD L,D',    partial(ld_r_r, 'L', 'D')),
-    0x6B: ('LD L,E',    partial(ld_r_r, 'L', 'E')),
-    0x6C: ('LD L,H',    partial(ld_r_r, 'L', 'H')),
-    0x6D: ('LD L,L',    partial(ld_r_r, 'L', 'L')),
+    0x67: ('LD H,A',    partial(ld_r_r,   'H', 'A')),
+    0x68: ('LD L,B',    partial(ld_r_r,   'L', 'B')),
+    0x69: ('LD L,C',    partial(ld_r_r,   'L', 'C')),
+    0x6A: ('LD L,D',    partial(ld_r_r,   'L', 'D')),
+    0x6B: ('LD L,E',    partial(ld_r_r,   'L', 'E')),
+    0x6C: ('LD L,H',    partial(ld_r_r,   'L', 'H')),
+    0x6D: ('LD L,L',    partial(ld_r_r,   'L', 'L')),
     0x6E: ('LD L,(HL)', partial(ld_r_pdd, 'L', 'HL')),
-    0x6F: ('LD L,A',    partial(ld_r_r, 'L', 'A')),
+    0x6F: ('LD L,A',    partial(ld_r_r,   'L', 'A')),
+
+    # 7x: complete.
     0x70: ('LD (HL),B', partial(ld_pdd_r, 'HL', 'B')),
     0x71: ('LD (HL),C', partial(ld_pdd_r, 'HL', 'C')),
     0x72: ('LD (HL),D', partial(ld_pdd_r, 'HL', 'D')),
     0x73: ('LD (HL),E', partial(ld_pdd_r, 'HL', 'E')),
+    0x74: ('LD (HL),H', partial(ld_pdd_r, 'HL', 'H')),
     0x75: ('LD (HL),L', partial(ld_pdd_r, 'HL', 'L')),
     0x76: ('HALT',      halt),
     0x77: ('LD (HL),A', partial(ld_pdd_r, 'HL', 'A')),
-    0x78: ('LD A,B',    partial(ld_r_r, 'A', 'B')),
-    0x79: ('LD A,C',    partial(ld_r_r, 'A', 'C')),
-    0x7A: ('LD A,D',    partial(ld_r_r, 'A', 'D')),
-    0x7B: ('LD A,E',    partial(ld_r_r, 'A', 'E')),
-    0x7C: ('LD A,H',    partial(ld_r_r, 'A', 'H')),
-    0x7D: ('LD A,L',    partial(ld_r_r, 'A', 'L')),
-    0x7E: ('LD A,(HL)', partial(ld_r_pdd, 'A', 'HL')),
-    0x80: ('ADD A,B',   partial(add_a_r, 'B')),
-    0x81: ('ADD A,C',   partial(add_a_r, 'C')),
-    0x82: ('ADD A,D',   partial(add_a_r, 'D')),
-    0x83: ('ADD A,E',   partial(add_a_r, 'E')),
-    0x84: ('ADD A,H',   partial(add_a_r, 'H')),
-    0x85: ('ADD A,L',   partial(add_a_r, 'L')),
+    0x78: ('LD A,B',    partial(ld_r_r,   'A',  'B')),
+    0x79: ('LD A,C',    partial(ld_r_r,   'A',  'C')),
+    0x7A: ('LD A,D',    partial(ld_r_r,   'A',  'D')),
+    0x7B: ('LD A,E',    partial(ld_r_r,   'A',  'E')),
+    0x7C: ('LD A,H',    partial(ld_r_r,   'A',  'H')),
+    0x7D: ('LD A,L',    partial(ld_r_r,   'A',  'L')),
+    0x7E: ('LD A,(HL)', partial(ld_r_pdd, 'A',  'HL')),
+    0x7F: ('LD A,A',    partial(ld_r_r,   'A',  'A')),
+
+    # 8x: complete.
+    0x80: ('ADD A,B',    partial(add_a_r, 'B')),
+    0x81: ('ADD A,C',    partial(add_a_r, 'C')),
+    0x82: ('ADD A,D',    partial(add_a_r, 'D')),
+    0x83: ('ADD A,E',    partial(add_a_r, 'E')),
+    0x84: ('ADD A,H',    partial(add_a_r, 'H')),
+    0x85: ('ADD A,L',    partial(add_a_r, 'L')),
     0x86: ('ADD A,(HL)', add_a_phl),
-    0x87: ('ADD A,A',   partial(add_a_r, 'A')),
-    0x88: ('ADC A,B',   partial(adc_a_r, 'B')),
-    0x89: ('ADC A,C',   partial(adc_a_r, 'C')),
-    0x8A: ('ADC A,D',   partial(adc_a_r, 'D')),
-    0x8B: ('ADC A,E',   partial(adc_a_r, 'E')),
-    0x8C: ('ADC A,H',   partial(adc_a_r, 'H')),
-    0x8D: ('ADC A,L',   partial(adc_a_r, 'L')),
+    0x87: ('ADD A,A',    partial(add_a_r, 'A')),
+    0x88: ('ADC A,B',    partial(adc_a_r, 'B')),
+    0x89: ('ADC A,C',    partial(adc_a_r, 'C')),
+    0x8A: ('ADC A,D',    partial(adc_a_r, 'D')),
+    0x8B: ('ADC A,E',    partial(adc_a_r, 'E')),
+    0x8C: ('ADC A,H',    partial(adc_a_r, 'H')),
+    0x8D: ('ADC A,L',    partial(adc_a_r, 'L')),
     0x8E: ('ADC A,(HL)', adc_a_phl),
-    0x8F: ('ADC A,A',   partial(adc_a_r, 'A')),
-    0x90: ('SUB B',     partial(sub_r, 'B')),
-    0x91: ('SUB C',     partial(sub_r, 'C')),
-    0x92: ('SUB D',     partial(sub_r, 'D')),
-    0x93: ('SUB E',     partial(sub_r, 'E')),
-    0x94: ('SUB H',     partial(sub_r, 'H')),
-    0x95: ('SUB L',     partial(sub_r, 'L')),
-    0x96: ('SUB (HL)',  sub_phl),
+    0x8F: ('ADC A,A',    partial(adc_a_r, 'A')),
+
+    # 9x: complete.
+    0x90: ('SUB B',      partial(sub_r,   'B')),
+    0x91: ('SUB C',      partial(sub_r,   'C')),
+    0x92: ('SUB D',      partial(sub_r,   'D')),
+    0x93: ('SUB E',      partial(sub_r,   'E')),
+    0x94: ('SUB H',      partial(sub_r,   'H')),
+    0x95: ('SUB L',      partial(sub_r,   'L')),
+    0x96: ('SUB (HL)',   sub_phl),
+    0x97: ('SUB A',      partial(sub_r,   'A')),
+    0x98: ('SBC A,B',    partial(sbc_a_r, 'B')),
+    0x99: ('SBC A,C',    partial(sbc_a_r, 'C')),
+    0x9A: ('SBC A,D',    partial(sbc_a_r, 'D')),
+    0x9B: ('SBC A,E',    partial(sbc_a_r, 'E')),
+    0x9C: ('SBC A,H',    partial(sbc_a_r, 'H')),
+    0x9D: ('SBC A,L',    partial(sbc_a_r, 'L')),
     0x9E: ('SBC A,(HL)', sbc_a_phl),
-    0x9F: ('SBC A,A',   partial(sbc_a_r, 'A')),
-    0xA0: ('AND B',     partial(and_r, 'B')),
-    0xA1: ('AND C',     partial(and_r, 'C')),
-    0xA2: ('AND D',     partial(and_r, 'D')),
-    0xA3: ('AND E',     partial(and_r, 'E')),
-    0xA4: ('AND H',     partial(and_r, 'H')),
-    0xA5: ('AND L',     partial(and_r, 'L')),
-    0xA7: ('AND A',     partial(and_r, 'A')),
-    0xA8: ('XOR B',     partial(xor_r, 'B')),
-    0xA9: ('XOR C',     partial(xor_r, 'C')),
-    0xAA: ('XOR D',     partial(xor_r, 'D')),
-    0xAB: ('XOR E',     partial(xor_r, 'E')),
-    0xAC: ('XOR H',     partial(xor_r, 'H')),
-    0xAD: ('XOR L',     partial(xor_r, 'L')),
-    0xAE: ('XOR (HL)',
-           '''
-           A ^= memory_read(HL); T(3);
-           F = SZ53P(A);
-           '''),
-    0xAF: ('XOR A',     partial(xor_r, 'A')),
-    0xB0: ('OR B',      partial(or_r, 'B')),
-    0xB1: ('OR C',      partial(or_r, 'C')),
-    0xB2: ('OR D',      partial(or_r, 'D')),
-    0xB3: ('OR E',      partial(or_r, 'E')),
-    0xB4: ('OR H',      partial(or_r, 'H')),
-    0xB5: ('OR L',      partial(or_r, 'L')),
-    0xB6: ('OR (HL)',   or_phl),
-    0xB7: ('OR A',      partial(or_r, 'A')),
+    0x9F: ('SBC A,A',    partial(sbc_a_r, 'A')),
+
+    # Ax: complete.
+    0xA0: ('AND B',     partial(logical_r,   '&', 'B')),
+    0xA1: ('AND C',     partial(logical_r,   '&', 'C')),
+    0xA2: ('AND D',     partial(logical_r,   '&', 'D')),
+    0xA3: ('AND E',     partial(logical_r,   '&', 'E')),
+    0xA4: ('AND H',     partial(logical_r,   '&', 'H')),
+    0xA5: ('AND L',     partial(logical_r,   '&', 'L')),
+    0xA6: ('AND (HL)',  partial(logical_phl, '&')),
+    0xA7: ('AND A',     partial(logical_r,   '&', 'A')),
+    0xA8: ('XOR B',     partial(logical_r,   '^', 'B')),
+    0xA9: ('XOR C',     partial(logical_r,   '^', 'C')),
+    0xAA: ('XOR D',     partial(logical_r,   '^', 'D')),
+    0xAB: ('XOR E',     partial(logical_r,   '^', 'E')),
+    0xAC: ('XOR H',     partial(logical_r,   '^', 'H')),
+    0xAD: ('XOR L',     partial(logical_r,   '^', 'L')),
+    0xAE: ('XOR (HL)',  partial(logical_phl, '^')),
+    0xAF: ('XOR A',     partial(logical_r,   '^', 'A')),
+
+    # Bx: complete.
+    0xB0: ('OR B',      partial(logical_r,   '|', 'B')),
+    0xB1: ('OR C',      partial(logical_r,   '|', 'C')),
+    0xB2: ('OR D',      partial(logical_r,   '|', 'D')),
+    0xB3: ('OR E',      partial(logical_r,   '|', 'E')),
+    0xB4: ('OR H',      partial(logical_r,   '|', 'H')),
+    0xB5: ('OR L',      partial(logical_r,   '|', 'L')),
+    0xB6: ('OR (HL)',   partial(logical_phl, '|')),
+    0xB7: ('OR A',      partial(logical_r,   '|', 'A')),
     0xB8: ('CP B',      partial(cp_r, 'B')),
     0xB9: ('CP C',      partial(cp_r, 'C')),
     0xBA: ('CP D',      partial(cp_r, 'D')),
     0xBB: ('CP E',      partial(cp_r, 'E')),
     0xBC: ('CP H',      partial(cp_r, 'H')),
     0xBD: ('CP L',      partial(cp_r, 'L')),
-    0xBE: ('CP (HL)',
-           '''
-           const u8_t  n      = memory_read(HL); T(3);
-           const u16_t result = A - n;
-           F                  = SZ53(result & 0xFF) | HF_SUB(A, n, result) | VF_SUB(A, n, result) | NF_MASK | (A < n) << CF_SHIFT;
-           '''),
+    0xBE: ('CP (HL)',   cp_phl),
     0xBF: ('CP A',      partial(cp_r, 'A')),
-    0xC0: ('RET NZ',    partial(ret, '!(F & ZF_MASK)')),
-    0xC1: ('POP BC',    partial(pop_qq, 'BC')),
-    0xC2: ('JP NZ,nn',  partial(jp, '!(F & ZF_MASK)')),
-    0xC3: ('JP nn',     jp),
+
+    # Cx: complete.
+    0xC0: ('RET NZ',     partial(ret,  '!(F & ZF_MASK)')),
+    0xC1: ('POP BC',     partial(pop_qq, 'BC')),
+    0xC2: ('JP NZ,nn',   partial(jp,   '!(F & ZF_MASK)')),
+    0xC3: ('JP nn',      jp),
     0xC4: ('CALL NZ,nn', partial(call, '!(F & ZF_MASK)')),
     0xC5: ('PUSH BC',    partial(push_qq, 'BC')),
-    0xC6: ('ADD A,n',
-           '''
-           const u8_t n       = memory_read(PC++); T(3);
-           const u16_t result = A + n;
-           const u8_t  carry  = A > 255 - n;
-           F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | carry;
-           A = result & 0xFF;
-           '''),
-    0xC8: ('RET Z',      partial(ret, 'F & ZF_MASK')),
+    0xC6: ('ADD A,n',    add_a_n),
+    0xC7: ('RST $00',    partial(rst, 0x00)),
+    0xC8: ('RET Z',      partial(ret,  'F & ZF_MASK')),
     0xC9: ('RET',        ret),
-    0xCA: ('JP Z,nn',    partial(jp, 'F & ZF_MASK')),
+    0xCA: ('JP Z,nn',    partial(jp,   'F & ZF_MASK')),
     0xCB: cb_table(),
     0xCC: ('CALL Z,nn',  partial(call, 'F & ZF_MASK')),
     0xCD: ('CALL nn',    call),
-    0xCE: ('ADC A,n',
-           '''
-           const u8_t  n      = memory_read(PC++); T(3);
-           const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
-           const u16_t result = A + n + carry;
-           F = SZ53(A) | HF_ADD(A, n + carry, result) | VF_ADD(A, n + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
-           A = result & 0xFF;
-           '''),
-    0xC7: ('RST $00',  partial(rst, 0x00)),
-    0xCF: ('RST $08',  partial(rst, 0x08)),
-    0xD0: ('RET NC',   partial(ret, '!(F & CF_MASK)')),
-    0xD1: ('POP DE',   partial(pop_qq, 'DE')),
-    0xD2: ('JP NC,nn', partial(jp, '!(F & CF_MASK)')),
-    0xD3: ('OUT (n),A',
-           '''
-           WZ = A << 8 | memory_read(PC++); T(3);
-           io_write(WZ, A);                 T(4);
-           '''),
+    0xCE: ('ADC A,n',    adc_a_n),
+    0xCF: ('RST $08',    partial(rst, 0x08)),
+
+    # Dx: complete.
+    0xD0: ('RET NC',     partial(ret,   '!(F & CF_MASK)')),
+    0xD1: ('POP DE',     partial(pop_qq, 'DE')),
+    0xD2: ('JP NC,nn',   partial(jp,   '!(F & CF_MASK)')),
+    0xD3: ('OUT (n),A',  out_n_a),
     0xD4: ('CALL NC,nn', partial(call, '!(F & CF_MASK)')),
     0xD5: ('PUSH DE',    partial(push_qq, 'DE')),
-    0xD6: ('SUB n',
-           '''
-           u16_t result;
-           Z      = memory_read(PC++); T(3);
-           result = A - Z;
-           F     = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
-           A     = result & 0xFF;
-           '''),
-    0xD7: ('RST $10', partial(rst, 0x10)),
-    0xD8: ('RET C',   partial(ret, 'F & CF_MASK')),
-    0xD9: ('EXX',
-           '''
-           u16_t tmp;
-           tmp = BC; BC = BC_; BC_ = tmp;
-           tmp = DE; DE = DE_; DE_ = tmp;
-           tmp = HL; HL = HL_; HL_ = tmp;
-           '''),
-    0xDA: ('JP C,nn', partial(jp, 'F & CF_MASK')),
-    0xDB: ('IN A,(n)',
-           '''
-           Z = memory_read(PC++);   T(3);
-           A = io_read(A << 8 | Z); T(4);
-           F = SZ53P(A);
-           '''),
-    0xDC: ('CALL C,nn', partial(call, 'F & CF_MASK')),
+    0xD6: ('SUB n',      sub_n),
+    0xD7: ('RST $10',    partial(rst, 0x10)),
+    0xD8: ('RET C',      partial(ret,  'F & CF_MASK')),
+    0xD9: ('EXX',        exx),
+    0xDA: ('JP C,nn',    partial(jp,   'F & CF_MASK')),
+    0xDB: ('IN A,(n)',   in_a_n),
+    0xDC: ('CALL C,nn',  partial(call, 'F & CF_MASK')),
     0xDD: xy_table('IX'),
-    0xDE: ('SBC A,n', sbc_a_n),
-    0xDF: ('RST $18', partial(rst, 0x18)),
-    0xE1: ('POP HL',  partial(pop_qq, 'HL')),
-    0xE2: ('JP PO,nn', partial(jp, '!(F & PF_MASK)')),
+    0xDE: ('SBC A,n',    sbc_a_n),
+    0xDF: ('RST $18',    partial(rst, 0x18)),
+
+    # Ex: complete.
+    0xE0: ('RET PO',     partial(ret,  '!(F & PF_MASK)')),
+    0xE1: ('POP HL',     partial(pop_qq, 'HL')),
+    0xE2: ('JP PO,nn',   partial(jp,   '!(F & PF_MASK)')),
     0xE3: ('EX (SP),HL', partial(ex_psp_dd, 'HL')),
-    0xE5: ('PUSH HL', partial(push_qq, 'HL')),
-    0xE6: ('AND n',
-           '''
-           A &= memory_read(PC++); T(3);
-           F = SZ53P(A) | HF_MASK;
-           '''),
-    0xE7: ('RST $20', partial(rst, 0x20)),
-    0xE8: ('RET PE',  partial(ret, 'F & PF_MASK')),
-    0xE9: ('JP (HL)', 'PC = HL;'),
-    0xEB: ('EX DE,HL', partial(ex, 'DE', 'HL')),
-    0xEF: ('RST $28',  partial(rst, 0x28)),
+    0xE4: ('CALL PO,nn', partial(call, '!(F & PF_MASK)')),
+    0xE5: ('PUSH HL',    partial(push_qq, 'HL')),
+    0xE6: ('AND n',      partial(logical_n, '&')),
+    0xE7: ('RST $20',    partial(rst, 0x20)),
+    0xE8: ('RET PE',     partial(ret,  'F & PF_MASK')),
+    0xE9: ('JP (HL)',    'PC = HL;'),
+    0xEA: ('JP PE,nn',   partial(jp,   'F & PF_MASK')),
+    0xEB: ('EX DE,HL',   partial(ex, 'DE', 'HL')),
+    0xEC: ('CALL PE,nn', partial(call, 'F & PF_MASK')),
     0xED: ed_table(),
-    0xEE: ('XOR n',
-           '''
-           A ^= memory_read(PC++); T(3);
-           F = SZ53P(A);
-           '''),
-    0xF1: ('POP AF',  partial(pop_qq, 'AF')),
-    0xF2: ('JP P,nn', partial(jp, '!(F & SF_MASK)')),
-    0xF3: ('DI', 'IFF1 = IFF2 = 0;'),
-    0xF5: ('PUSH AF', partial(push_qq, 'AF')),
-    0xF6: ('OR n',
-           '''
-           A |= memory_read(PC++); T(3);
-           F = SZ53P(A);
-           '''),
-    0xF7: ('RST $30', partial(rst, 0x30)),
-    0xF9: ('LD SP,HL', partial(ld_dd_ss, 'SP', 'HL')),
-    0xFA: ('JP M,nn', partial(jp, 'F & SF_MASK')),
-    0xFB: ('EI', 'IFF1 = IFF2 = 1;'),  # TODO: enabled maskable interrupt only AFTER NEXT instruction
+    0xEE: ('XOR n',      partial(logical_n, '^')),
+    0xEF: ('RST $28',    partial(rst, 0x28)),
+
+    # Fx: complete.
+    0xF0: ('RET P',     partial(ret,   '!(F & SF_MASK)')),
+    0xF1: ('POP AF',    partial(pop_qq, 'AF')),
+    0xF2: ('JP P,nn',   partial(jp,   '!(F & SF_MASK)')),
+    0xF3: ('DI',        'IFF1 = IFF2 = 0;'),
+    0xF4: ('CALL P,nn', partial(call, '!(F & SF_MASK)')),
+    0xF5: ('PUSH AF',   partial(push_qq, 'AF')),
+    0xF6: ('OR n',      partial(logical_n, '|')),
+    0xF7: ('RST $30',   partial(rst, 0x30)),
+    0xF8: ('RET M',     partial(ret,  'F & SF_MASK')),
+    0xF9: ('LD SP,HL',  partial(ld_dd_ss, 'SP', 'HL')),
+    0xFA: ('JP M,nn',   partial(jp,   'F & SF_MASK')),
+    0xFB: ('EI',        'IFF1 = IFF2 = 1;'),  # TODO: enabled maskable interrupt only AFTER NEXT instruction
+    0xFC: ('CALL M,nn', partial(call, 'F & SF_MASK')),
     0xFD: xy_table('IY'),
-    0xFE: ('CP n',
-           '''
-           u16_t result;
-           Z      = memory_read(PC++);
-           result = A - Z;
-           F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
-           T(3);
-           '''),
-    0xFF: ('RST $38', partial(rst, 0x38)),
+    0xFE: ('CP n',      cp_n),
+    0xFF: ('RST $38',   partial(rst, 0x38)),
 }
 
 
