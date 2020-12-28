@@ -97,27 +97,38 @@ void spi_cs_write(u16_t address, u8_t value) {
 
 
 u8_t spi_data_read(u16_t address) {
-  if (self.device == E_SPI_DEVICE_SDCARD_0) {
-    return sdcard_read(E_SDCARD_0, address);
-  }
-  if (self.device == E_SPI_DEVICE_SDCARD_1) {
-    return sdcard_read(E_SDCARD_1, address);
-  }
+  switch (self.device) {
+    case E_SPI_DEVICE_SDCARD_0:
+      return sdcard_read(E_SDCARD_0, address);
 
-  fprintf(stderr, "spi: unimplemented read from %s\n", spi_device_names[self.device]);
-  return 0xFF;
+    case E_SPI_DEVICE_SDCARD_1:
+      return sdcard_read(E_SDCARD_1, address);
+
+    case E_SPI_DEVICE_NONE:
+      return 0xFF;
+
+    default:
+      fprintf(stderr, "spi: unimplemented read from %s\n", spi_device_names[self.device]);
+      return 0xFF;
+  }
 }
 
 
 void spi_data_write(u16_t address, u8_t value) {
-  if (self.device == E_SPI_DEVICE_SDCARD_0) {
-    sdcard_write(E_SDCARD_0, address, value);
-    return;
-  }
-  if (self.device == E_SPI_DEVICE_SDCARD_1) {
-    sdcard_write(E_SDCARD_1, address, value);
-    return;
-  }
+  switch (self.device) {
+    case E_SPI_DEVICE_SDCARD_0:
+      sdcard_write(E_SDCARD_0, address, value);
+      break;
 
-  fprintf(stderr, "spi: unimplemented write of $%02X to %s\n", value, spi_device_names[self.device]);
+    case E_SPI_DEVICE_SDCARD_1:
+      sdcard_write(E_SDCARD_1, address, value);
+      break;
+
+    case E_SPI_DEVICE_NONE:
+      break;
+
+    default:
+      fprintf(stderr, "spi: unimplemented write of $%02X to %s\n", value, spi_device_names[self.device]);
+      break;
+  }
 }
