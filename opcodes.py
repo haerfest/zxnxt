@@ -650,6 +650,20 @@ def sbc_a_r(r: str) -> C:
         F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
+def sbc_a_xy_d(xy: str) -> C:
+    return f'''
+        const u8_t  carry = (F & CF_MASK) >> CF_SHIFT;
+        const u8_t  a     = A;
+        s16_t       result;
+        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
+        PC++;
+        Z      = memory_read(WZ) + carry; T(5);
+        result = A - Z;
+        A      = result & 0xFF;
+        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
+        T(3);
+    '''
+
 def sbc_hl_ss(ss: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
@@ -1032,6 +1046,7 @@ def xy_table(xy: str) -> Table:
         0x86: (f'ADD A,({xy}+d)', partial(add_a_xy_d, xy)),
         0x8E: (f'ADC A,({xy}+d)', partial(adc_a_xy_d, xy)),
         0x96: (f'SUB ({xy}+d)',   partial(sub_xy_d, xy)),
+        0x9E: (f'SBC ({xy}+d)',   partial(sbc_a_xy_d, xy)),
         0xA6: (f'AND ({xy}+d)',   partial(and_xy_d, xy)),
         0xB6: (f'OR ({xy}+d)',    partial(or_xy_d, xy)),
         0xBE: (f'CP ({xy}+d)',    partial(cp_xy_d, xy)),
@@ -1474,7 +1489,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
 
     # Show on stderr the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
-    debug = True
+    debug = False
 
     if debug:
         if not prefix:
