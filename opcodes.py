@@ -656,7 +656,6 @@ def sbc_a_xy_d(xy: str) -> C:
         const u8_t  a     = A;
         s16_t       result;
         WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
-        PC++;
         Z      = memory_read(WZ) + carry; T(5);
         result = A - Z;
         A      = result & 0xFF;
