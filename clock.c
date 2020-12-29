@@ -60,7 +60,7 @@ void clock_cpu_speed_set(clock_cpu_speed_t speed) {
   };
 
   self.cpu_speed = speed;
-  log_inf("clock: CPU speed set to %s MHz\n", speeds[speed]);
+  log_dbg("clock: CPU speed set to %s MHz\n", speeds[speed]);
 }
 
 
@@ -82,7 +82,7 @@ void clock_display_timing_set(clock_display_timing_t timing) {
   };
 
   self.display_timing = timing;
-  log_inf("clock: display timing set to %s\n", descriptions[timing]);
+  log_dbg("clock: display timing set to %s\n", descriptions[timing]);
 }
 
 
@@ -104,7 +104,7 @@ void clock_video_timing_set(clock_video_timing_t timing) {
   };
 
   self.video_timing = timing;
-  log_inf("clock: video timing set to %s\n", descriptions[timing]);
+  log_dbg("clock: video timing set to %s\n", descriptions[timing]);
 }
 
 
