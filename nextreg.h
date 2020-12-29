@@ -14,6 +14,18 @@ typedef enum {
 } nextreg_machine_type_t;
 
 
+typedef enum {
+  E_NEXTREG_PALETTE_ULA_FIRST = 0,
+  E_NEXTREG_PALETTE_LAYER2_FIRST,
+  E_NEXTREG_PALETTE_SPRITES_FIRST,
+  E_NEXTREG_PALETTE_TILEMAP_FIRST,
+  E_NEXTREG_PALETTE_ULA_SECOND,
+  E_NEXTREG_PALETTE_LAYER2_SECOND,
+  E_NEXTREG_PALETTE_SPRITES_SECOND,
+  E_NEXTREG_PALETTE_TILEMAP_SECOND
+} nextreg_palette_t;
+
+
 int                    nextreg_init(void);
 void                   nextreg_finit(void);
 void                   nextreg_data_write(u16_t address, u8_t value);

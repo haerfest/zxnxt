@@ -29,6 +29,11 @@
 #define REGISTER_CORE_VERSION_SUB_MINOR  0x0E
 #define REGISTER_PERIPHERAL_5_SETTING    0x10
 #define REGISTER_VIDEO_TIMING            0x11
+#define REGISTER_PALETTE_INDEX           0x40
+#define REGISTER_PALETTE_VALUE_8BITS     0x41
+#define REGISTER_PALETTE_CONTROL         0x43
+#define REGISTER_PALETTE_VALUE_9BITS     0x44
+#define REGISTER_FALLBACK_COLOUR         0x4A
 #define REGISTER_MMU_SLOT0_CONTROL       0x50
 #define REGISTER_MMU_SLOT1_CONTROL       0x51
 #define REGISTER_MMU_SLOT2_CONTROL       0x52
@@ -42,24 +47,58 @@
 #define REGISTER_MEMORY_MAPPING_MODE     0x8F
 
 
+#define N_PALETTES  (E_NEXTREG_PALETTE_TILEMAP_SECOND - E_NEXTREG_PALETTE_ULA_FIRST + 1)
+#define N_COLOURS   256
+
+
 typedef struct {
   u8_t                   selected_register;
   u8_t                   rom_ram_bank;
   nextreg_machine_type_t machine_type;
   int                    is_bootrom_active;
   int                    is_hard_reset;
+  u32_t                  palette[N_PALETTES][N_COLOURS];
+  int                    palette_write_auto_increment;
+  nextreg_palette_t      palette_sprites;
+  nextreg_palette_t      palette_layer2;
+  nextreg_palette_t      palette_ula;
+  nextreg_palette_t      palette_selected;
+  u8_t                   palette_index;
+  int                    palette_index_9bit_is_first_write;
+  u8_t                   fallback_colour;
+  int                    ula_next_mode;
 } nextreg_t;
 
 
 static nextreg_t self;
 
 
+static void nextreg_reset_soft(void) {
+  self.palette_write_auto_increment      = 1;
+  self.palette_selected                  = E_NEXTREG_PALETTE_ULA_FIRST;
+  self.palette_index                     = 0;
+  self.palette_index_9bit_is_first_write = 1;
+  self.palette_sprites                   = E_NEXTREG_PALETTE_SPRITES_FIRST;
+  self.palette_layer2                    = E_NEXTREG_PALETTE_LAYER2_FIRST;
+  self.palette_ula                       = E_NEXTREG_PALETTE_ULA_FIRST;
+  self.fallback_colour                   = 0xE3;
+  self.ula_next_mode                     = 0;
+}
+
+
+static void nextreg_reset_hard(void) {
+  self.selected_register            = 0x00;
+  self.machine_type                 = E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+  self.is_bootrom_active            = 1;
+  self.is_hard_reset                = 1;
+  self.rom_ram_bank                 = 0;
+
+  nextreg_reset_soft();
+}
+
+
 int nextreg_init(void) {
-  self.selected_register  = 0x55;
-  self.rom_ram_bank       = 0;
-  self.machine_type       = E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
-  self.is_bootrom_active  = 1;
-  self.is_hard_reset      = 1;
+  nextreg_reset_hard();
   return 0;
 }
 
@@ -207,6 +246,82 @@ int nextreg_is_config_mode_active(void) {
 }
 
 
+static u8_t nextreg_palette_control_read(void) {
+  return self.palette_write_auto_increment                          << 7
+       | self.palette_selected                                      << 4
+       | (self.palette_sprites == E_NEXTREG_PALETTE_SPRITES_SECOND) << 3
+       | (self.palette_layer2  == E_NEXTREG_PALETTE_LAYER2_SECOND)  << 2
+       | (self.palette_ula     == E_NEXTREG_PALETTE_ULA_SECOND)     << 1
+       | self.ula_next_mode;
+}
+
+
+static void nextreg_palette_control_write(u8_t value) {
+  self.palette_write_auto_increment = value >> 7;
+  self.palette_selected             = (value & 0x70) >> 4;
+  self.palette_sprites              = (value & 0x08) ? E_NEXTREG_PALETTE_SPRITES_SECOND : E_NEXTREG_PALETTE_SPRITES_FIRST;
+  self.palette_layer2               = (value & 0x04) ? E_NEXTREG_PALETTE_LAYER2_SECOND  : E_NEXTREG_PALETTE_LAYER2_FIRST;
+  self.palette_ula                  = (value & 0x02) ? E_NEXTREG_PALETTE_ULA_SECOND     : E_NEXTREG_PALETTE_ULA_FIRST;
+  self.ula_next_mode                = value & 0x01;
+  
+  if (self.ula_next_mode) {
+    log_wrn("nextreg: ULANext mode not implemented\n");
+  }
+}
+
+
+static void nextreg_palette_index_write(u8_t value) {
+  self.palette_index                     = value;
+  self.palette_index_9bit_is_first_write = 1;
+}
+
+
+static u8_t nextreg_palette_value_8bits_read(void) {
+  const u32_t colour = self.palette[self.palette_selected][self.palette_index];
+  const u8_t  red    = colour >> 24;
+  const u8_t  green  = colour >> 16;
+  const u8_t  blue   = colour >>  8;
+  return red << 5 | green << 2 | blue >> 1;
+}
+
+
+static void nextreg_palette_value_8bits_write(u8_t value) {
+  const u8_t red   = (value & 0xE0) >> 5;
+  const u8_t green = (value & 0x1C) >> 2;
+  const u8_t blue  = (value & 0x03) << 1;
+  self.palette[self.palette_selected][self.palette_index] = red << 24 | green << 16 | blue << 8;
+
+  if (self.palette_write_auto_increment) {
+    self.palette_index++;
+  }
+}
+
+
+static u8_t nextreg_palette_value_9bits_read(void) {
+  const u32_t colour          = self.palette[self.palette_selected][self.palette_index];
+  const u8_t  blue            = colour >> 8;
+  const u8_t  layer2_priority = colour & 0x01;
+  return layer2_priority << 7 | (blue & 0x01);
+}
+
+
+static void nextreg_palette_value_9bits_write(u8_t value) {
+  if (self.palette_index_9bit_is_first_write) {
+    nextreg_palette_value_8bits_write(value);
+  } else {
+    const u8_t blue            = value & 0x01;
+    const u8_t layer2_priority = value >> 7;
+    self.palette[self.palette_selected][self.palette_index] |= blue << 8 | layer2_priority;
+
+    if (self.palette_write_auto_increment) {
+      self.palette_index++;
+    }
+  }
+
+  self.palette_index_9bit_is_first_write ^= 1;  
+}
+
+
 void nextreg_data_write(u16_t address, u8_t value) {
   switch (self.selected_register) {
     case REGISTER_CONFIG_MAPPING:
@@ -231,6 +346,26 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
     case REGISTER_VIDEO_TIMING:
       nextreg_video_timing_write(value);
+      break;
+
+    case REGISTER_PALETTE_INDEX:
+      nextreg_palette_index_write(value);
+      break;
+
+    case REGISTER_PALETTE_CONTROL:
+      nextreg_palette_control_write(value);
+      break;
+
+    case REGISTER_PALETTE_VALUE_8BITS:
+      nextreg_palette_value_8bits_write(value);
+      break;
+
+    case REGISTER_PALETTE_VALUE_9BITS:
+      nextreg_palette_value_9bits_write(value);
+      break;
+
+    case REGISTER_FALLBACK_COLOUR:
+      self.fallback_colour = value;
       break;
 
     case REGISTER_MMU_SLOT0_CONTROL:
@@ -272,6 +407,21 @@ u8_t nextreg_data_read(u16_t address) {
 
     case REGISTER_RESET:
       return nextreg_reset_read();
+
+    case REGISTER_PALETTE_INDEX:
+      return self.palette_index;
+
+    case REGISTER_PALETTE_CONTROL:
+      return nextreg_palette_control_read();
+
+    case REGISTER_PALETTE_VALUE_8BITS:
+      return nextreg_palette_value_8bits_read();
+
+    case REGISTER_PALETTE_VALUE_9BITS:
+      return nextreg_palette_value_9bits_read();
+
+    case REGISTER_FALLBACK_COLOUR:
+      return self.fallback_colour;
 
     case REGISTER_MMU_SLOT0_CONTROL:
     case REGISTER_MMU_SLOT1_CONTROL:
