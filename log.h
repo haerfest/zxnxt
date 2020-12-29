@@ -2,28 +2,29 @@
 #define __LOGGER_H
 
 
-#include <SDL2/SDL.h>
+#include <stdio.h>
 
 
-int  log_init(void);
-void log_finit(void);
-
+/* Always want to show error messages. */
+#define log_err(...) fprintf(stderr, __VA_ARGS__)
 
 #ifdef DEBUG
 
-#define log_dbg(...) SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, __VA_ARGS__)
-#define log_err(...) SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, __VA_ARGS__)
-#define log_inf(...) SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,  __VA_ARGS__)
-#define log_wrn(...) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,  __VA_ARGS__)
+#define log_dbg(...) fprintf(stderr, __VA_ARGS__)
+#define log_inf(...) fprintf(stderr, __VA_ARGS__)
+#define log_wrn(...) fprintf(stderr, __VA_ARGS__)
 
 #else  /* DEBUG */
 
 #define log_dbg(...)
-#define log_err(...)
 #define log_inf(...)
 #define log_wrn(...)
 
 #endif  /* DEBUG */
+
+
+int  log_init(void);
+void log_finit(void);
 
 
 #endif  /* __LOGGER_H */

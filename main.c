@@ -44,23 +44,23 @@ static int main_init(void) {
   u8_t* sram;
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init: %s\n", SDL_GetError());
+    fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
     goto exit;
   }
 
   if (SDL_CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0, &self.window, &self.renderer) != 0) {
-    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "main: SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
+    fprintf(stderr, "main: SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
 
   if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
-    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "main: SDL_RenderSetScale error: %s\n", SDL_GetError());
+    fprintf(stderr, "main: SDL_RenderSetScale error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
   }
 
   self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
-    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
+    fprintf(stderr, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
   }
 
