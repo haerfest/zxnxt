@@ -121,28 +121,29 @@ nextreg_machine_type_t nextreg_get_machine_type(void) {
 
 
 static void nextreg_machine_type_write(u8_t value) {
-  const char* descriptions[8] = {
-    "configuration mode",
-    "ZX 48K",
-    "ZX 128K/+2",
-    "ZX +2A/+2B/+3",
-    "Pentagon"
-  };
-  u8_t machine_type;
-
-  self.is_bootrom_active = 0;
-  fprintf(stderr, "nextreg: bootrom disabled\n");
-
   if (value & 0x80) {
     ula_display_timing_set((value >> 4) & 0x03);
   }
 
-  machine_type      = value & 0x03;
-  self.machine_type = (machine_type <= E_NEXTREG_MACHINE_TYPE_PENTAGON)
-                    ? machine_type
-                    : E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+  if (self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIG_MODE) {
+    const char* descriptions[8] = {
+      "configuration mode",
+      "ZX Spectrum 48K",
+      "ZX Spectrum 128K/+2",
+      "ZX Spectrum +2A/+2B/+3",
+      "Pentagon"
+    };
+    const u8_t machine_type = value & 0x03;
 
-  fprintf(stderr, "nextreg: machine type set to %s\n", descriptions[self.machine_type]);
+    self.machine_type = (machine_type <= E_NEXTREG_MACHINE_TYPE_PENTAGON)
+                      ? machine_type
+                      : E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+
+    fprintf(stderr, "nextreg: machine type set to %s\n", descriptions[self.machine_type]);
+
+    self.is_bootrom_active = 0;
+    fprintf(stderr, "nextreg: bootrom disabled\n");
+  }
 }
 
 
@@ -217,11 +218,7 @@ void nextreg_data_write(u16_t address, u8_t value) {
       break;
 
     case REGISTER_MACHINE_TYPE:
-      if (nextreg_is_config_mode_active()) {
-        nextreg_machine_type_write(value);
-      } else {
-        fprintf(stderr, "nextreg: write to $%02X requires configuration mode\n", self.selected_register);
-      }
+      nextreg_machine_type_write(value);
       break;
 
     case REGISTER_PERIPHERAL_1_SETTING:
