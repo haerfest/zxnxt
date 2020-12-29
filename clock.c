@@ -4,6 +4,7 @@
 #include "clock.h"
 
 
+#if 0
 static const unsigned int clock_frequency_28mhz[E_CLOCK_VIDEO_TIMING_HDMI - E_CLOCK_VIDEO_TIMING_VGA_BASE + 1] = {
   28000000,  /* E_CLOCK_VIDEO_TIMING_VGA_BASE      */
   28571429,  /* E_CLOCK_VIDEO_TIMING_VGA_SETTING_1 */
@@ -14,7 +15,7 @@ static const unsigned int clock_frequency_28mhz[E_CLOCK_VIDEO_TIMING_HDMI - E_CL
   33000000,  /* E_CLOCK_VIDEO_TIMING_VGA_SETTING_6 */
   27000000   /* E_CLOCK_VIDEO_TIMING_HDMI          */
 };
-
+#endif
 
 static const unsigned int clock_divider[E_CLOCK_CPU_SPEED_28MHZ - E_CLOCK_CPU_SPEED_3MHZ + 1] = {
   8,
@@ -133,8 +134,7 @@ static void clock_invoke_callbacks(u64_t ticks, unsigned int delta) {
 
 /* Called by the CPU, telling us how many of its ticks have passed. */
 void clock_ticks(unsigned int cpu_ticks) {
-  const unsigned int clock_frequency = clock_frequency_28mhz[self.video_timing];
-  const unsigned     ticks_28mhz     = cpu_ticks * clock_divider[self.cpu_speed];
+  const unsigned ticks_28mhz = cpu_ticks * clock_divider[self.cpu_speed];
 
   self.ticks += ticks_28mhz;
   clock_invoke_callbacks(self.ticks, ticks_28mhz);

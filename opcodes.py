@@ -871,7 +871,7 @@ def sra_phl() -> C:
         u8_t carry;
         Z = memory_read(HL);
         carry = Z & 0x01;
-        Z = Z & 0x80 | Z >> 1;
+        Z = (Z & 0x80) | Z >> 1;
         F = SZ53P(Z) | carry << CF_SHIFT;
         T(4);
         memory_write(HL, Z);
@@ -881,7 +881,7 @@ def sra_phl() -> C:
 def sra_r(r: str) -> C:
     return f'''
         const u8_t carry = {r} & 0x01;
-        {r} = {r} & 0x80 | {r} >> 1;
+        {r} = ({r} & 0x80) | {r} >> 1;
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
@@ -895,7 +895,7 @@ def sra_xy_d(xy: str) -> C:
         tmp   = memory_read(WZ);
         T(5);
         carry = tmp & 0x01;
-        tmp   = tmp & 0x80 | tmp >> 1;
+        tmp   = (tmp & 0x80) | tmp >> 1;
         F     = SZ53P(tmp) | carry << CF_SHIFT;
         T(4);
         memory_write(WZ, tmp);

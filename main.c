@@ -94,7 +94,7 @@ static int main_init(void) {
   sram = memory_sram();
 
   if (bootrom_init(sram) != 0) {
-    goto exit_io;
+    goto exit_memory;
   }
 
   if (config_init(sram) != 0) {
@@ -180,29 +180,16 @@ exit:
 
 
 static void main_eventloop(void) {
-  SDL_Event event;
-  u32_t     t0;
-  u32_t     t1;
-  u32_t     consumed;
-  s32_t     ticks_left;
+  s32_t ticks_left = 0;
 
-  ticks_left = 0;
   for (;;) {
     if (SDL_QuitRequested() == SDL_TRUE) {
       break;
     }
 
-    t0 = SDL_GetTicks();
     if (cpu_run(1000000 + ticks_left, &ticks_left) != 0) {
       break;
     }
-    t1 = SDL_GetTicks();
-
-#if 0
-    /* Assuming 3.5 MHz, 1,000,000 ticks take 286 milliseconds. */
-    consumed = t1 - t0;
-    SDL_Delay(286 - consumed);
-#endif
   }
 }
 

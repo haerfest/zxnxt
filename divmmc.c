@@ -36,8 +36,6 @@ void divmmc_finit(void) {
 
 
 int divmmc_read(u16_t address, u8_t* value) {
-  u32_t offset;
-
   if (!self.conmem_enabled) {
     return -1;
   }
@@ -53,8 +51,6 @@ int divmmc_read(u16_t address, u8_t* value) {
 
 
 int divmmc_write(u16_t address, u8_t value) {
-  u32_t offset;
-
   if (!self.conmem_enabled) {
     return -1;
   }

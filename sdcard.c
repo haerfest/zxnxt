@@ -219,9 +219,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
   fprintf(stderr, "sdcard%d: received CMD%d ($%02X $%02X $%02X $%02X $%02X $%02X)\n", n, self[n].command, self[n].command_buffer[0], self[n].command_buffer[1], self[n].command_buffer[2], self[n].command_buffer[3], self[n].command_buffer[4], self[n].command_buffer[5]);
 
   if (self[n].fp != NULL) {
-    u32_t      block_length;
-    long       position;
-    int        i;
+    u32_t block_length;
 
     /* Defaults: no error, R1 response. */
     self[n].error           = E_ERROR_NONE;

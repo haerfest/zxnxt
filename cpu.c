@@ -220,13 +220,6 @@ void cpu_reset(void) {
 }
 
 
-static void cpu_exchange(u16_t* x, u16_t* y) {
-  u16_t tmp = *x;
-  *x = *y;
-  *y = tmp;
-}
-
-
 int cpu_run(u32_t ticks, s32_t* ticks_left) {
   u8_t  opcode;
 

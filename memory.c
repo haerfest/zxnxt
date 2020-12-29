@@ -28,7 +28,6 @@ static memory_t self;
 
 
 int memory_init(void) {
-  FILE*  fp;
   size_t i;
 
   self.sram = malloc(RAM_SIZE);
