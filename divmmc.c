@@ -74,7 +74,7 @@ u8_t divmmc_control_read(u16_t address) {
 
 void divmmc_control_write(u16_t address, u8_t value) {
   self.conmem_enabled = value >> 7;
-  self.bank_number    = value & 0x03;
+  self.bank_number    = value & 0x0F;
 
   if (self.conmem_enabled) {
     fprintf(stderr, "divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);
