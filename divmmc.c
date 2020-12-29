@@ -26,10 +26,6 @@ int divmmc_init(u8_t* rom, u8_t* ram) {
   self.conmem_enabled = 0;
   self.bank_number    = 0;
 
-  if (utils_load_rom("enNxtmmc.rom", 8 * 1024, self.rom) != 0) {
-    return -1;
-  }
-
   return 0;
 }
 
@@ -79,7 +75,11 @@ void divmmc_control_write(u16_t address, u8_t value) {
   self.conmem_enabled = value >> 7;
   self.bank_number    = value & 0x03;
 
-  fprintf(stderr, "divmmc: CONMEM %sabled\n", self.conmem_enabled ? "en" : "dis");
+  if (self.conmem_enabled) {
+    fprintf(stderr, "divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);
+  } else {
+    fprintf(stderr, "divmmc: CONMEM disabled\n");
+  }
 
   if (value & 0x40) {
     fprintf(stderr, "divmmc: MAPRAM functionality not implemented\n");
