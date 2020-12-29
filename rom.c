@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include "defs.h"
+#include "log.h"
 #include "memory.h"
 #include "nextreg.h"
 #include "rom.h"
@@ -78,7 +78,7 @@ static int rom_translate_48k(u16_t address, u8_t** sram, rom_action_t action) {
 
 
 static int rom_translate_128k(u16_t address, u8_t** sram, rom_action_t action) {
-  fprintf(stderr, "rom: address $%04X translation error, ZX 128K/PLUS2 not implemented yet\n", address);
+  log_wrn("rom: address $%04X translation error, ZX 128K/PLUS2 not implemented yet\n", address);
   return -1;
 }
 
@@ -91,7 +91,7 @@ static int rom_translate_plus3(u16_t address, u8_t** sram, rom_action_t action) 
   }
 
   if (action == E_ROM_ACTION_WRITE) {
-    fprintf(stderr, "rom: attempt to write to ROM address $%04X\n", address);
+    log_wrn("rom: attempt to write to ROM address $%04X\n", address);
     return -1;
   }
 
@@ -115,7 +115,7 @@ static int rom_translate(u16_t address, u8_t** sram, rom_action_t action) {
       return rom_translate_plus3(address, sram, action);
 
     default:
-      fprintf(stderr, "rom: address $%04X translation error for machine type (%u)\n", address, machine_type);
+      log_wrn("rom: address $%04X translation error for machine type (%u)\n", address, machine_type);
       return -1;
   }
 }

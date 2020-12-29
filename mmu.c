@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include "defs.h"
+#include "log.h"
 #include "memory.h"
 #include "mmu.h"
 
@@ -44,7 +44,7 @@ u8_t mmu_page_get(u8_t slot) {
 
 void mmu_page_set(u8_t slot, u8_t page) {
   self.pages[slot] = page;
-  fprintf(stderr, "mmu: slot %u contains page %u\n", slot, page);
+  log_dbg("mmu: slot %u contains page %u\n", slot, page);
 }
 
 

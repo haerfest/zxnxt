@@ -1504,7 +1504,7 @@ def make_disassembler(mnemonic: str) -> Tuple[str, int]:
         'value': (2, lambda offset: f'memory_read(PC + {offset})'),
     }
 
-    statement = 'fprintf(stderr, "'
+    statement = 'log_dbg("'
     args      = []
 
     offset = 0
@@ -1527,7 +1527,7 @@ def make_disassembler(mnemonic: str) -> Tuple[str, int]:
 
 
 def make_dumper(prefix: List[Opcode], opcode: Opcode, length: int) -> str:
-    s = 'fprintf(stderr, "'
+    s = 'log_dbg("'
     s += ' '.join(f'{p:02X}' for p in prefix + [opcode])
     s += ' %02X' * length
     for i in range(4 - len(prefix) - length):
@@ -1544,17 +1544,17 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
     prefix_str     = ''.join(f'${opcode:02X} ' for opcode in prefix)
     prefix_comment = f'/* {prefix_str}*/ ' if prefix else ''
 
-    # Show on stderr the registers before and after each instruction execution,
+    # Show on the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
     debug = False
 
     if debug:
         if not prefix:
             f.write('''
-fprintf(stderr, "     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
-fprintf(stderr, "     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
-fprintf(stderr, "     ROM %d  DIVMMC %02X  PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", rom_selected(), divmmc_control_read(0xE3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
-fprintf(stderr, "%04X ", PC);
+log_dbg("     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
+log_dbg("     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
+log_dbg("     ROM %d  DIVMMC %02X  PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", rom_selected(), divmmc_control_read(0xE3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
+log_dbg("%04X ", PC);
 ''')
 
     if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
@@ -1595,7 +1595,7 @@ case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
     optional_break = 'break;' if prefix else ''
     f.write(f'''
 default:
-  fprintf(stderr, "cpu: unknown opcode {prefix_str}$%02X at $%04X\\n", opcode, PC - 1 - {prefix_len});
+  log_dbg("cpu: unknown opcode {prefix_str}$%02X at $%04X\\n", opcode, PC - 1 - {prefix_len});
   return -1;
 }}
 {optional_break}

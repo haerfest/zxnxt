@@ -1,8 +1,8 @@
-#include <stdio.h>
 #include "bootrom.h"
 #include "config.h"
 #include "defs.h"
 #include "divmmc.h"
+#include "log.h"
 #include "mmu.h"
 #include "memory.h"
 #include "rom.h"
@@ -32,7 +32,7 @@ int memory_init(void) {
 
   self.sram = malloc(RAM_SIZE);
   if (self.sram == NULL) {
-    fprintf(stderr, "memory: out of memory\n");
+    log_err("memory: out of memory\n");
     return -1;
   }
 
@@ -93,7 +93,7 @@ u8_t memory_read(u16_t address) {
     }
   }
 
-  fprintf(stderr, "memory: cannot read from $%04X\n", address);
+  log_err("memory: cannot read from $%04X\n", address);
   return 0xFF;
 }
 

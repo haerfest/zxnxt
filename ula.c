@@ -1,6 +1,6 @@
 #include <SDL2/SDL.h>
-#include <stdio.h>
 #include "defs.h"
+#include "log.h"
 #include "memory.h"
 #include "ula.h"
 
@@ -262,7 +262,7 @@ void ula_finit(void) {
 
 
 u8_t ula_read(u16_t address) {
-  fprintf(stderr, "ula: unimplemented read from $%04X\n", address);
+  log_wrn("ula: unimplemented read from $%04X\n", address);
   return 0x1F;  /* No keys pressed. */
 }
 
@@ -290,7 +290,7 @@ void ula_display_frequency_set(ula_display_frequency_t frequency) {
   };
 
   self.display_frequency = frequency;
-  fprintf(stderr, "ula: display frequency set to %s Hz\n", descriptions[frequency]);
+  log_dbg("ula: display frequency set to %s Hz\n", descriptions[frequency]);
 
   self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
   self.display_line       = 0;

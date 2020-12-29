@@ -1,7 +1,7 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include "defs.h"
 #include "clock.h"
+#include "log.h"
 
 
 #if 0
@@ -32,10 +32,10 @@ typedef struct {
   u64_t                  ticks;  /* At max dot clock overflows in 20k years. */
   unsigned int           n_callbacks;
   clock_callback_t*      callbacks;
-} clock_t;
+} next_clock_t;
 
 
-static clock_t self;
+static next_clock_t self;
 
 
 int clock_init(void) {
@@ -60,7 +60,7 @@ void clock_cpu_speed_set(clock_cpu_speed_t speed) {
   };
 
   self.cpu_speed = speed;
-  fprintf(stderr, "clock: CPU speed set to %s MHz\n", speeds[speed]);
+  log_inf("clock: CPU speed set to %s MHz\n", speeds[speed]);
 }
 
 
@@ -82,7 +82,7 @@ void clock_display_timing_set(clock_display_timing_t timing) {
   };
 
   self.display_timing = timing;
-  fprintf(stderr, "clock: display timing set to %s\n", descriptions[timing]);
+  log_inf("clock: display timing set to %s\n", descriptions[timing]);
 }
 
 
@@ -104,14 +104,14 @@ void clock_video_timing_set(clock_video_timing_t timing) {
   };
 
   self.video_timing = timing;
-  fprintf(stderr, "clock: video timing set to %s\n", descriptions[timing]);
+  log_inf("clock: video timing set to %s\n", descriptions[timing]);
 }
 
 
 int clock_register_callback(clock_callback_t callback) {
   clock_callback_t* callbacks = realloc(self.callbacks, (self.n_callbacks + 1) * sizeof(clock_callback_t));
   if (callbacks == NULL) {
-    fprintf(stderr, "clock: out of memory\n");
+    log_err("clock: out of memory\n");
     return -1;
   }
 

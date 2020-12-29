@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include "defs.h"
+#include "log.h"
 #include "memory.h"
 #include "utils.h"
 
@@ -73,12 +73,12 @@ void divmmc_control_write(u16_t address, u8_t value) {
   self.bank_number    = value & 0x0F;
 
   if (self.conmem_enabled) {
-    fprintf(stderr, "divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);
+    log_dbg("divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);
   } else {
-    fprintf(stderr, "divmmc: CONMEM disabled\n");
+    log_dbg("divmmc: CONMEM disabled\n");
   }
 
   if (value & 0x40) {
-    fprintf(stderr, "divmmc: MAPRAM functionality not implemented\n");
+    log_wrn("divmmc: MAPRAM functionality not implemented\n");
   }
 }

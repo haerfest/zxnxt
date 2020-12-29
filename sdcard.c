@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "defs.h"
+#include "log.h"
 #include "sdcard.h"
 
 
@@ -95,7 +96,7 @@ int sdcard_init(void) {
     if (n == 0) {
       self[n].fp = fopen(SDCARD_IMAGE, "rb");
       if (self[n].fp == NULL) {
-        fprintf(stderr, "sdcard%d: could not open %s for reading\n", n, SDCARD_IMAGE);
+        log_err("sdcard%d: could not open %s for reading\n", n, SDCARD_IMAGE);
         for (n--; n >= 0; n--) {
           fclose(self[n].fp);
         }
@@ -103,7 +104,7 @@ int sdcard_init(void) {
       }
 
       if (fseek(self[n].fp, 0L, SEEK_END) != 0) {
-        fprintf(stderr, "sdcard%d: error seeking to the end in %s\n", n, SDCARD_IMAGE);
+        log_err("sdcard%d: error seeking to the end in %s\n", n, SDCARD_IMAGE);
         for (n--; n >= 0; n--) {
           fclose(self[n].fp);
         }
@@ -116,7 +117,7 @@ int sdcard_init(void) {
         self[n].block_length = self[n].size == SDSC_MAX_SIZE ? 1024 : 512;
       }
 
-      fprintf(stderr, "sdcard%d: %s capacity is %ld bytes: %s, block length %u\n", n, SDCARD_IMAGE, self[n].size, self[n].is_sdsc ? "SDSC" : "SDHC/SDXC", self[n].block_length);
+      log_dbg("sdcard%d: %s capacity is %ld bytes: %s, block length %u\n", n, SDCARD_IMAGE, self[n].size, self[n].is_sdsc ? "SDSC" : "SDHC/SDXC", self[n].block_length);
     }
   }
 
@@ -137,16 +138,16 @@ void sdcard_finit(void) {
 
 
 static int sdcard_read_block(sdcard_nr_t n, u8_t* response_buffer) {
-  fprintf(stderr, "sdcard%d: reading %u bytes from position %u in %s\n", n, self[n].block_length, self[n].position, SDCARD_IMAGE);
+  log_dbg("sdcard%d: reading %u bytes from position %u in %s\n", n, self[n].block_length, self[n].position, SDCARD_IMAGE);
 
   if (fseek(self[n].fp, (long) self[n].position, SEEK_SET) != 0) {
-    fprintf(stderr, "sdcard%d: error seeking to position %u in %s\n", n, self[n].position, SDCARD_IMAGE);
+    log_err("sdcard%d: error seeking to position %u in %s\n", n, self[n].position, SDCARD_IMAGE);
     response_buffer[0] = 0x09;  /* Data error token (out of range). */
     return 1;
   }
 
   if (fread(&response_buffer[1], self[n].block_length, 1, self[n].fp) != 1) {
-    fprintf(stderr, "sdcard%d: error reading %u bytes from position %u in %s\n", n, self[n].block_length, self[n].position, SDCARD_IMAGE);
+    log_err("sdcard%d: error reading %u bytes from position %u in %s\n", n, self[n].block_length, self[n].position, SDCARD_IMAGE);
     response_buffer[0] = 0x03;  /* Data error token (card controller error) . */
     return 1;
   }
@@ -197,7 +198,7 @@ static void sdcard_fill_csd(sdcard_nr_t n, u8_t* csd) {
       c_size = n_blocks / multi - 1;
     } while (c_size > 4095);
 
-    fprintf(stderr, "sdcard%d: block_length=%u multi=%u c_size=%u\n", n, self[n].block_length, multi, c_size);
+    log_dbg("sdcard%d: block_length=%u multi=%u c_size=%u\n", n, self[n].block_length, multi, c_size);
 
     csd[ 5] = (self[n].block_length == 1024 ? 10 : 9);
     csd[ 6] = (c_size >> 10) & 0x03;
@@ -216,7 +217,7 @@ static void sdcard_fill_csd(sdcard_nr_t n, u8_t* csd) {
 
 
 static void sdcard_handle_command(sdcard_nr_t n) {
-  fprintf(stderr, "sdcard%d: received CMD%d ($%02X $%02X $%02X $%02X $%02X $%02X)\n", n, self[n].command, self[n].command_buffer[0], self[n].command_buffer[1], self[n].command_buffer[2], self[n].command_buffer[3], self[n].command_buffer[4], self[n].command_buffer[5]);
+  log_dbg("sdcard%d: received CMD%d ($%02X $%02X $%02X $%02X $%02X $%02X)\n", n, self[n].command, self[n].command_buffer[0], self[n].command_buffer[1], self[n].command_buffer[2], self[n].command_buffer[3], self[n].command_buffer[4], self[n].command_buffer[5]);
 
   if (self[n].fp != NULL) {
     u32_t block_length;
@@ -265,7 +266,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
                        | self[n].command_buffer[3] << 8
                        | self[n].command_buffer[4];
           if (block_length != 512 && block_length != 1024) {
-            fprintf(stderr, "sdcard%d: unsupported block length %u bytes\n", n, block_length);
+            log_wrn("sdcard%d: unsupported block length %u bytes\n", n, block_length);
             break;
           }
           self[n].block_length = block_length;
@@ -319,7 +320,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
     }
   }
 
-  fprintf(stderr, "sdcard%d: signalling error\n", n);
+  log_dbg("sdcard%d: signalling error\n", n);
   self[n].state      = E_STATE_IDLE;
   self[n].error      = E_ERROR_ILLEGAL_COMMAND;
   self[n].in_app_cmd = 0;
@@ -333,12 +334,12 @@ void sdcard_write(sdcard_nr_t n, u16_t address, u8_t value) {
 
   if (self[n].command_length == 0) {
     if (value >> 6 != 0x01) {
-      fprintf(stderr, "sdcard%d: invalid first byte $%02X of command\n", n, value);
+      log_wrn("sdcard%d: invalid first byte $%02X of command\n", n, value);
       return;
     }
   } else if (self[n].command_length == sizeof(self[n].command_buffer) - 1) {
     if ((value & 0x01) != 0x01) {
-      fprintf(stderr, "sdcard%d: invalid last byte $%02X of command\n", n, value);
+      log_wrn("sdcard%d: invalid last byte $%02X of command\n", n, value);
       self[n].command_length = 0;
       return;
     }

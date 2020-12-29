@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "defs.h"
+#include "log.h"
 #include "nextreg.h"
 #include "utils.h"
 
@@ -24,7 +25,7 @@ int bootrom_init(u8_t* sram) {
 
   self.rom = malloc(BOOT_ROM_SIZE);
   if (self.rom == NULL) {
-    fprintf(stderr, "bootrom: out of memory\n");
+    log_err("bootrom: out of memory\n");
     return -1;
   }
 
@@ -73,6 +74,6 @@ int bootrom_write(u16_t address, u8_t value) {
     return -1;
   }
 
-  fprintf(stderr, "bootrom: attempt to write $%02X to $%04X\n", value, address);
+  log_inf("bootrom: attempt to write $%02X to $%04X\n", value, address);
   return -1;
 }

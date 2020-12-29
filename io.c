@@ -1,8 +1,8 @@
-#include <stdio.h>
 #include "divmmc.h"
 #include "nextreg.h"
 #include "defs.h"
 #include "layer2.h"
+#include "log.h"
 #include "i2c.h"
 #include "spi.h"
 #include "timex.h"
@@ -53,7 +53,7 @@ u8_t io_read(u16_t address) {
     return nextreg_data_read(address);
   } 
 
-  fprintf(stderr, "io: unimplemented read from $%04X\n", address);
+  log_wrn("io: unimplemented read from $%04X\n", address);
 
   return 0xFF;
 }
@@ -109,5 +109,5 @@ void io_write(u16_t address, u8_t value) {
     return;
   }
 
-  fprintf(stderr, "io: unimplemented write of $%02X to $%04X\n", value, address);
+  log_wrn("io: unimplemented write of $%02X to $%04X\n", value, address);
 }

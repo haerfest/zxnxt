@@ -8,6 +8,7 @@
 #include "i2c.h"
 #include "io.h"
 #include "layer2.h"
+#include "log.h"
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
@@ -43,28 +44,32 @@ static int main_init(void) {
   u8_t* sram;
 
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-    SDL_Log("SDL_Init: %s\n", SDL_GetError());
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init: %s\n", SDL_GetError());
     goto exit;
   }
 
   if (SDL_CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0, &self.window, &self.renderer) != 0) {
-    fprintf(stderr, "main: SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "main: SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
 
   if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
-    fprintf(stderr, "main: SDL_RenderSetScale error: %s\n", SDL_GetError());
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "main: SDL_RenderSetScale error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
   }
 
   self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
-    fprintf(stderr, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
   }
 
-  if (utils_init() != 0) {
+  if (log_init() != 0) {
     goto exit_texture;
+  }
+
+  if (utils_init() != 0) {
+    goto exit_log;
   }
 
   if (i2c_init() != 0) {
@@ -167,6 +172,8 @@ exit_i2c:
   i2c_finit();
 exit_utils:
   utils_finit();
+exit_log:
+  log_finit();
 exit_texture:
   SDL_DestroyTexture(self.texture);
 exit_window_and_renderer:
@@ -212,6 +219,7 @@ static void main_finit(void) {
   sdcard_finit();
   i2c_finit();
   utils_finit();
+  log_finit();
 
   SDL_DestroyTexture(self.texture);
   SDL_DestroyRenderer(self.renderer);

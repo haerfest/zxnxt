@@ -1,6 +1,6 @@
-#include <stdio.h>
 #include "clock.h"
 #include "cpu.h"
+#include "log.h"
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
@@ -98,7 +98,7 @@ static void nextreg_reset_write(u8_t value) {
 
     cpu_reset();
 
-    fprintf(stderr, "nextreg: %s reset\n", self.is_hard_reset ? "hard" : "soft");
+    log_dbg("nextreg: %s reset\n", self.is_hard_reset ? "hard" : "soft");
   }
 }
 
@@ -106,7 +106,7 @@ static void nextreg_reset_write(u8_t value) {
 static void nextreg_config_mapping_write(u8_t value) {
   /* Only bits 4:0 are specified, but FPGA uses bits 6:0. */
   self.rom_ram_bank = value & 0x7F;
-  fprintf(stderr, "nextreg: ROM/RAM bank in lower 16 KiB set to %u\n", self.rom_ram_bank);
+  log_dbg("nextreg: ROM/RAM bank in lower 16 KiB set to %u\n", self.rom_ram_bank);
 }
 
 
@@ -139,10 +139,10 @@ static void nextreg_machine_type_write(u8_t value) {
                       ? machine_type
                       : E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
 
-    fprintf(stderr, "nextreg: machine type set to %s\n", descriptions[self.machine_type]);
+    log_dbg("nextreg: machine type set to %s\n", descriptions[self.machine_type]);
 
     self.is_bootrom_active = 0;
-    fprintf(stderr, "nextreg: bootrom disabled\n");
+    log_dbg("nextreg: bootrom disabled\n");
   }
 }
 
@@ -253,7 +253,7 @@ void nextreg_data_write(u16_t address, u8_t value) {
       break;
 
     default:
-      fprintf(stderr, "nextreg: unimplemented write of $%02X to Next register $%02X\n", value, self.selected_register);
+      log_wrn("nextreg: unimplemented write of $%02X to Next register $%02X\n", value, self.selected_register);
       break;
   }
 }
@@ -284,7 +284,7 @@ u8_t nextreg_data_read(u16_t address) {
       return mmu_page_get(self.selected_register - REGISTER_MMU_SLOT0_CONTROL);
 
     default:
-      fprintf(stderr, "nextreg: unimplemented read from Next register $%02X\n", self.selected_register);
+      log_wrn("nextreg: unimplemented read from Next register $%02X\n", self.selected_register);
       break;
   }
 

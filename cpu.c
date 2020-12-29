@@ -1,9 +1,9 @@
-#include <stdio.h>
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"
 #include "divmmc.h"  /* For debugging. */
 #include "io.h"
+#include "log.h"     /* For debugging. */
 #include "memory.h"
 #include "mmu.h"     /* For debugging. */
 #include "rom.h"     /* For debugging. */
