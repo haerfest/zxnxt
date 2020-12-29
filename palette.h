@@ -28,6 +28,7 @@ typedef struct {
 int  palette_init(void);
 void palette_finit(void);
 
+palette_entry_t palette_read_rgb(palette_t palette, u8_t index);
 palette_entry_t palette_read(palette_t palette, u8_t index);
 void            palette_write(palette_t palette, u8_t index, palette_entry_t entry);
 
