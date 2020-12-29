@@ -5,7 +5,7 @@
 #include "defs.h"
 
 
-int   mmu_init(u8_t* ram);
+int   mmu_init(u8_t* sram);
 void  mmu_finit(void);
 u8_t  mmu_page_get(u8_t slot);
 void  mmu_page_set(u8_t slot, u8_t page);

@@ -235,8 +235,8 @@ static void ula_fill_tables(void) {
 
 int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.renderer           = renderer;
-  self.display_ram        = &sram[5 * 16 * 1024];  /* Always bank 5. */
-  self.attribute_ram      = &sram[5 * 16 * 1024 + 192 * 32];
+  self.display_ram        = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
+  self.attribute_ram      = &self.display_ram[192 * 32];
   self.display_offset     = 0;
   self.attribute_offset   = 0;
   self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;

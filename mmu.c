@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "defs.h"
+#include "memory.h"
 #include "mmu.h"
 
 
@@ -16,8 +17,8 @@ typedef struct  {
 static mmu_t self;
 
 
-int mmu_init(u8_t* ram) {
-  self.ram = ram;
+int mmu_init(u8_t* sram) {
+  self.ram = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM];
 
   mmu_page_set(0, 0xFF);
   mmu_page_set(1, 0xFF);

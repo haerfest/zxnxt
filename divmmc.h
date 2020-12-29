@@ -5,7 +5,7 @@
 #include "defs.h"
 
 
-int  divmmc_init(u8_t* rom, u8_t* ram);
+int  divmmc_init(u8_t* sram);
 void divmmc_finit(void);
 int  divmmc_read(u16_t address, u8_t* value);
 int  divmmc_write(u16_t address, u8_t value);

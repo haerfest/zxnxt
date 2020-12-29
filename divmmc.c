@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "defs.h"
+#include "memory.h"
 #include "utils.h"
 
 
@@ -20,9 +21,9 @@ typedef struct {
 static divmmc_t self;
 
 
-int divmmc_init(u8_t* rom, u8_t* ram) {
-  self.rom            = rom;
-  self.ram            = ram;
+int divmmc_init(u8_t* sram) {
+  self.rom            = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
+  self.ram            = &sram[MEMORY_RAM_OFFSET_DIVMMC_RAM];
   self.conmem_enabled = 0;
   self.bank_number    = 0;
 

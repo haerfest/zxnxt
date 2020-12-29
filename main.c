@@ -92,6 +92,7 @@ static int main_init(void) {
   }
 
   sram = memory_sram();
+
   if (bootrom_init(sram) != 0) {
     goto exit_io;
   }
@@ -104,11 +105,11 @@ static int main_init(void) {
     goto exit_config;
   }
 
-  if (mmu_init(sram + MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM) != 0) {
+  if (mmu_init(sram) != 0) {
     goto exit_rom;
   }
 
-  if (divmmc_init(sram + MEMORY_RAM_OFFSET_DIVMMC_ROM, sram + MEMORY_RAM_OFFSET_DIVMMC_RAM) != 0) {
+  if (divmmc_init(sram) != 0) {
     goto exit_mmu;
   }
 
@@ -116,7 +117,7 @@ static int main_init(void) {
     goto exit_divmmc;
   }
 
-  if (ula_init(self.renderer, self.texture, sram + MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM) != 0) {
+  if (ula_init(self.renderer, self.texture, sram) != 0) {
     goto exit_clock;
   }
 
