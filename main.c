@@ -12,6 +12,7 @@
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
+#include "palette.h"
 #include "rom.h"
 #include "sdcard.h"
 #include "spi.h"
@@ -84,8 +85,12 @@ static int main_init(void) {
     goto exit_sdcard;
   }
 
-  if (nextreg_init() != 0) {
+  if (palette_init() != 0) {
     goto exit_spi;
+  }
+
+  if (nextreg_init() != 0) {
+    goto exit_palette;
   }
 
   if (io_init() != 0) {
@@ -164,6 +169,8 @@ exit_io:
   io_finit();
 exit_nextreg:
   nextreg_finit();
+exit_palette:
+  palette_finit();
 exit_spi:
   spi_finit();
 exit_sdcard:
@@ -215,6 +222,7 @@ static void main_finit(void) {
   memory_finit();
   io_finit();
   nextreg_finit();
+  palette_finit();
   spi_finit();
   sdcard_finit();
   i2c_finit();

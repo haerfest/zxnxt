@@ -1,10 +1,11 @@
 #include "clock.h"
 #include "cpu.h"
+#include "defs.h"
 #include "log.h"
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
-#include "defs.h"
+#include "palette.h"
 #include "rom.h"
 #include "ula.h"
 
@@ -47,22 +48,17 @@
 #define REGISTER_MEMORY_MAPPING_MODE     0x8F
 
 
-#define N_PALETTES  (E_NEXTREG_PALETTE_TILEMAP_SECOND - E_NEXTREG_PALETTE_ULA_FIRST + 1)
-#define N_COLOURS   256
-
-
 typedef struct {
   u8_t                   selected_register;
   u8_t                   rom_ram_bank;
   nextreg_machine_type_t machine_type;
   int                    is_bootrom_active;
   int                    is_hard_reset;
-  u32_t                  palette[N_PALETTES][N_COLOURS];
   int                    palette_write_auto_increment;
-  nextreg_palette_t      palette_sprites;
-  nextreg_palette_t      palette_layer2;
-  nextreg_palette_t      palette_ula;
-  nextreg_palette_t      palette_selected;
+  palette_t              palette_sprites;
+  palette_t              palette_layer2;
+  palette_t              palette_ula;
+  palette_t              palette_selected;
   u8_t                   palette_index;
   int                    palette_index_9bit_is_first_write;
   u8_t                   fallback_colour;
@@ -75,12 +71,12 @@ static nextreg_t self;
 
 static void nextreg_reset_soft(void) {
   self.palette_write_auto_increment      = 1;
-  self.palette_selected                  = E_NEXTREG_PALETTE_ULA_FIRST;
+  self.palette_selected                  = E_PALETTE_ULA_FIRST;
   self.palette_index                     = 0;
   self.palette_index_9bit_is_first_write = 1;
-  self.palette_sprites                   = E_NEXTREG_PALETTE_SPRITES_FIRST;
-  self.palette_layer2                    = E_NEXTREG_PALETTE_LAYER2_FIRST;
-  self.palette_ula                       = E_NEXTREG_PALETTE_ULA_FIRST;
+  self.palette_sprites                   = E_PALETTE_SPRITES_FIRST;
+  self.palette_layer2                    = E_PALETTE_LAYER2_FIRST;
+  self.palette_ula                       = E_PALETTE_ULA_FIRST;
   self.fallback_colour                   = 0xE3;
   self.ula_next_mode                     = 0;
 }
@@ -247,11 +243,11 @@ int nextreg_is_config_mode_active(void) {
 
 
 static u8_t nextreg_palette_control_read(void) {
-  return self.palette_write_auto_increment                          << 7
-       | self.palette_selected                                      << 4
-       | (self.palette_sprites == E_NEXTREG_PALETTE_SPRITES_SECOND) << 3
-       | (self.palette_layer2  == E_NEXTREG_PALETTE_LAYER2_SECOND)  << 2
-       | (self.palette_ula     == E_NEXTREG_PALETTE_ULA_SECOND)     << 1
+  return self.palette_write_auto_increment                  << 7
+       | self.palette_selected                              << 4
+       | (self.palette_sprites == E_PALETTE_SPRITES_SECOND) << 3
+       | (self.palette_layer2  == E_PALETTE_LAYER2_SECOND)  << 2
+       | (self.palette_ula     == E_PALETTE_ULA_SECOND)     << 1
        | self.ula_next_mode;
 }
 
@@ -259,9 +255,9 @@ static u8_t nextreg_palette_control_read(void) {
 static void nextreg_palette_control_write(u8_t value) {
   self.palette_write_auto_increment = value >> 7;
   self.palette_selected             = (value & 0x70) >> 4;
-  self.palette_sprites              = (value & 0x08) ? E_NEXTREG_PALETTE_SPRITES_SECOND : E_NEXTREG_PALETTE_SPRITES_FIRST;
-  self.palette_layer2               = (value & 0x04) ? E_NEXTREG_PALETTE_LAYER2_SECOND  : E_NEXTREG_PALETTE_LAYER2_FIRST;
-  self.palette_ula                  = (value & 0x02) ? E_NEXTREG_PALETTE_ULA_SECOND     : E_NEXTREG_PALETTE_ULA_FIRST;
+  self.palette_sprites              = (value & 0x08) ? E_PALETTE_SPRITES_SECOND : E_PALETTE_SPRITES_FIRST;
+  self.palette_layer2               = (value & 0x04) ? E_PALETTE_LAYER2_SECOND  : E_PALETTE_LAYER2_FIRST;
+  self.palette_ula                  = (value & 0x02) ? E_PALETTE_ULA_SECOND     : E_PALETTE_ULA_FIRST;
   self.ula_next_mode                = value & 0x01;
   
   if (self.ula_next_mode) {
@@ -277,19 +273,20 @@ static void nextreg_palette_index_write(u8_t value) {
 
 
 static u8_t nextreg_palette_value_8bits_read(void) {
-  const u32_t colour = self.palette[self.palette_selected][self.palette_index];
-  const u8_t  red    = colour >> 24;
-  const u8_t  green  = colour >> 16;
-  const u8_t  blue   = colour >>  8;
-  return red << 5 | green << 2 | blue >> 1;
+  const palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
+
+  return entry.red << 5 | entry.green << 2 | entry.blue >> 1;
 }
 
 
 static void nextreg_palette_value_8bits_write(u8_t value) {
-  const u8_t red   = (value & 0xE0) >> 5;
-  const u8_t green = (value & 0x1C) >> 2;
-  const u8_t blue  = (value & 0x03) << 1;
-  self.palette[self.palette_selected][self.palette_index] = red << 24 | green << 16 | blue << 8;
+  const palette_entry_t entry = {
+    .red                = (value & 0xE0) >> 5,
+    .green              = (value & 0x1C) >> 2,
+    .blue               = (value & 0x03) << 1,
+    .is_layer2_priority = 0
+  };
+  palette_write(self.palette_selected, self.palette_index, entry);
 
   if (self.palette_write_auto_increment) {
     self.palette_index++;
@@ -298,10 +295,9 @@ static void nextreg_palette_value_8bits_write(u8_t value) {
 
 
 static u8_t nextreg_palette_value_9bits_read(void) {
-  const u32_t colour          = self.palette[self.palette_selected][self.palette_index];
-  const u8_t  blue            = colour >> 8;
-  const u8_t  layer2_priority = colour & 0x01;
-  return layer2_priority << 7 | (blue & 0x01);
+  const palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
+
+  return entry.is_layer2_priority << 7 | (entry.blue & 0x01);
 }
 
 
@@ -309,9 +305,10 @@ static void nextreg_palette_value_9bits_write(u8_t value) {
   if (self.palette_index_9bit_is_first_write) {
     nextreg_palette_value_8bits_write(value);
   } else {
-    const u8_t blue            = value & 0x01;
-    const u8_t layer2_priority = value >> 7;
-    self.palette[self.palette_selected][self.palette_index] |= blue << 8 | layer2_priority;
+    palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
+    entry.blue              |= value & 0x01;
+    entry.is_layer2_priority = value >> 7;
+    palette_write(self.palette_selected, self.palette_index, entry);
 
     if (self.palette_write_auto_increment) {
       self.palette_index++;
