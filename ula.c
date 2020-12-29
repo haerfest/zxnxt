@@ -2,7 +2,13 @@
 #include "defs.h"
 #include "log.h"
 #include "memory.h"
+#include "palette.h"
 #include "ula.h"
+
+
+#define PALETTE_OFFSET_INK      0
+#define PALETTE_OFFSET_PAPER   16
+#define PALETTE_OFFSET_BORDER  16
 
 
 /** See: https://wiki.specnext.dev/Reference_machines. */
@@ -35,33 +41,6 @@ static const ula_display_spec_t ula_display_spec[5][2][2] = {
 };
 
 
-typedef struct {
-  u8_t red;
-  u8_t green;
-  u8_t blue;
-} ula_colour_t;
-
-
-static const ula_colour_t colours[] = {
-  { 0x00, 0x00, 0x00 },  /*  0: Dark black.     */
-  { 0x00, 0x00, 0xD7 },  /*  1: Dark blue.      */
-  { 0xD7, 0x00, 0x00 },  /*  2: Dark red.       */
-  { 0xD7, 0x00, 0xD7 },  /*  3: Dark magenta.   */
-  { 0x00, 0xD7, 0x00 },  /*  4: Dark green.     */
-  { 0x00, 0xD7, 0xD7 },  /*  5: Dark cyan.      */
-  { 0xD7, 0xD7, 0x00 },  /*  6: Dark yellow.    */
-  { 0xD7, 0xD7, 0xD7 },  /*  7: Dark white.     */
-  { 0x00, 0x00, 0x00 },  /*  8: Bright black.   */
-  { 0x00, 0x00, 0xFF },  /*  9: Bright blue.    */
-  { 0xFF, 0x00, 0x00 },  /* 10: Bright red.     */
-  { 0xFF, 0x00, 0xFF },  /* 11: Bright magenta. */
-  { 0x00, 0xFF, 0x00 },  /* 12: Bright green.   */
-  { 0x00, 0xFF, 0xFF },  /* 13: Bright cyan.    */
-  { 0xFF, 0xFF, 0x00 },  /* 14: Bright yellow.  */
-  { 0xFF, 0xFF, 0xFF }   /* 15: Bright white.   */
-};
-
-
 typedef enum {
   E_ULA_DISPLAY_STATE_TOP_BORDER = 0,
   E_ULA_DISPLAY_STATE_LEFT_BORDER,
@@ -90,6 +69,7 @@ typedef struct {
   u8_t                    attribute_byte;
   u8_t                    border_colour;
   u8_t                    speaker_state;
+  palette_t               palette;
 } ula_t;
 
 
@@ -97,14 +77,15 @@ static ula_t self;
 
 
 static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t spec) {
-  unsigned int tick;
-  ula_colour_t colour;
+  unsigned int    tick;
+  palette_entry_t colour;
+  u8_t            index;
 
   /* The ULA uses a 7 MHz clock to refresh the display, which is 28/4 MHz. */
   for (tick = 0; tick < delta; tick += 4) {
     switch (self.display_state) {
       case E_ULA_DISPLAY_STATE_TOP_BORDER:
-        colour = colours[self.border_colour];
+        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
         SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
@@ -114,7 +95,7 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         break;
 
       case E_ULA_DISPLAY_STATE_LEFT_BORDER:
-        colour = colours[self.border_colour];
+        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
         SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
@@ -134,11 +115,19 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         }
 
         /* TODO: blinking colours. */
-        colour = colours[
-          (self.display_byte & self.display_pixel_mask ? self.attribute_byte : self.attribute_byte >> 3) & 0x07
-          + (self.attribute_byte & 0x20) * 7
-        ];
-        
+        if (self.display_byte & self.display_pixel_mask) {
+          /* Ink. */
+          index = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
+        } else {
+          /* Paper. */
+          index = PALETTE_OFFSET_PAPER + (self.attribute_byte >> 3) & 0x07;
+        }
+        if (self.attribute_byte & 0x40) {
+          /* Bright. */
+          index += 8;
+        }
+        colour = palette_read_rgb(self.palette, index);
+
         SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
 
@@ -165,7 +154,7 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         break;
 
       case E_ULA_DISPLAY_STATE_RIGHT_BORDER:
-        colour = colours[self.border_colour];
+        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
         SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
@@ -175,7 +164,7 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
         break;
 
       case E_ULA_DISPLAY_STATE_BOTTOM_BORDER:
-        colour = colours[self.border_colour];
+        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
         SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
         SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
         self.display_column++;
@@ -246,6 +235,7 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.display_pixel_mask = 0;
   self.border_colour      = 0;
   self.speaker_state      = 0;
+  self.palette            = E_PALETTE_ULA_FIRST;
 
   ula_fill_tables();
 
@@ -268,7 +258,7 @@ u8_t ula_read(u16_t address) {
 
 
 void ula_write(u16_t address, u8_t value) {
-  self.border_colour = value & 0x03;
+  self.border_colour = value & 0x07;
   self.speaker_state = value & 0x04;
 }
 
@@ -296,4 +286,9 @@ void ula_display_frequency_set(ula_display_frequency_t frequency) {
   self.display_line       = 0;
   self.display_column     = 0;
   self.display_pixel_mask = 0;
+}
+
+
+void ula_palette_set(int use_second) {
+  self.palette = use_second ? E_PALETTE_ULA_SECOND : E_PALETTE_ULA_FIRST;
 }

@@ -20,6 +20,7 @@ void ula_write(u16_t address, u8_t value);
 void ula_display_timing_set(clock_display_timing_t timing);
 void ula_video_timing_set(clock_video_timing_t timing);
 void ula_display_frequency_set(ula_display_frequency_t frequency);
+void ula_palette_set(int use_second);
 
 
 #endif  /* __ULA_H */
