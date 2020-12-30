@@ -112,19 +112,10 @@ def add_dd_ss(dd: str, ss: str) -> C:
     return f'''
         const u16_t prev  = {dd};
         const u8_t  carry = {dd} > 0xFFFF - {ss};
-        HL += {ss}; T(4 + 3);
+        {dd} += {ss}; T(4 + 3);
         F &= ~(HF_MASK | NF_MASK | CF_MASK);
-        F |= HF_ADD(prev >> 8, {ss} >> 8, HL >> 8) | carry;
+        F |= HF_ADD(prev >> 8, {ss} >> 8, {dd} >> 8) | carry;
     '''
-
-def add_xy_rr(xy: str, rr: str) -> C:
-    return f'''
-        const u32_t result = {xy} + {rr};
-        F &= NF_MASK;
-        F |= HF_ADD({xy} >> 8, {rr} >> 8, result >> 8) | (result >> 16) << CF_SHIFT;
-        {xy} = result & 0xFFFF;
-    '''
-
 
 def bit_b_r(b: int, r: str) -> C:
     return f'''
@@ -1411,7 +1402,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
 
     # Show on the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
-    debug = False
+    debug = True
 
     if debug:
         if not prefix:
