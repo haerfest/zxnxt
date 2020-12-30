@@ -25,7 +25,7 @@ def lo(dd: str) -> str:
     return f'{dd}L' if dd in ['IX', 'IY'] else dd[1]
 
 def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL') -> C:
-    if xy:
+    if rr == 'HL' and xy:
         return f'{xy} + (s8_t) memory_read(PC++); T(3 + 5)'
     else:
         return rr
@@ -1348,7 +1348,7 @@ def table(xy: Optional[str] = None) -> Table:
         0xE6: (f'AND n',        partial(logical_n, '&')),
         0xE7: (f'RST $20',      partial(rst, 0x20)),
         0xE8: (f'RET PE',       partial(ret,  'F & PF_MASK')),
-        0xE9: (f'JP (HL)',      'PC = HL;'),
+        0xE9: (f'JP ({hl})',    f'PC = {hl};'),
         0xEA: (f'JP PE,nn',     partial(jp,   'F & PF_MASK')),
         0xEB: (f'EX DE,HL',     partial(ex, 'DE', 'HL')),
         0xEC: (f'CALL PE,nn',   partial(call, 'F & PF_MASK')),
