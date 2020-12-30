@@ -132,6 +132,24 @@ def bit_b_pss(b: int, xy: Optional[str] = None) -> C:
         T(4);
     '''
 
+def brlc() -> C:
+    return '''
+        DE = (DE << (B & 0x0F))
+           | (DE >> (0x10 - B & 0x0F));
+    '''
+
+def bsla() -> C:
+    return 'DE <<= B & 0x1F;'
+
+def bsra() -> C:
+    return 'DE = (u16_t) ((s16_t) DE >> (B & 0x1F));'
+
+def bsrf() -> C:
+    return 'DE = ~(~DE >> (B & 0x1F));'
+
+def bsrl() -> C:
+    return 'DE >>= B & 0x1F;'
+
 def call(cond: Optional[str] = None) -> C:
     s = '''
         Z = memory_read(PC++);   T(3);
@@ -489,6 +507,21 @@ def logical_pss(op: str, xy: Optional[str] = None) -> C:
         A {op}= memory_read(WZ); T(4);
         F     = SZ53P(A);        T(3);
     '''
+
+def mirr() -> C:
+    return '''
+        A = (A & 0x01) << 7
+          | (A & 0x02) << 5
+          | (A & 0x04) << 3
+          | (A & 0x08) << 1
+          | (A & 0x10) >> 1
+          | (A & 0x20) >> 3
+          | (A & 0x40) >> 5
+          | (A & 0x80) >> 7;
+    '''
+
+def mul() -> C:
+    return 'DE = D * E;'
 
 def neg() -> C:
     return '''
@@ -906,11 +939,18 @@ def sub_pss(xy: Optional[str] = None) -> C:
         F      = SZ53(A) | HF_SUB(a, TMP, A) | VF_SUB(a, TMP, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
-def swapnib() -> C:
+def swap() -> C:
     return '''
         A = A >> 4 | A << 4;
         T(8);
     '''
+
+def test() -> C:
+    return '''
+       TMP = A & memory_read(PC++); T(3);
+       F = SZ53P(A) | HF_MASK;
+    '''
+
 
 def cb_table(xy: Optional[str] = None) -> Table:
     hld = f'{xy}+d' if xy else 'HL'
@@ -959,8 +999,15 @@ def cb_table(xy: Optional[str] = None) -> Table:
 # See https://wiki.specnext.dev/Extended_Z80_instruction_set.
 def ed_table() -> Table:
     return {
-        0x23: ('SWAPNIB', swapnib),
-        0x30: ('MUL D,E', 'DE = D * E;'),
+        0x23: ('SWAP',       swap),
+        0x24: ('MIRR A',     mirr),
+        0x27: ('TEST n',     test),
+        0x28: ('BSLA DE,B',  bsla),
+        0x29: ('BSRA DE,B',  bsra),
+        0x2A: ('BSRL DE,B',  bsrl),
+        0x2B: ('BSRF DE,B',  bsrf),
+        0x2C: ('BRLC DE,B',  brlc),
+        0x30: ('MUL D,E',    mul),
         0x31: ('ADD HL,A',   partial(add_dd_r, 'HL', 'A')),
         0x34: ('ADD HL,nn',  partial(add_dd_nn, 'HL')),
         0x35: ('ADD DE,nn',  partial(add_dd_nn, 'DE')),
