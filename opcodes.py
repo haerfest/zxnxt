@@ -571,14 +571,14 @@ def neg() -> C:
         F = SZ53(A) | HF_SUB(0, prev, A) | (prev == 0x80) << VF_SHIFT | NF_MASK | (prev != 0x00) << CF_SHIFT;
     '''
 
-def nextreg_reg_A() -> C:
+def nreg_reg_A() -> C:
     return '''
         io_write(0x243B, memory_read(PC++));
         io_write(0x253B, A);
         T(4);
     '''
 
-def nextreg_reg_value() -> C:
+def nreg_reg_value() -> C:
     return '''
         io_write(0x243B, memory_read(PC++));
         io_write(0x253B, memory_read(PC++));
@@ -637,6 +637,23 @@ def push_qq(qq: str) -> C:
         T(1);
         memory_write(--SP, {hi(qq)}); T(3);
         memory_write(--SP, {lo(qq)}); T(3);
+    '''
+
+def pxad() -> C:
+    return '''
+        HL = 0x4000 + ((D & 0xC0) << 5) + ((D & 0x07) << 8) + ((D & 0x38) << 2) + (E >> 3);
+        T(8);
+    '''
+
+def pxdn() -> C:
+    return '''
+        if ((HL & 0x0700) != 0x0700) {
+            HL += 256;
+        } else if ((HL & 0xE0) != 0xE0) {
+            HL = HL & 0xF8FF + 0x20;
+        } else {
+           HL = HL & 0xF81F + 0x0800;
+        }
     '''
 
 def res_b_pHL(b: int) -> C:
@@ -1211,9 +1228,10 @@ def ed_table() -> Table:
         0x7A: ('ADC HL,SP',  partial(adc_HL_ss, 'SP')),
         0x7B: ('LD SP,(nn)', partial(ld_dd_pnn, 'SP')),
         0x8A: ('PUSH mm',    push_im),
-        0x91: ('NEXTREG reg,value', nextreg_reg_value),
-        0x92: ('NEXTREG reg,A',     nextreg_reg_A),
-        0x94: ('PIXELAD',           None), # using D,E (as Y,X) calculate the ULA screen address and store in HL
+        0x91: ('NREG reg,value', nreg_reg_value),
+        0x92: ('NREG reg,A',     nreg_reg_A),
+        0x93: ('PXDN',           pxdn),
+        0x94: ('PXAD',           pxad),
         0xA0: ('LDI',  partial(ldx,  '+')),
         0xA1: ('CPI',  partial(cpx,  '+')),
         0xA2: ('INI',  partial(inx,  '+')),
@@ -1273,6 +1291,7 @@ def xy_table(xy: str) -> Table:
         0x23: (f'INC {xy}',       partial(inc_ss, xy)),
         0x26: (f'LD {hi(xy)},n',  partial(ld_r_n, hi(xy))),
         0x2A: (f'LD {xy},(nn)',   partial(ld_dd_pnn, xy)),
+        0x2E: (f'LD {lo(xy)},n',  partial(ld_r_n, lo(xy))),
         0x34: (f'INC ({xy}+d)',   partial(inc_xy_d, xy)),
         0x35: (f'DEC ({xy}+d)',   partial(dec_xy_d, xy)),
         0x36: (f'LD ({xy}+d),n',  partial(ld_xy_d_n, xy)),
@@ -1280,6 +1299,7 @@ def xy_table(xy: str) -> Table:
         0x46: (f'LD B,({xy}+d)',  partial(ld_r_xy_d, 'B', xy)),
         0x4E: (f'LD C,({xy}+d)',  partial(ld_r_xy_d, 'C', xy)),
         0x54: (f'LD D,{hi(xy)}',  partial(ld_r_r, 'D', hi(xy))),
+        0x55: (f'LD D,{lo(xy)}',  partial(ld_r_r, 'D', lo(xy))),
         0x56: (f'LD D,({xy}+d)',  partial(ld_r_xy_d, 'D', xy)),
         0x5D: (f'LD E,{lo(xy)}',  partial(ld_r_r, 'E', lo(xy))),
         0x5E: (f'LD E,({xy}+d)',  partial(ld_r_xy_d, 'E', xy)),
