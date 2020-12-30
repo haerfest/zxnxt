@@ -233,7 +233,7 @@ def cpx(op: str) -> C:
     '''
     
 def cpxr(op: str) -> C:
-    return '''
+    return f'''
       u16_t result;
       Z      = memory_read(HL{op}{op}); T(3);
       result = A - Z;
