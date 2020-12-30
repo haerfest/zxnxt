@@ -1071,6 +1071,7 @@ def ed_table() -> Table:
                A = R;
                F = SZ53(A) | (IFF2 << VF_SHIFT) | (F & CF_MASK) >> CF_SHIFT;
                '''),
+        0x60: ('IN H,(C)',   partial(in_r_c,  'H')),
         0x61: ('OUT (C),H',  partial(out_c_r, 'H')),
         0x68: ('IN L,(C)',   partial(in_r_c, 'L')),
         0x69: ('OUT (C),L',  partial(out_c_r, 'L')),
