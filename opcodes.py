@@ -50,29 +50,17 @@ def adc_A_r(r: str) -> C:
 
 def adc_A_pss(xy: Optional[str] = None) -> C:
     return f'''
-        const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
-        const u16_t result = A + TMP + carry;
-        WZ  = {wz(xy)};
-        TMP = memory_read(WZ); T(3);
-        F   = SZ53(result & 0xFF) | HF_ADD(A, TMP + carry, result) | VF_ADD(A, TMP + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
-        A   = result & 0xFF;
+        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
+        u16_t      result;
+        WZ     = {wz(xy)};
+        TMP    = memory_read(WZ) + carry; T(3);
+        result = A + TMP;
+        F      = SZ53(result & 0xFF) | HF_ADD(A, TMP, result) | VF_ADD(A, TMP, result) | (result & 0x100) >> 8 << CF_SHIFT;
+        A      = result & 0xFF;
         T(3);
     '''
 
     return None
-
-def adc_A_xy_d(xy: str) -> C:
-    return f'''
-        const u8_t carry  = (F & CF_MASK) >> CF_SHIFT;
-        u16_t      result;
-        u8_t       tmp;
-        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
-        tmp    = memory_read(WZ);                 T(5);
-        result = A + tmp + carry;
-        F      = SZ53(result & 0xFF) | HF_ADD(A, tmp + carry, result) | VF_ADD(A, tmp + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
-        A      = result & 0xFF;
-        T(3);
-    '''
 
 def adc_HL_ss(ss: str) -> C:
     return f'''
@@ -106,18 +94,6 @@ def add_A_pss(xy: Optional[str] = None) -> C:
         TMP    = memory_read(WZ);
         result = A + TMP;
         F      = SZ53(result & 0xFF) | HF_ADD(A, TMP, result) | VF_ADD(A, TMP, result) | (result & 0x100) >> 8 << CF_SHIFT;
-        A      = result & 0xFF;
-        T(3);
-    '''
-
-def add_A_xy_d(xy: str) -> C:
-    return f'''
-        u16_t result;
-        u8_t  tmp;
-        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
-        tmp    = memory_read(WZ);                 T(5);
-        result = A + tmp;
-        F      = SZ53(result & 0xFF) | HF_ADD(A, tmp, result) | VF_ADD(A, tmp, result) | (result & 0x100) >> 8 << CF_SHIFT;
         A      = result & 0xFF;
         T(3);
     '''
@@ -162,16 +138,6 @@ def bit_b_pss(b: int, xy: Optional[str] = None) -> C:
         WZ = {wz(xy)};
         F &= ~(ZF_MASK | NF_MASK);
         F |= (memory_read(WZ) & 1 << {b} ? 0 : ZF_MASK) | HF_MASK; T(4);
-        T(4);
-    '''
-
-def bit_b_xy_d(b: int, xy: str) -> C:
-    return f'''
-        T(1);
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        PC++;
-        F &= ~(ZF_MASK | NF_MASK);
-        F |= (memory_read(WZ) & 1 << {b} ? 0 : ZF_MASK) | HF_MASK;
         T(4);
     '''
 
@@ -226,16 +192,6 @@ def cp_pss(xy: Optional[str] = None) -> C:
         F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (A < TMP) << CF_SHIFT;
     '''
 
-def cp_xy_d(xy: str) -> C:
-    return f'''
-        u16_t result;
-        u8_t  tmp;
-        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
-        tmp    = memory_read(WZ);                 T(5);
-        result = A - tmp;
-        F      = SZ53(result & 0xFF) | HF_SUB(A, tmp, result) | VF_SUB(A, tmp, result) | NF_MASK | (A < tmp) << CF_SHIFT;
-    '''
-
 def cpx(op: str) -> C:
     return f'''
       u16_t result;
@@ -285,16 +241,6 @@ def dec_r(r: str) -> C:
 
 def dec_ss(ss: str) -> C:
     return f'{ss}--; T(2);'
-
-def dec_xy_d(xy: str) -> C:
-    return f'''
-        u8_t m;
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        m = memory_read(WZ) - 1;              T(5);
-        memory_write(WZ, m);                  T(4);
-        F = SZ53(m) | HF_SUB(m + 1, 1, m) | (m == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
-        T(3);
-    '''
 
 def djnz() -> C:
     return f'''
@@ -508,24 +454,6 @@ def ld_r_n(r: str) -> C:
 def ld_r_r(r1: str, r2: str) -> C:
     return f'{r1} = {r2};'
 
-def ld_r_xy_d(r: str, xy: str) -> C:
-    return f'''
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3 + 5);
-        {r} = memory_read(WZ); T(3);
-    '''
-
-def ld_xy_d_n(xy: str) -> C:
-    return f'''
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        memory_write(WZ, memory_read(PC++));  T(5 + 3);
-    '''
-
-def ld_xy_d_r(xy: str, r: str) -> C:
-    return f'''
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3 + 5);
-        memory_write(WZ, {r}); T(3);
-    '''
-
 def ldx(op: str) -> C:
     return f'''
         Z = memory_read(HL{op}{op}); T(3);
@@ -563,13 +491,6 @@ def logical_pss(op: str, xy: Optional[str] = None) -> C:
         WZ    = {wz(xy)};
         A {op}= memory_read(WZ); T(4);
         F     = SZ53P(A);        T(3);
-    '''
-
-def logical_xy_d(op: str, xy: str) -> C:
-    return f'''
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        A {op}= memory_read(WZ);              T(5);
-        F = SZ53P(A);                         T(3);
     '''
 
 def neg() -> C:
@@ -673,14 +594,6 @@ def res_b_pss(b: int, xy: Optional[str] = None) -> C:
 def res_b_r(b: int, r: str) -> C:
     return f'{r} &= ~(1 << {b});'
 
-def res_b_xy_d(b: int, xy: str) -> C:
-    return f'''
-        T(1);
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        PC++;
-        memory_write(WZ, memory_read(WZ) & ~(1 << {b})); T(4 + 3);
-    '''
-
 def ret(cond: Optional[str] = None) -> C:
     s = 'T(1);\n'
     if cond:
@@ -727,23 +640,6 @@ def rl_r(r: str) -> C:
         const u8_t carry = {r} >> 7;
         {r} = {r} << 1 | (F & CF_MASK) >> CF_SHIFT;
         F = SZ53P({r}) | carry << CF_SHIFT;
-    '''
-
-def rl_xy_d(xy: str) -> C:
-    return f'''
-        u8_t carry;
-        u8_t tmp;
-        WZ = {xy} + (s8_t) memory_read(PC++);
-        PC++;
-        T(3);
-        tmp   = memory_read(WZ);
-        T(5);
-        carry = tmp >> 7;
-        tmp   = tmp << 1 | (F & CF_MASK) >> CF_SHIFT;
-        F     = SZ53P(tmp) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, tmp);
-        T(3);
     '''
 
 def rla() -> C:
@@ -830,23 +726,6 @@ def rr_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
-def rr_xy_d(xy: str) -> C:
-    return f'''
-        u8_t carry;
-        u8_t tmp;
-        WZ = {xy} + (s8_t) memory_read(PC++);
-        PC++;
-        T(3);
-        tmp = memory_read(WZ);
-        T(5);
-        carry = tmp & 0x01;
-        tmp   = tmp >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
-        F     = SZ53P(tmp) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, tmp);
-        T(3);
-    '''
-
 def rra() -> C:
     return '''
         const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
@@ -874,23 +753,6 @@ def rrc_r(r: str) -> C:
         const u8_t carry = {r} & 0x01;
         {r} = {r} >> 1 | carry << 7;
         F = SZ53P({r}) | carry << CF_SHIFT;
-    '''
-
-def rrc_xy_d(xy: str) -> C:
-    return f'''
-        u8_t carry;
-        u8_t tmp;
-        WZ    = {xy} + (s8_t) memory_read(PC++);
-        PC++;
-        T(3);
-        tmp   = memory_read(WZ);
-        T(5);
-        carry = tmp & 0x01;
-        tmp   = tmp >> 1 | carry << 7;
-        F     = SZ53P(tmp) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, tmp);
-        T(3);
     '''
 
 def rrca() -> C:
@@ -953,19 +815,6 @@ def sbc_A_r(r: str) -> C:
         F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
-def sbc_A_xy_d(xy: str) -> C:
-    return f'''
-        const u8_t  carry = (F & CF_MASK) >> CF_SHIFT;
-        const u8_t  a     = A;
-        s16_t       result;
-        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
-        Z      = memory_read(WZ) + carry; T(5);
-        result = A - Z;
-        A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
-        T(3);
-    '''
-
 def sbc_HL_ss(ss: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
@@ -989,14 +838,6 @@ def set_b_pss(b: int, xy: Optional[str] = None) -> C:
 def set_b_r(b: int, r: str) -> C:
     return f'{r} |= 1 << {b};'
 
-def set_b_xy_d(b: int, xy: str) -> C:
-    return f'''
-        T(1);
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        PC++;
-        memory_write(WZ, memory_read(WZ) | 1 << {b}); T(4 + 3);
-    '''
-
 def sla_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
@@ -1015,23 +856,6 @@ def sla_r(r: str) -> C:
         const u8_t carry = {r} >> 7;
         {r} <<= 1;
         F = SZ53P({r}) | carry << CF_SHIFT;
-    '''
-
-def sla_xy_d(xy: str) -> C:
-    return f'''
-        u8_t carry;
-        u8_t tmp;
-        WZ    = {xy} + (s8_t) memory_read(PC++);
-        PC++;
-        T(3);
-        tmp   = memory_read(WZ);
-        T(5);
-        carry = tmp >> 7;
-        tmp <<= 1;
-        F     = SZ53P(tmp) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, tmp);
-        T(3);
     '''
 
 def sra_pss(xy: Optional[str] = None) -> C:
@@ -1054,23 +878,6 @@ def sra_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
-def sra_xy_d(xy: str) -> C:
-    return f'''
-        u8_t carry;
-        u8_t tmp;
-        WZ    = {xy} + (s8_t) memory_read(PC++);
-        PC++;
-        T(3);
-        tmp   = memory_read(WZ);
-        T(5);
-        carry = tmp & 0x01;
-        tmp   = (tmp & 0x80) | tmp >> 1;
-        F     = SZ53P(tmp) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, tmp);
-        T(3);
-    '''
-
 def srl_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
@@ -1089,23 +896,6 @@ def srl_r(r: str) -> C:
         const u8_t carry = {r} & 0x01;
         {r} >>= 1;
         F = SZ53P({r}) | carry << CF_SHIFT;
-    '''
-
-def srl_xy_d(xy: str) -> C:
-    return f'''
-        u8_t carry;
-        u8_t tmp;
-        WZ    = {xy} + (s8_t) memory_read(PC++);
-        PC++;
-        T(3);
-        tmp   = memory_read(WZ);
-        T(5);
-        carry = tmp & 0x01;
-        tmp >>= 1;
-        F     = SZ53P(tmp) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, tmp);
-        T(3);
     '''
 
 def sub_n() -> C:
@@ -1130,22 +920,10 @@ def sub_pss(xy: Optional[str] = None) -> C:
         const u8_t a = A;
         s16_t      result;
         WZ     = {wz(xy)};
-        TMP    = memory_read(HL); T(3);
+        TMP    = memory_read(WZ); T(3);
         result = A - TMP;
         A      = result & 0xFF;
         F      = SZ53(A) | HF_SUB(a, TMP, A) | VF_SUB(a, TMP, A) | NF_MASK | (result < 0) << CF_SHIFT;
-    '''
-
-def sub_xy_d(xy: str) -> C:
-    return f'''
-        const u8_t a = A;
-        s16_t      result;
-        WZ     = {xy} + (s8_t) memory_read(PC++); T(3);
-        Z      = memory_read(WZ);                 T(5);
-        result = A - Z;
-        A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
-        T(3);
     '''
 
 def swapnib() -> C:
@@ -1268,38 +1046,6 @@ def ed_table() -> Table:
         0xBA: ('INDR', partial(inxr, '-')),
         0xBB: ('OTDR', partial(otxr, '-')),
     }
-
-
-def xy_cb_table(xy: str) -> Table:
-    table = {}
-
-    def _bit_twiddling(mnemonic: str, top_opcode: int, act: Callable[[int, str], C]) -> None:
-        for opcode, b in zip(count(top_opcode, 8), range(8)):
-            table[opcode] = (f'{mnemonic} {b},({xy}+d)', partial(act, b, xy))
-
-    def _rotates(top_opcode: int) -> None:
-        actions = [
-            ('RLC', rlc_xy_d),
-            ('RRC', rrc_xy_d),
-            ('RL',  rl_xy_d),
-            ('RR',  rr_xy_d),
-            ('SLA', sla_xy_d),
-            ('SRA', sra_xy_d),
-            ('SRL', srl_xy_d),
-        ]
-
-        deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38]
-        for delta, (mnemonic, act) in zip(deltas, actions):
-            table[top_opcode + delta] = (f'{mnemonic} ({xy}+d)', partial(act, xy))
-
-    # This is on the 4th byte, not the 3rd! PC remains at 3rd.
-    _bit_twiddling('BIT', 0x46, bit_b_xy_d)
-    _bit_twiddling('RES', 0x86, res_b_xy_d)
-    _bit_twiddling('SET', 0xC6, set_b_xy_d)
-
-    _rotates(0x06)
-
-    return table
 
 
 def table(xy: Optional[str] = None) -> Table:
@@ -1541,7 +1287,7 @@ def table(xy: Optional[str] = None) -> Table:
         0xC8: (f'RET Z',      partial(ret,  'F & ZF_MASK')),
         0xC9: (f'RET',        ret),
         0xCA: (f'JP Z,nn',    partial(jp,   'F & ZF_MASK')),
-        0xCB: None,
+        0xCB: cb_table(xy),
         0xCC: (f'CALL Z,nn',  partial(call, 'F & ZF_MASK')),
         0xCD: (f'CALL nn',    call),
         0xCE: (f'ADC A,n',    adc_A_n),
@@ -1602,11 +1348,8 @@ def table(xy: Optional[str] = None) -> Table:
         0xFF: (f'RST $38',     partial(rst, 0x38)),
     }
 
-    if xy:
-        t[0xCB] = xy_cb_table(xy)
-    else:
+    if not xy:
         t.update({
-            0xCB: cb_table(),
             0xED: ed_table(),
             0xDD: table('IX'),
             0xFD: table('IY'),
