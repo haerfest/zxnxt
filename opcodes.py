@@ -662,23 +662,6 @@ def rlc_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
-def rlc_xy_d(xy: str) -> C:
-    return f'''
-        u8_t carry;
-        u8_t tmp;
-        WZ    = {xy} + (s8_t) memory_read(PC++);
-        PC++;
-        T(3);
-        tmp   = memory_read(WZ);
-        T(5);
-        carry = tmp >> 7;
-        tmp   = tmp << 1 | carry;
-        F     = SZ53P(tmp) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, tmp);
-        T(3);
-    '''
-
 def rlca() -> C:
     return '''
         const u8_t carry = A >> 7;
