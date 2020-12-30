@@ -24,11 +24,11 @@ def hi(dd: str) -> str:
 def lo(dd: str) -> str:
     return f'{dd}L' if dd in ['IX', 'IY'] else dd[1]
 
-def wz(xy: Optional[str] = None) -> C:
+def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL') -> C:
     if xy:
         return f'{xy} + (s8_t) memory_read(PC++); T(3 + 5)'
     else:
-        return 'HL'
+        return rr
 
 
 def adc_A_n() -> C:
@@ -405,13 +405,16 @@ def ld_I_A() -> C:
         I = A;
     '''
 
-def ld_pdd_r(dd: str, r: str) -> C:
-    return f'memory_write({dd}, {r}); T(3);'
+def ld_pdd_r(dd: str, r: str, xy: Optional[str] = None) -> C:
+    return f'''
+        WZ = {wz(xy, dd)};
+        memory_write(WZ, {r}); T(3);
+    '''
 
 def ld_pss_n(xy: Optional[str] = None) -> C:
     return f'''
-        TMP = memory_read(PC++); T(3);
         WZ  = {wz(xy)};
+        TMP = memory_read(PC++); T(3);
         memory_write(WZ, TMP);   T(3);
     '''
 
@@ -436,8 +439,11 @@ def ld_R_A() -> C:
         R = A;
     '''
     
-def ld_r_pdd(r: str, dd: str) -> C:
-    return f'{r} = memory_read({dd}); T(3);'
+def ld_r_pdd(r: str, dd: str, xy: Optional[str] = None) -> C:
+    return f'''
+        WZ = {wz(xy, dd)};
+        {r} = memory_read(WZ); T(3);
+    '''
 
 def ld_r_n(r: str) -> C:
     return f'{r} = memory_read(PC++); T(3);'
@@ -620,7 +626,7 @@ def rl_pss(xy: Optional[str] = None) -> C:
         TMP   = memory_read(WZ);
         carry = TMP >> 7;
         TMP   = TMP << 1 | (F & CF_MASK) >> CF_SHIFT;
-        F = SZ53P(TMP) | carry << CF_SHIFT;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
         memory_write(WZ, TMP);
         T(3);
@@ -687,7 +693,7 @@ def rr_pss(xy: Optional[str] = None) -> C:
         TMP   = memory_read(WZ);
         carry = TMP & 0x01;
         TMP   = TMP >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
-        F = SZ53P(TMP) | carry << CF_SHIFT;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
         memory_write(WZ, TMP);
         T(3);
@@ -1106,76 +1112,76 @@ def table(xy: Optional[str] = None) -> Table:
         0x3F: (f'CCF',          ccf),
 
         # 4x: complete.
-        0x40: (f'LD B,B',    partial(ld_r_r,   'B', 'B')),
-        0x41: (f'LD B,C',    partial(ld_r_r,   'B', 'C')),
-        0x42: (f'LD B,D',    partial(ld_r_r,   'B', 'D')),
-        0x43: (f'LD B,E',    partial(ld_r_r,   'B', 'E')),
-        0x44: (f'LD B,{h}',  partial(ld_r_r,   'B', h)),
-        0x45: (f'LD B,{l}',  partial(ld_r_r,   'B', l)),
-        0x46: (f'LD B,(HL)', partial(ld_r_pdd, 'B', 'HL')),
-        0x47: (f'LD B,A',    partial(ld_r_r,   'B', 'A')),
-        0x48: (f'LD C,B',    partial(ld_r_r,   'C', 'B')),
-        0x49: (f'LD C,C',    partial(ld_r_r,   'C', 'C')),
-        0x4A: (f'LD C,D',    partial(ld_r_r,   'C', 'D')),
-        0x4B: (f'LD C,E',    partial(ld_r_r,   'C', 'E')),
-        0x4C: (f'LD C,{h}',  partial(ld_r_r,   'C', h)),
-        0x4D: (f'LD C,{l}',  partial(ld_r_r,   'C', l)),
-        0x4E: (f'LD C,(HL)', partial(ld_r_pdd, 'C', 'HL')),
-        0x4F: (f'LD C,A',    partial(ld_r_r,   'C', 'A')),
+        0x40: (f'LD B,B',      partial(ld_r_r,   'B', 'B')),
+        0x41: (f'LD B,C',      partial(ld_r_r,   'B', 'C')),
+        0x42: (f'LD B,D',      partial(ld_r_r,   'B', 'D')),
+        0x43: (f'LD B,E',      partial(ld_r_r,   'B', 'E')),
+        0x44: (f'LD B,{h}',    partial(ld_r_r,   'B', h)),
+        0x45: (f'LD B,{l}',    partial(ld_r_r,   'B', l)),
+        0x46: (f'LD B,({hld})', partial(ld_r_pdd, 'B', 'HL', xy)),
+        0x47: (f'LD B,A',       partial(ld_r_r,   'B', 'A')),
+        0x48: (f'LD C,B',       partial(ld_r_r,   'C', 'B')),
+        0x49: (f'LD C,C',       partial(ld_r_r,   'C', 'C')),
+        0x4A: (f'LD C,D',       partial(ld_r_r,   'C', 'D')),
+        0x4B: (f'LD C,E',       partial(ld_r_r,   'C', 'E')),
+        0x4C: (f'LD C,{h}',     partial(ld_r_r,   'C', h)),
+        0x4D: (f'LD C,{l}',     partial(ld_r_r,   'C', l)),
+        0x4E: (f'LD C,({hld})', partial(ld_r_pdd, 'C', 'HL', xy)),
+        0x4F: (f'LD C,A',       partial(ld_r_r,   'C', 'A')),
 
         # 5x: complete.
-        0x50: (f'LD D,B',    partial(ld_r_r,   'D', 'B')),
-        0x51: (f'LD D,C',    partial(ld_r_r,   'D', 'C')),
-        0x52: (f'LD D,D',    partial(ld_r_r,   'D', 'D')),
-        0x53: (f'LD D,E',    partial(ld_r_r,   'D', 'E')),
-        0x54: (f'LD D,{h}',  partial(ld_r_r,   'D', h)),
-        0x55: (f'LD D,{l}',  partial(ld_r_r,   'D', l)),
-        0x56: (f'LD D,(HL)', partial(ld_r_pdd, 'D', 'HL')),
-        0x57: (f'LD D,A',    partial(ld_r_r,   'D', 'A')),
-        0x58: (f'LD E,B',    partial(ld_r_r,   'E', 'B')),
-        0x59: (f'LD E,C',    partial(ld_r_r,   'E', 'C')),
-        0x5A: (f'LD E,D',    partial(ld_r_r,   'E', 'D')),
-        0x5B: (f'LD E,E',    partial(ld_r_r,   'E', 'E')),
-        0x5C: (f'LD E,{h}',  partial(ld_r_r,   'E', h)),
-        0x5D: (f'LD E,{l}',  partial(ld_r_r,   'E', l)),
-        0x5E: (f'LD E,(HL)', partial(ld_r_pdd, 'E', 'HL')),
-        0x5F: (f'LD E,A',    partial(ld_r_r,   'E', 'A')),
+        0x50: (f'LD D,B',       partial(ld_r_r,   'D', 'B')),
+        0x51: (f'LD D,C',       partial(ld_r_r,   'D', 'C')),
+        0x52: (f'LD D,D',       partial(ld_r_r,   'D', 'D')),
+        0x53: (f'LD D,E',       partial(ld_r_r,   'D', 'E')),
+        0x54: (f'LD D,{h}',     partial(ld_r_r,   'D', h)),
+        0x55: (f'LD D,{l}',     partial(ld_r_r,   'D', l)),
+        0x56: (f'LD D,({hld})', partial(ld_r_pdd, 'D', 'HL', xy)),
+        0x57: (f'LD D,A',       partial(ld_r_r,   'D', 'A')),
+        0x58: (f'LD E,B',       partial(ld_r_r,   'E', 'B')),
+        0x59: (f'LD E,C',       partial(ld_r_r,   'E', 'C')),
+        0x5A: (f'LD E,D',       partial(ld_r_r,   'E', 'D')),
+        0x5B: (f'LD E,E',       partial(ld_r_r,   'E', 'E')),
+        0x5C: (f'LD E,{h}',     partial(ld_r_r,   'E', h)),
+        0x5D: (f'LD E,{l}',     partial(ld_r_r,   'E', l)),
+        0x5E: (f'LD E,({hld})', partial(ld_r_pdd, 'E', 'HL', xy)),
+        0x5F: (f'LD E,A',       partial(ld_r_r,   'E', 'A')),
 
         # 6x: complete.
-        0x60: (f'LD H,B',    partial(ld_r_r,   h, 'B')),
-        0x61: (f'LD H,C',    partial(ld_r_r,   h, 'C')),
-        0x62: (f'LD H,D',    partial(ld_r_r,   h, 'D')),
-        0x63: (f'LD H,E',    partial(ld_r_r,   h, 'E')),
-        0x64: (f'LD H,{h}',  partial(ld_r_r,   h, h)),
-        0x65: (f'LD H,{l}',  partial(ld_r_r,   h, l)),
-        0x66: (f'LD H,(HL)', partial(ld_r_pdd, h, 'HL')),
-        0x67: (f'LD H,A',    partial(ld_r_r,   h, 'A')),
-        0x68: (f'LD L,B',    partial(ld_r_r,   l, 'B')),
-        0x69: (f'LD L,C',    partial(ld_r_r,   l, 'C')),
-        0x6A: (f'LD L,D',    partial(ld_r_r,   l, 'D')),
-        0x6B: (f'LD L,E',    partial(ld_r_r,   l, 'E')),
-        0x6C: (f'LD L,{h}',  partial(ld_r_r,   l, h)),
-        0x6D: (f'LD L,{l}',  partial(ld_r_r,   l, l)),
-        0x6E: (f'LD L,(HL)', partial(ld_r_pdd, l, 'HL')),
-        0x6F: (f'LD L,A',    partial(ld_r_r,   l, 'A')),
+        0x60: (f'LD {h},B',                      partial(ld_r_r,   h, 'B')),
+        0x61: (f'LD {h},C',                      partial(ld_r_r,   h, 'C')),
+        0x62: (f'LD {h},D',                      partial(ld_r_r,   h, 'D')),
+        0x63: (f'LD {h},E',                      partial(ld_r_r,   h, 'E')),
+        0x64: (f'LD {h},{h}',                    partial(ld_r_r,   h, h)),
+        0x65: (f'LD {h},{l}',                    partial(ld_r_r,   h, l)),
+        0x66: (f'LD {"H" if xy else h},({hld})', partial(ld_r_pdd, 'H' if xy else h, 'HL', xy)),
+        0x67: (f'LD {h},A',                      partial(ld_r_r,   h, 'A')),
+        0x68: (f'LD {l},B',                      partial(ld_r_r,   l, 'B')),
+        0x69: (f'LD {l},C',                      partial(ld_r_r,   l, 'C')),
+        0x6A: (f'LD {l},D',                      partial(ld_r_r,   l, 'D')),
+        0x6B: (f'LD {l},E',                      partial(ld_r_r,   l, 'E')),
+        0x6C: (f'LD {l},{h}',                    partial(ld_r_r,   l, h)),
+        0x6D: (f'LD {l},{l}',                    partial(ld_r_r,   l, l)),
+        0x6E: (f'LD {"L" if xy else l},({hld})', partial(ld_r_pdd, 'L' if xy else l, 'HL', xy)),
+        0x6F: (f'LD {l},A',                      partial(ld_r_r,   l, 'A')),
 
         # 7x: complete.
-        0x70: (f'LD (HL),B',   partial(ld_pdd_r, 'HL', 'B')),
-        0x71: (f'LD (HL),C',   partial(ld_pdd_r, 'HL', 'C')),
-        0x72: (f'LD (HL),D',   partial(ld_pdd_r, 'HL', 'D')),
-        0x73: (f'LD (HL),E',   partial(ld_pdd_r, 'HL', 'E')),
-        0x74: (f'LD (HL),{h}', partial(ld_pdd_r, 'HL', h)),
-        0x75: (f'LD (HL),{l}', partial(ld_pdd_r, 'HL', l)),
-        0x76: (f'HALT',        halt),
-        0x77: (f'LD (HL),A',   partial(ld_pdd_r, 'HL', 'A')),
-        0x78: (f'LD A,B',      partial(ld_r_r,   'A',  'B')),
-        0x79: (f'LD A,C',      partial(ld_r_r,   'A',  'C')),
-        0x7A: (f'LD A,D',      partial(ld_r_r,   'A',  'D')),
-        0x7B: (f'LD A,E',      partial(ld_r_r,   'A',  'E')),
-        0x7C: (f'LD A,{h}',    partial(ld_r_r,   'A',  h)),
-        0x7D: (f'LD A,{l}',    partial(ld_r_r,   'A',  l)),
-        0x7E: (f'LD A,(HL)',   partial(ld_r_pdd, 'A',  'HL')),
-        0x7F: (f'LD A,A',      partial(ld_r_r,   'A',  'A')),
+        0x70: (f'LD ({hld}),B',                  partial(ld_pdd_r, 'HL', 'B', xy)),
+        0x71: (f'LD ({hld}),C',                  partial(ld_pdd_r, 'HL', 'C', xy)),
+        0x72: (f'LD ({hld}),D',                  partial(ld_pdd_r, 'HL', 'D', xy)),
+        0x73: (f'LD ({hld}),E',                  partial(ld_pdd_r, 'HL', 'E', xy)),
+        0x74: (f'LD ({hld}),{"H" if xy else h}', partial(ld_pdd_r, 'HL', 'H' if xy else h, xy)),
+        0x75: (f'LD ({hld}),{"L" if xy else l}', partial(ld_pdd_r, 'HL', 'L' if xy else l, xy)),
+        0x76: (f'HALT',                          halt),
+        0x77: (f'LD ({hld}),A',                  partial(ld_pdd_r, 'HL', 'A', xy)),
+        0x78: (f'LD A,B',                        partial(ld_r_r,   'A',  'B')),
+        0x79: (f'LD A,C',                        partial(ld_r_r,   'A',  'C')),
+        0x7A: (f'LD A,D',                        partial(ld_r_r,   'A',  'D')),
+        0x7B: (f'LD A,E',                        partial(ld_r_r,   'A',  'E')),
+        0x7C: (f'LD A,{h}',                      partial(ld_r_r,   'A',  h)),
+        0x7D: (f'LD A,{l}',                      partial(ld_r_r,   'A',  l)),
+        0x7E: (f'LD A,({hld})',                  partial(ld_r_pdd, 'A',  'HL', xy)),
+        0x7F: (f'LD A,A',                        partial(ld_r_r,   'A',  'A')),
 
         # 8x: complete.
         0x80: (f'ADD A,B',       partial(add_A_r, 'B')),
@@ -1385,7 +1391,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
 
     # Show on the registers before and after each instruction execution,
     # as well as a disassembly of each executed instruction.
-    debug = True
+    debug = False
 
     if debug:
         if not prefix:
