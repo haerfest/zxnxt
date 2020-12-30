@@ -28,7 +28,7 @@ def adc_a_n() -> C:
         const u8_t  n      = memory_read(PC++); T(3);
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
         const u16_t result = A + n + carry;
-        F = SZ53(A) | HF_ADD(A, n + carry, result) | VF_ADD(A, n + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
+        F = SZ53(result & 0xFF) | HF_ADD(A, n + carry, result) | VF_ADD(A, n + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
         A = result & 0xFF;
     '''
 
@@ -36,7 +36,7 @@ def adc_a_r(r: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
         const u16_t result = A + {r} + carry;
-        F = SZ53(A) | HF_ADD(A, {r} + carry, result) | VF_ADD(A, {r} + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
+        F = SZ53(result & 0xFF) | HF_ADD(A, {r} + carry, result) | VF_ADD(A, {r} + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
         A = result & 0xFF;
     '''
 
