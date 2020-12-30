@@ -86,6 +86,9 @@
 #define R    self.r
 #define IM   self.im
 
+#define TMP  self.tmp
+
+
 /* Not a register, but a shortcut for "clock tick". */
 #define T    clock_ticks
 
@@ -168,6 +171,9 @@ typedef struct {
 
   /* Interrupt mode. */
   u8_t im;
+
+  /* Eight-bit register to hold temporary values. */
+  u8_t tmp;
 
   /* Look-up tables to set multiple flags at once and prevent needing to
    * calculate things every time. */

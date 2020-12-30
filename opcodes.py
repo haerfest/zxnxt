@@ -17,11 +17,19 @@ Instruction = Tuple[Mnemonic, Union[C, CGenerator]]
 Table       = Dict[Opcode, Union[Instruction, 'Table']]
 
 
+# Helper routines.
 def hi(dd: str) -> str:
     return f'{dd}H' if dd in ['IX', 'IY'] else dd[0]
 
 def lo(dd: str) -> str:
     return f'{dd}L' if dd in ['IX', 'IY'] else dd[1]
+
+def wz(xy: Optional[str] = None) -> C:
+    if xy:
+        return f'{xy} + (s8_t) memory_read(PC++); T(3 + 5)'
+    else:
+        return 'HL'
+
 
 def adc_A_n() -> C:
     return '''
@@ -40,13 +48,14 @@ def adc_A_r(r: str) -> C:
         A = result & 0xFF;
     '''
 
-def adc_A_pHL() -> C:
-    return '''
+def adc_A_pss(xy: Optional[str] = None) -> C:
+    return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
-        const u8_t  tmp    = memory_read(HL);
-        const u16_t result = A + tmp + carry;
-        F = SZ53(result & 0xFF) | HF_ADD(A, tmp + carry, result) | VF_ADD(A, tmp + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
-        A = result & 0xFF;
+        const u16_t result = A + TMP + carry;
+        WZ  = {wz(xy)};
+        TMP = memory_read(WZ); T(3);
+        F   = SZ53(result & 0xFF) | HF_ADD(A, TMP + carry, result) | VF_ADD(A, TMP + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
+        A   = result & 0xFF;
         T(3);
     '''
 
@@ -90,11 +99,13 @@ def add_A_r(r: str) -> C:
         A += {r} & 0xFF;
     '''
 
-def add_A_pHL() -> C:
-    return '''
-        const u8_t  tmp    = memory_read(HL);
-        const u16_t result = A + tmp;
-        F      = SZ53(result & 0xFF) | HF_ADD(A, tmp, result) | VF_ADD(A, tmp, result) | (result & 0x100) >> 8 << CF_SHIFT;
+def add_A_pss(xy: Optional[str] = None) -> C:
+    return f'''
+        u16_t result;
+        WZ     = {wz(xy)};
+        TMP    = memory_read(WZ);
+        result = A + TMP;
+        F      = SZ53(result & 0xFF) | HF_ADD(A, TMP, result) | VF_ADD(A, TMP, result) | (result & 0x100) >> 8 << CF_SHIFT;
         A      = result & 0xFF;
         T(3);
     '''
@@ -146,10 +157,11 @@ def bit_b_r(b: int, r: str) -> C:
         T(4);
     '''
 
-def bit_b_pHL(b: int) -> C:
+def bit_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
+        WZ = {wz(xy)};
         F &= ~(ZF_MASK | NF_MASK);
-        F |= (memory_read(HL) & 1 << {b} ? 0 : ZF_MASK) | HF_MASK; T(4);
+        F |= (memory_read(WZ) & 1 << {b} ? 0 : ZF_MASK) | HF_MASK; T(4);
         T(4);
     '''
 
@@ -205,11 +217,13 @@ def cp_r(r: str) -> C:
         F                  = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
     '''
 
-def cp_pHL() -> C:
-    return '''
-        const u8_t  n      = memory_read(HL); T(3);
-        const u16_t result = A - n;
-        F                  = SZ53(result & 0xFF) | HF_SUB(A, n, result) | VF_SUB(A, n, result) | NF_MASK | (A < n) << CF_SHIFT;
+def cp_pss(xy: Optional[str] = None) -> C:
+    return f'''
+        u16_t result;
+        WZ     = {wz(xy)};
+        TMP    = memory_read(WZ); T(3);
+        result = A - TMP;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (A < TMP) << CF_SHIFT;
     '''
 
 def cp_xy_d(xy: str) -> C:
@@ -255,11 +269,12 @@ def daa() -> C:
     # TODO: implement DAA.
     return None
 
-def dec_pHL() -> C:
-    return '''
-      Z = memory_read(HL) - 1; T(4);
-      memory_write(HL, Z);     T(3);
-      F = SZ53(Z) | HF_SUB(Z + 1, 1, Z) | (Z == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
+def dec_pdd(xy: Optional[str] = None) -> C:
+    return f'''
+        WZ  = {wz(xy)};
+        TMP = memory_read(WZ) - 1; T(4);
+        memory_write(WZ, TMP);     T(3);
+        F = SZ53(TMP) | HF_SUB(TMP + 1, 1, TMP) | (TMP == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
     '''
 
 def dec_r(r: str) -> C:
@@ -337,27 +352,18 @@ def in_r_C(r: str) -> C:
         F = SZ53P({r});
     '''
 
-def inc_pHL() -> C:
-    return '''
-      Z = memory_read(HL) + 1; T(4);
-      memory_write(HL, Z);     T(3);
-      F = SZ53(Z) | HF_ADD(Z - 1, 1, Z) | (Z == 0x80) << VF_SHIFT | (F & CF_MASK);
+def inc_pdd(xy: Optional[str] = None) -> C:
+    return f'''
+        WZ  = {wz(xy)};
+        TMP = memory_read(WZ) + 1; T(4);
+        memory_write(WZ, TMP);     T(3);
+        F = SZ53(TMP) | HF_ADD(TMP - 1, 1, TMP) | (TMP == 0x80) << VF_SHIFT | (F & CF_MASK);
     '''
 
 def inc_r(r: str) -> C:
     return f'''
        {r}++;
        F = SZ53({r}) | HF_ADD({r} - 1, 1, {r}) | ({r} == 0x80) << VF_SHIFT | (F & CF_MASK);
-    '''
-
-def inc_xy_d(xy: str) -> C:
-    return f'''
-        u8_t m;
-        WZ = {xy} + (s8_t) memory_read(PC++); T(3);
-        m = memory_read(WZ) + 1;              T(5);
-        memory_write(WZ, m);                  T(4);
-        F = SZ53(m) | HF_ADD(m - 1, 1, m) | (m == 0x80) << VF_SHIFT | (F & CF_MASK);
-        T(3);
     '''
 
 def inc_ss(ss: str) -> C:
@@ -465,10 +471,11 @@ def ld_I_A() -> C:
 def ld_pdd_r(dd: str, r: str) -> C:
     return f'memory_write({dd}, {r}); T(3);'
 
-def ld_pHL_n() -> C:
-    return '''
-        Z = memory_read(PC++); T(3);
-        memory_write(HL, Z);   T(3);
+def ld_pss_n(xy: Optional[str] = None) -> C:
+    return f'''
+        TMP = memory_read(PC++); T(3);
+        WZ  = {wz(xy)};
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def ld_pnn_a() -> C:
@@ -551,10 +558,11 @@ def logical_r(op: str, r: str) -> C:
        F = SZ53P(A);
     '''
 
-def logical_pHL(op: str) -> C:
+def logical_pss(op: str, xy: Optional[str] = None) -> C:
     return f'''
-        A {op}= memory_read(HL); T(4);
-        F = SZ53P(A);            T(3);
+        WZ    = {wz(xy)};
+        A {op}= memory_read(WZ); T(4);
+        F     = SZ53P(A);        T(3);
     '''
 
 def logical_xy_d(op: str, xy: str) -> C:
@@ -656,9 +664,10 @@ def pxdn() -> C:
         }
     '''
 
-def res_b_pHL(b: int) -> C:
+def res_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
-        memory_write(HL, memory_read(HL) & ~(1 << {b})); T(4 + 3);
+        WZ = {wz(xy)};
+        memory_write(WZ, memory_read(WZ) & ~(1 << {b})); T(4 + 3);
     '''
 
 def res_b_r(b: int, r: str) -> C:
@@ -700,15 +709,16 @@ def retn() -> C:
         IFF1 = IFF2;
     '''
 
-def rl_pHL() -> C:
-    return '''
+def rl_pss(xy: Optional[str] = None) -> C:
+    return f'''
         u8_t carry;
-        Z = memory_read(HL);
-        carry = Z >> 7;
-        Z = Z << 1 | (F & CF_MASK) >> CF_SHIFT;
-        F = SZ53P(Z) | carry << CF_SHIFT;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP >> 7;
+        TMP   = TMP << 1 | (F & CF_MASK) >> CF_SHIFT;
+        F = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
-        memory_write(HL, Z);
+        memory_write(WZ, TMP);
         T(3);
     '''
 
@@ -745,15 +755,16 @@ def rla() -> C:
         A |= carry;
     '''
 
-def rlc_pHL() -> C:
-    return '''
+def rlc_pss(xy: Optional[str] = None) -> C:
+    return f'''
         u8_t carry;
-        Z = memory_read(HL);
-        carry = Z >> 7;
-        Z = Z << 1 | carry;
-        F = SZ53P(Z) | carry << CF_SHIFT;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP >> 7;
+        TMP   = TMP << 1 | carry;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
-        memory_write(HL, Z);
+        memory_write(WZ, TMP);
         T(3);
     '''
 
@@ -799,15 +810,16 @@ def rld() -> C:
         T(3);
     '''
 
-def rr_pHL() -> C:
-    return '''
+def rr_pss(xy: Optional[str] = None) -> C:
+    return f'''
         u8_t carry;
-        Z = memory_read(HL);
-        carry = Z & 0x01;
-        Z = Z >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
-        F = SZ53P(Z) | carry << CF_SHIFT;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP & 0x01;
+        TMP   = TMP >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
+        F = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
-        memory_write(HL, Z);
+        memory_write(WZ, TMP);
         T(3);
     '''
 
@@ -844,15 +856,16 @@ def rra() -> C:
         A |= carry << 7;
     '''
 
-def rrc_pHL() -> C:
-    return '''
+def rrc_pss(xy: Optional[str] = None) -> C:
+    return f'''
         u8_t carry;
-        Z = memory_read(HL);
-        carry = Z & 0x01;
-        Z = Z >> 1 | carry << 7;
-        F = SZ53P(Z) | carry << CF_SHIFT;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP & 0x01;
+        TMP   = TMP >> 1 | carry << 7;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
-        memory_write(HL, Z);
+        memory_write(WZ, TMP);
         T(3);
     '''
 
@@ -917,15 +930,16 @@ def sbc_A_n() -> C:
         F  = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
-def sbc_A_pHL() -> C:
-    return '''
+def sbc_A_pss(xy: Optional[str] = None) -> C:
+    return f'''
         const u8_t  carry = (F & CF_MASK) >> CF_SHIFT;
         const u8_t  a     = A;
         s16_t       result;
-        Z      = memory_read(HL) + carry; T(3);
-        result = A - Z;
+        WZ     = {wz(xy)};
+        TMP    = memory_read(WZ) + carry; T(3);
+        result = A - TMP;
         A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
+        F      = SZ53(A) | HF_SUB(a, TMP, A) | VF_SUB(a, TMP, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sbc_A_r(r: str) -> C:
@@ -966,9 +980,10 @@ def scf() -> C:
         F |= CF_MASK;
     '''
 
-def set_b_pHL(b: int) -> C:
+def set_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
-      memory_write(HL, memory_read(HL) | 1 << {b}); T(4 + 3);
+      WZ = {wz(xy)};
+      memory_write(WZ, memory_read(WZ) | 1 << {b}); T(4 + 3);
     '''
 
 def set_b_r(b: int, r: str) -> C:
@@ -982,15 +997,16 @@ def set_b_xy_d(b: int, xy: str) -> C:
         memory_write(WZ, memory_read(WZ) | 1 << {b}); T(4 + 3);
     '''
 
-def sla_pHL() -> C:
-    return '''
+def sla_pss(xy: Optional[str] = None) -> C:
+    return f'''
         u8_t carry;
-        Z = memory_read(HL);
-        carry = Z >> 7;
-        Z <<= 1;
-        F = SZ53P(Z) | carry << CF_SHIFT;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP >> 7;
+        TMP <<= 1;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
-        memory_write(HL, Z);
+        memory_write(WZ, TMP);
         T(3);
     '''
 
@@ -1018,15 +1034,16 @@ def sla_xy_d(xy: str) -> C:
         T(3);
     '''
 
-def sra_pHL() -> C:
-    return '''
+def sra_pss(xy: Optional[str] = None) -> C:
+    return f'''
         u8_t carry;
-        Z = memory_read(HL);
-        carry = Z & 0x01;
-        Z = (Z & 0x80) | Z >> 1;
-        F = SZ53P(Z) | carry << CF_SHIFT;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP & 0x01;
+        TMP   = (TMP & 0x80) | TMP >> 1;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
-        memory_write(HL, Z);
+        memory_write(WZ, TMP);
         T(3);
     '''
 
@@ -1054,15 +1071,16 @@ def sra_xy_d(xy: str) -> C:
         T(3);
     '''
 
-def srl_pHL() -> C:
-    return '''
+def srl_pss(xy: Optional[str] = None) -> C:
+    return f'''
         u8_t carry;
-        Z = memory_read(HL);
-        carry = Z & 0x01;
-        Z >>= 1;
-        F = SZ53P(Z) | carry << CF_SHIFT;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP & 0x01;
+        TMP >>= 1;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
-        memory_write(HL, Z);
+        memory_write(WZ, TMP);
         T(3);
     '''
 
@@ -1107,14 +1125,15 @@ def sub_r(r: str) -> C:
         F                  = SZ53(A) | HF_SUB(a, {r}, A) | VF_SUB(a, {r}, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
-def sub_pHL() -> C:
-    return '''
+def sub_pss(xy: Optional[str] = None) -> C:
+    return f'''
         const u8_t a = A;
         s16_t      result;
-        Z      = memory_read(HL); T(3);
-        result = A - Z;
+        WZ     = {wz(xy)};
+        TMP    = memory_read(HL); T(3);
+        result = A - TMP;
         A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
+        F      = SZ53(A) | HF_SUB(a, TMP, A) | VF_SUB(a, TMP, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sub_xy_d(xy: str) -> C:
@@ -1135,49 +1154,48 @@ def swapnib() -> C:
         T(8);
     '''
 
-def cb_table() -> Table:
-    table = {}
+def cb_table(xy: Optional[str] = None) -> Table:
+    hld = f'{xy}+d' if xy else 'HL'
+    t   = {}
 
-    def _bit_twiddling(mnemonic: str, B_opcode: int, act_b_r: Callable[[int, str], C], act_b_pHL: Callable[[int, str], C]) -> None:
+    def _bit_twiddling(mnemonic: str, B_opcode: int, act_b_r: Callable[[int, str], C], act_b_pss: Callable[[int, str], C]) -> None:
         for top_opcode, r in zip(range(B_opcode, B_opcode + 6), 'BCDEHL'):
             for opcode, b in zip(count(top_opcode, 8), range(8)):
-                table[opcode] = (f'{mnemonic} {b},{r}', partial(act_b_r, b, r))
+                t[opcode] = (f'{mnemonic} {b},{r}', partial(act_b_r, b, r))
 
         for opcode, b in zip(count(B_opcode + 6, 8), range(8)):
-            table[opcode] = (f'{mnemonic} {b},(HL)', partial(act_b_pHL, b))
+            t[opcode] = (f'{mnemonic} {b},({hld})', partial(act_b_pss, b, xy))
 
         for opcode, b in zip(count(B_opcode + 7, 8), range(8)):
-            table[opcode] = (f'{mnemonic} {b},A', partial(act_b_r, b, 'A'))
+            t[opcode] = (f'{mnemonic} {b},A', partial(act_b_r, b, 'A'))
 
     def _rotates(B_opcode: int) -> None:
         actions = [
-            ('RLC', rlc_r, rlc_pHL),
-            ('RRC', rrc_r, rrc_pHL),
-            ('RL',  rl_r,  rl_pHL),
-            ('RR',  rr_r,  rr_pHL),
-            ('SLA', sla_r, sla_pHL),
-            ('SRA', sra_r, sra_pHL),
-            ('SRL', srl_r, srl_pHL)
+            ('RLC', rlc_r, rlc_pss),
+            ('RRC', rrc_r, rrc_pss),
+            ('RL',  rl_r,  rl_pss),
+            ('RR',  rr_r,  rr_pss),
+            ('SLA', sla_r, sla_pss),
+            ('SRA', sra_r, sra_pss),
+            ('SRL', srl_r, srl_pss)
         ]
 
         for top_opcode, r in zip(range(B_opcode, B_opcode + 6), 'BCDEHL'):
             deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38]
-            for delta, (mnemonic, act_r, act_pHL) in zip(deltas, actions):
-                table[top_opcode + delta] = (f'{mnemonic} {r}', partial(act_r, r))
+            for delta, (mnemonic, act_r, act_pss) in zip(deltas, actions):
+                t[top_opcode + delta] = (f'{mnemonic} {r}', partial(act_r, r))
 
-        for delta, (mnemonic, act_r, act_pHL) in zip(deltas, actions):
-            table[B_opcode + 6 + delta] = (f'{mnemonic} (HL)', act_pHL)
+        for delta, (mnemonic, act_r, act_pss) in zip(deltas, actions):
+            t[B_opcode + 6 + delta] = (f'{mnemonic} ({hld})', partial(act_pss, xy))
+            t[B_opcode + 7 + delta] = (f'{mnemonic} A',       partial(act_r, 'A'))
 
-        for delta, (mnemonic, act_r, act_pHL) in zip(deltas, actions):
-            table[B_opcode + 7 + delta] = (f'{mnemonic} A', partial(act_r, 'A'))
-
-    _bit_twiddling('BIT', 0x40, bit_b_r, bit_b_pHL)
-    _bit_twiddling('RES', 0x80, res_b_r, res_b_pHL)
-    _bit_twiddling('SET', 0xC0, set_b_r, set_b_pHL)
+    _bit_twiddling('BIT', 0x40, bit_b_r, bit_b_pss)
+    _bit_twiddling('RES', 0x80, res_b_r, res_b_pss)
+    _bit_twiddling('SET', 0xC0, set_b_r, set_b_pss)
 
     _rotates(0x00)
 
-    return table
+    return t
 
 
 # See https://wiki.specnext.dev/Extended_Z80_instruction_set.
@@ -1285,7 +1303,13 @@ def xy_cb_table(xy: str) -> Table:
 
 
 def table(xy: Optional[str] = None) -> Table:
-    hl   = xy if xy else 'hl'
+    if xy:
+        hl   = xy
+        hld  = f'{xy}+d'
+    else:
+        hl   = 'HL'
+        hld  = 'HL'
+
     h, l = hi(hl), lo(hl)
 
     t = {
@@ -1344,22 +1368,22 @@ def table(xy: Optional[str] = None) -> Table:
         0x2F: (f'CPL',           cpl),
 
         # 3x: complete.
-        0x30: (f'JR NC,e',     partial(jr_c_e, '!CF')),
-        0x31: (f'LD SP,nn',    partial(ld_dd_nn, 'SP')),
-        0x32: (f'LD (nn),A',   ld_pnn_a),
-        0x33: (f'INC SP',      inc_ss(f'SP')),
-        0x34: (f'INC (HL)',    inc_pHL),
-        0x35: (f'DEC (HL)',    dec_pHL),
-        0x36: (f'LD (HL),n',   ld_pHL_n),
-        0x37: (f'SCF',         scf),
-        0x38: (f'JR C,e',      partial(jr_c_e, 'CF')),
-        0x39: (f'ADD {hl},SP', partial(add_dd_ss, hl, 'SP')),
-        0x3A: (f'LD A,(nn)',   ld_A_pnn),
-        0x3B: (f'DEC SP',      partial(dec_ss, 'SP')),
-        0x3C: (f'INC A',       partial(inc_r, 'A')),
-        0x3D: (f'DEC A',       partial(dec_r, 'A')),
-        0x3E: (f'LD A,n',      partial(ld_r_n, 'A')),
-        0x3F: (f'CCF',         ccf),
+        0x30: (f'JR NC,e',      partial(jr_c_e, '!CF')),
+        0x31: (f'LD SP,nn',     partial(ld_dd_nn, 'SP')),
+        0x32: (f'LD (nn),A',    ld_pnn_a),
+        0x33: (f'INC SP',       inc_ss(f'SP')),
+        0x34: (f'INC ({hld})',  partial(inc_pdd, xy)),
+        0x35: (f'DEC ({hld})',  partial(dec_pdd, xy)),
+        0x36: (f'LD ({hld}),n', partial(ld_pss_n, xy)),
+        0x37: (f'SCF',          scf),
+        0x38: (f'JR C,e',       partial(jr_c_e, 'CF')),
+        0x39: (f'ADD {hl},SP',  partial(add_dd_ss, hl, 'SP')),
+        0x3A: (f'LD A,(nn)',    ld_A_pnn),
+        0x3B: (f'DEC SP',       partial(dec_ss, 'SP')),
+        0x3C: (f'INC A',        partial(inc_r, 'A')),
+        0x3D: (f'DEC A',        partial(dec_r, 'A')),
+        0x3E: (f'LD A,n',       partial(ld_r_n, 'A')),
+        0x3F: (f'CCF',          ccf),
 
         # 4x: complete.
         0x40: (f'LD B,B',    partial(ld_r_r,   'B', 'B')),
@@ -1434,76 +1458,76 @@ def table(xy: Optional[str] = None) -> Table:
         0x7F: (f'LD A,A',      partial(ld_r_r,   'A',  'A')),
 
         # 8x: complete.
-        0x80: (f'ADD A,B',    partial(add_A_r, 'B')),
-        0x81: (f'ADD A,C',    partial(add_A_r, 'C')),
-        0x82: (f'ADD A,D',    partial(add_A_r, 'D')),
-        0x83: (f'ADD A,E',    partial(add_A_r, 'E')),
-        0x84: (f'ADD A,{h}',  partial(add_A_r, h)),
-        0x85: (f'ADD A,{l}',  partial(add_A_r, l)),
-        0x86: (f'ADD A,(HL)', add_A_pHL),
-        0x87: (f'ADD A,A',    partial(add_A_r, 'A')),
-        0x88: (f'ADC A,B',    partial(adc_A_r, 'B')),
-        0x89: (f'ADC A,C',    partial(adc_A_r, 'C')),
-        0x8A: (f'ADC A,D',    partial(adc_A_r, 'D')),
-        0x8B: (f'ADC A,E',    partial(adc_A_r, 'E')),
-        0x8C: (f'ADC A,{h}',  partial(adc_A_r, h)),
-        0x8D: (f'ADC A,{l}',  partial(adc_A_r, l)),
-        0x8E: (f'ADC A,(HL)', adc_A_pHL),
-        0x8F: (f'ADC A,A',    partial(adc_A_r, 'A')),
+        0x80: (f'ADD A,B',       partial(add_A_r, 'B')),
+        0x81: (f'ADD A,C',       partial(add_A_r, 'C')),
+        0x82: (f'ADD A,D',       partial(add_A_r, 'D')),
+        0x83: (f'ADD A,E',       partial(add_A_r, 'E')),
+        0x84: (f'ADD A,{h}',     partial(add_A_r, h)),
+        0x85: (f'ADD A,{l}',     partial(add_A_r, l)),
+        0x86: (f'ADD A,({hld})', partial(add_A_pss, xy)),
+        0x87: (f'ADD A,A',       partial(add_A_r, 'A')),
+        0x88: (f'ADC A,B',       partial(adc_A_r, 'B')),
+        0x89: (f'ADC A,C',       partial(adc_A_r, 'C')),
+        0x8A: (f'ADC A,D',       partial(adc_A_r, 'D')),
+        0x8B: (f'ADC A,E',       partial(adc_A_r, 'E')),
+        0x8C: (f'ADC A,{h}',     partial(adc_A_r, h)),
+        0x8D: (f'ADC A,{l}',     partial(adc_A_r, l)),
+        0x8E: (f'ADC A,({hld})', partial(adc_A_pss, xy)),
+        0x8F: (f'ADC A,A',       partial(adc_A_r, 'A')),
 
         # 9x: complete.
-        0x90: (f'SUB B',      partial(sub_r,   'B')),
-        0x91: (f'SUB C',      partial(sub_r,   'C')),
-        0x92: (f'SUB D',      partial(sub_r,   'D')),
-        0x93: (f'SUB E',      partial(sub_r,   'E')),
-        0x94: (f'SUB {h}',    partial(sub_r,   h)),
-        0x95: (f'SUB {l}',    partial(sub_r,   l)),
-        0x96: (f'SUB (HL)',   sub_pHL),
-        0x97: (f'SUB A',      partial(sub_r,   'A')),
-        0x98: (f'SBC A,B',    partial(sbc_A_r, 'B')),
-        0x99: (f'SBC A,C',    partial(sbc_A_r, 'C')),
-        0x9A: (f'SBC A,D',    partial(sbc_A_r, 'D')),
-        0x9B: (f'SBC A,E',    partial(sbc_A_r, 'E')),
-        0x9C: (f'SBC A,{h}',  partial(sbc_A_r, h)),
-        0x9D: (f'SBC A,{l}',  partial(sbc_A_r, l)),
-        0x9E: (f'SBC A,(HL)', sbc_A_pHL),
-        0x9F: (f'SBC A,A',    partial(sbc_A_r, 'A')),
+        0x90: (f'SUB B',         partial(sub_r,   'B')),
+        0x91: (f'SUB C',         partial(sub_r,   'C')),
+        0x92: (f'SUB D',         partial(sub_r,   'D')),
+        0x93: (f'SUB E',         partial(sub_r,   'E')),
+        0x94: (f'SUB {h}',       partial(sub_r,   h)),
+        0x95: (f'SUB {l}',       partial(sub_r,   l)),
+        0x96: (f'SUB ({hld})',   partial(sub_pss, xy)),
+        0x97: (f'SUB A',         partial(sub_r,   'A')),
+        0x98: (f'SBC A,B',       partial(sbc_A_r, 'B')),
+        0x99: (f'SBC A,C',       partial(sbc_A_r, 'C')),
+        0x9A: (f'SBC A,D',       partial(sbc_A_r, 'D')),
+        0x9B: (f'SBC A,E',       partial(sbc_A_r, 'E')),
+        0x9C: (f'SBC A,{h}',     partial(sbc_A_r, h)),
+        0x9D: (f'SBC A,{l}',     partial(sbc_A_r, l)),
+        0x9E: (f'SBC A,({hld})', partial(sbc_A_pss, xy)),
+        0x9F: (f'SBC A,A',       partial(sbc_A_r, 'A')),
 
         # Ax: complete.
-        0xA0: (f'AND B',     partial(logical_r,   '&', 'B')),
-        0xA1: (f'AND C',     partial(logical_r,   '&', 'C')),
-        0xA2: (f'AND D',     partial(logical_r,   '&', 'D')),
-        0xA3: (f'AND E',     partial(logical_r,   '&', 'E')),
-        0xA4: (f'AND {h}',   partial(logical_r,   '&', h)),
-        0xA5: (f'AND {l}',   partial(logical_r,   '&', l)),
-        0xA6: (f'AND (HL)',  partial(logical_pHL, '&')),
-        0xA7: (f'AND A',     partial(logical_r,   '&', 'A')),
-        0xA8: (f'XOR B',     partial(logical_r,   '^', 'B')),
-        0xA9: (f'XOR C',     partial(logical_r,   '^', 'C')),
-        0xAA: (f'XOR D',     partial(logical_r,   '^', 'D')),
-        0xAB: (f'XOR E',     partial(logical_r,   '^', 'E')),
-        0xAC: (f'XOR {h}',   partial(logical_r,   '^', h)),
-        0xAD: (f'XOR {l}',   partial(logical_r,   '^', l)),
-        0xAE: (f'XOR (HL)',  partial(logical_pHL, '^')),
-        0xAF: (f'XOR A',     partial(logical_r,   '^', 'A')),
+        0xA0: (f'AND B',       partial(logical_r,   '&', 'B')),
+        0xA1: (f'AND C',       partial(logical_r,   '&', 'C')),
+        0xA2: (f'AND D',       partial(logical_r,   '&', 'D')),
+        0xA3: (f'AND E',       partial(logical_r,   '&', 'E')),
+        0xA4: (f'AND {h}',     partial(logical_r,   '&', h)),
+        0xA5: (f'AND {l}',     partial(logical_r,   '&', l)),
+        0xA6: (f'AND ({hld})', partial(logical_pss, '&', xy)),
+        0xA7: (f'AND A',       partial(logical_r,   '&', 'A')),
+        0xA8: (f'XOR B',       partial(logical_r,   '^', 'B')),
+        0xA9: (f'XOR C',       partial(logical_r,   '^', 'C')),
+        0xAA: (f'XOR D',       partial(logical_r,   '^', 'D')),
+        0xAB: (f'XOR E',       partial(logical_r,   '^', 'E')),
+        0xAC: (f'XOR {h}',     partial(logical_r,   '^', h)),
+        0xAD: (f'XOR {l}',     partial(logical_r,   '^', l)),
+        0xAE: (f'XOR ({hld})', partial(logical_pss, '^', xy)),
+        0xAF: (f'XOR A',       partial(logical_r,   '^', 'A')),
 
         # Bx: complete.
-        0xB0: (f'OR B',      partial(logical_r,   '|', 'B')),
-        0xB1: (f'OR C',      partial(logical_r,   '|', 'C')),
-        0xB2: (f'OR D',      partial(logical_r,   '|', 'D')),
-        0xB3: (f'OR E',      partial(logical_r,   '|', 'E')),
-        0xB4: (f'OR {h}',    partial(logical_r,   '|', h)),
-        0xB5: (f'OR {l}',    partial(logical_r,   '|', l)),
-        0xB6: (f'OR (HL)',   partial(logical_pHL, '|')),
-        0xB7: (f'OR A',      partial(logical_r,   '|', 'A')),
-        0xB8: (f'CP B',      partial(cp_r, 'B')),
-        0xB9: (f'CP C',      partial(cp_r, 'C')),
-        0xBA: (f'CP D',      partial(cp_r, 'D')),
-        0xBB: (f'CP E',      partial(cp_r, 'E')),
-        0xBC: (f'CP {h}',    partial(cp_r, h)),
-        0xBD: (f'CP {l}',    partial(cp_r, l)),
-        0xBE: (f'CP (HL)',   cp_pHL),
-        0xBF: (f'CP A',      partial(cp_r, 'A')),
+        0xB0: (f'OR B',       partial(logical_r,   '|', 'B')),
+        0xB1: (f'OR C',       partial(logical_r,   '|', 'C')),
+        0xB2: (f'OR D',       partial(logical_r,   '|', 'D')),
+        0xB3: (f'OR E',       partial(logical_r,   '|', 'E')),
+        0xB4: (f'OR {h}',     partial(logical_r,   '|', h)),
+        0xB5: (f'OR {l}',     partial(logical_r,   '|', l)),
+        0xB6: (f'OR ({hld})', partial(logical_pss, '|', xy)),
+        0xB7: (f'OR A',       partial(logical_r,   '|', 'A')),
+        0xB8: (f'CP B',       partial(cp_r, 'B')),
+        0xB9: (f'CP C',       partial(cp_r, 'C')),
+        0xBA: (f'CP D',       partial(cp_r, 'D')),
+        0xBB: (f'CP E',       partial(cp_r, 'E')),
+        0xBC: (f'CP {h}',     partial(cp_r, h)),
+        0xBD: (f'CP {l}',     partial(cp_r, l)),
+        0xBE: (f'CP ({hld})', partial(cp_pss, xy)),
+        0xBF: (f'CP A',       partial(cp_r, 'A')),
 
         # Cx: complete.
         0xC0: (f'RET NZ',     partial(ret,  '!(F & ZF_MASK)')),
@@ -1658,9 +1682,11 @@ log_dbg("%04X ", PC);
     if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
         # Special opcode where 3rd byte is parameter and 4th byte needed for
         # decoding. Read 4th byte, but keep PC at 3rd byte.
-        read_opcode = 'opcode = memory_read(PC + 1)'
+        read_opcode    = 'opcode = memory_read(PC + 1)'
+        post_increment = 'PC++;'
     else:
-        read_opcode = 'opcode = memory_read(PC++)'
+        read_opcode    = 'opcode = memory_read(PC++)'
+        post_increment = ''
 
     f.write(f'{read_opcode}; T(4);')
     if not prefix:
@@ -1682,6 +1708,7 @@ case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
     {disassembler if debug else ''}
     {c}
   }}
+  {post_increment}
   break;
 
 ''')
