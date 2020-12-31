@@ -59,6 +59,7 @@ typedef struct {
   u16_t                   display_offset;
   u8_t                    display_byte;
   u8_t                    display_pixel_mask;
+  ula_display_timing_t    display_timing;
   ula_display_frequency_t display_frequency;
   ula_display_state_t     display_state;
   unsigned int            display_line;
@@ -70,10 +71,10 @@ typedef struct {
   u8_t                    border_colour;
   u8_t                    speaker_state;
   palette_t               palette;
-} ula_t;
+} self_t;
 
 
-static ula_t self;
+static self_t self;
 
 
 static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t spec) {
@@ -198,7 +199,7 @@ static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t s
 
 
 static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
-  const unsigned int       i    = clock_display_timing_get() - E_CLOCK_DISPLAY_TIMING_ZX_48K;
+  const unsigned int       i    = self.display_timing - E_ULA_DISPLAY_TIMING_ZX_48K;
   const unsigned int       j    = clock_video_timing_get() != E_CLOCK_VIDEO_TIMING_HDMI;
   const unsigned int       k    = self.display_frequency;
   const ula_display_spec_t spec = ula_display_spec[i][j][k];
@@ -228,6 +229,7 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.attribute_ram      = &self.display_ram[192 * 32];
   self.display_offset     = 0;
   self.attribute_offset   = 0;
+  self.display_timing     = E_ULA_DISPLAY_TIMING_ZX_48K;
   self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
   self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
   self.display_line       = 0;
@@ -263,13 +265,25 @@ void ula_write(u16_t address, u8_t value) {
 }
 
 
-void ula_display_timing_set(clock_display_timing_t timing) {
-  clock_display_timing_set(timing);
+ula_display_timing_t ula_display_timing_get(void) {
+  return self.display_timing;
 }
 
 
-void ula_video_timing_set(clock_video_timing_t timing) {
-  clock_video_timing_set(timing);
+void ula_display_timing_set(ula_display_timing_t timing) {
+  const char* descriptions[] = {
+    "internal use",
+    "ZX Spectrum 48K",
+    "ZX Spectrum 128K/+2",
+    "ZX Spectrum +2A/+2B/+3",
+    "Pentagon",
+    "invalid (5)",
+    "invalid (6)",
+    "invalid (7)"
+  };
+
+  self.display_timing = timing;
+  log_dbg("ula: display timing set to %s\n", descriptions[timing]);
 }
 
 

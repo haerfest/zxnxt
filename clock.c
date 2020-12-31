@@ -27,7 +27,6 @@ static const unsigned int clock_divider[E_CLOCK_CPU_SPEED_28MHZ - E_CLOCK_CPU_SP
 
 typedef struct {
   clock_video_timing_t   video_timing;
-  clock_display_timing_t display_timing;
   clock_cpu_speed_t      cpu_speed;
   u64_t                  ticks;  /* At max dot clock overflows in 20k years. */
   unsigned int           n_callbacks;
@@ -39,18 +38,22 @@ static next_clock_t self;
 
 
 int clock_init(void) {
-  self.video_timing   = E_CLOCK_VIDEO_TIMING_VGA_BASE;
-  self.display_timing = E_CLOCK_DISPLAY_TIMING_ZX_PLUS_2A;
-  self.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
-  self.ticks          = 0;
-  self.n_callbacks    = 0;
-  self.callbacks      = NULL;
+  self.video_timing = E_CLOCK_VIDEO_TIMING_VGA_BASE;
+  self.cpu_speed    = E_CLOCK_CPU_SPEED_3MHZ;
+  self.ticks        = 0;
+  self.n_callbacks  = 0;
+  self.callbacks    = NULL;
 
   return 0;
 }
 
 
 void clock_finit(void) {
+}
+
+
+clock_cpu_speed_t clock_cpu_speed_get(void) {
+  return self.cpu_speed;
 }
 
 
@@ -61,28 +64,6 @@ void clock_cpu_speed_set(clock_cpu_speed_t speed) {
 
   self.cpu_speed = speed;
   log_dbg("clock: CPU speed set to %s MHz\n", speeds[speed]);
-}
-
-
-clock_display_timing_t clock_display_timing_get(void) {
-  return self.display_timing;
-}
-
-
-void clock_display_timing_set(clock_display_timing_t timing) {
-  const char* descriptions[] = {
-    "internal use",
-    "ZX Spectrum 48K",
-    "ZX Spectrum 128K/+2",
-    "ZX Spectrum +2A/+2B/+3",
-    "Pentagon",
-    "invalid (5)",
-    "invalid (6)",
-    "invalid (7)"
-  };
-
-  self.display_timing = timing;
-  log_dbg("clock: display timing set to %s\n", descriptions[timing]);
 }
 
 

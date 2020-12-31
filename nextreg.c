@@ -161,7 +161,10 @@ nextreg_machine_type_t nextreg_get_machine_type(void) {
 
 static void nextreg_machine_type_write(u8_t value) {
   if (value & 0x80) {
-    ula_display_timing_set((value >> 4) & 0x03);
+    const u8_t display_timing = (value >> 4) & 0x03;
+    if (display_timing <= E_ULA_DISPLAY_TIMING_PENTAGON) {
+      ula_display_timing_set(display_timing);
+    }
   }
 
   if (self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIG_MODE) {
@@ -198,7 +201,7 @@ static void nextreg_cpu_speed_write(u8_t value) {
 
 static void nextreg_video_timing_write(u8_t value) {
   if (nextreg_is_config_mode_active()) {
-    ula_video_timing_set(value & 0x03);
+    clock_video_timing_set(value & 0x03);
   }
 }
 
