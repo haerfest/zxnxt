@@ -227,9 +227,12 @@ void cpu_reset(void) {
 
 
 int cpu_run(u32_t ticks) {
+  u32_t tick;
   u8_t  opcode;
 
+  for (tick = 0; tick < ticks; tick++) {
 #include "opcodes.c"
+  }
 
   return 0;
 }
