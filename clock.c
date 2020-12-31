@@ -1,3 +1,4 @@
+#include <SDL2/SDL.h>
 #include <stdlib.h>
 #include "clock.h"
 #include "defs.h"
@@ -31,8 +32,12 @@ static const unsigned int frequency_28mhz[E_CLOCK_VIDEO_TIMING_HDMI - E_CLOCK_VI
 typedef struct {
   clock_video_timing_t video_timing;
   clock_cpu_speed_t    cpu_speed;
-  u64_t                ticks_28mhz;  /* At max dot clock overflows in 20k years. */
-  u64_t                sync_7mhz;    /* Last 28 MHz tick where we synced the 7 MHz clock. */
+  u64_t                ticks_28mhz;   /* At max dot clock overflows in 20k years. */
+  u64_t                sync_7mhz;     /* Last 28 MHz tick where we synced the 7 MHz clock. */
+  u64_t                sync_reality;  /* Last 28 MHz tick where we synced with reality. */
+  u64_t                time_reality;  /* Time at the last reality check. */
+  u64_t                time_frequency;
+  
 } next_clock_t;
 
 
@@ -40,10 +45,13 @@ static next_clock_t self;
 
 
 int clock_init(void) {
-  self.video_timing = E_CLOCK_VIDEO_TIMING_VGA_BASE;
-  self.cpu_speed    = E_CLOCK_CPU_SPEED_3MHZ;
-  self.ticks_28mhz  = 0;
-  self.sync_7mhz    = self.ticks_28mhz;
+  self.video_timing   = E_CLOCK_VIDEO_TIMING_VGA_BASE;
+  self.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
+  self.ticks_28mhz    = 0;
+  self.sync_7mhz      = self.ticks_28mhz;
+  self.sync_reality   = self.ticks_28mhz;
+  self.time_reality   = SDL_GetPerformanceCounter();
+  self.time_frequency = SDL_GetPerformanceFrequency();
 
   return 0;
 }
@@ -96,13 +104,28 @@ void clock_run(u32_t cpu_ticks) {
   };
   const u32_t ticks_28mhz = cpu_ticks * clock_divider[self.cpu_speed];
   u32_t       ticks_7mhz;
+  u64_t       ticks_elapsed;
 
   /* Update system clock. */
   self.ticks_28mhz += ticks_28mhz;
 
+  /* Update 7 MHz clock. */
   ticks_7mhz = (self.ticks_28mhz - self.sync_7mhz) / 4;
   if (ticks_7mhz > 0) {
     ula_run(ticks_7mhz);
     self.sync_7mhz += ticks_7mhz * 4;
+  }
+
+  /* Align with reality roughly once a second. */
+  ticks_elapsed = self.ticks_28mhz - self.sync_reality;
+  if (ticks_elapsed >= frequency_28mhz[self.video_timing]) {
+    const u64_t now           = SDL_GetPerformanceCounter();
+    const u64_t ticks_reality = frequency_28mhz[self.video_timing] * (now - self.time_reality) / self.time_frequency;
+    const float percentage    = 100.0 * ticks_elapsed / ticks_reality;
+
+    log_inf("clock: emulating at %.1f%% speed\n", percentage);
+
+    self.sync_reality = self.ticks_28mhz;
+    self.time_reality = now;
   }
 }

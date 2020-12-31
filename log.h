@@ -5,22 +5,15 @@
 #include <stdio.h>
 
 
-/* Always want to show error messages. */
 #define log_err(...) fprintf(stderr, __VA_ARGS__)
-
-#ifdef DEBUG
-
-#define log_dbg(...) fprintf(stderr, __VA_ARGS__)
 #define log_inf(...) fprintf(stderr, __VA_ARGS__)
 #define log_wrn(...) fprintf(stderr, __VA_ARGS__)
 
-#else  /* DEBUG */
-
+#ifdef DEBUG
+#define log_dbg(...) fprintf(stderr, __VA_ARGS__)
+#else
 #define log_dbg(...)
-#define log_inf(...)
-#define log_wrn(...)
-
-#endif  /* DEBUG */
+#endif
 
 
 int  log_init(void);
