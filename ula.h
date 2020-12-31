@@ -3,7 +3,6 @@
 
 
 #include <SDL2/SDL.h>
-#include "clock.h"
 #include "defs.h"
 
 
@@ -30,6 +29,7 @@ ula_display_timing_t ula_display_timing_get(void);
 void                 ula_display_timing_set(ula_display_timing_t timing);
 void                 ula_display_frequency_set(ula_display_frequency_t frequency);
 void                 ula_palette_set(int use_second);
+void                 ula_run(u32_t ticks);
 
 
 #endif  /* __ULA_H */

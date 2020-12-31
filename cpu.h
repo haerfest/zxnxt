@@ -8,8 +8,7 @@
 int  cpu_init(void);
 void cpu_finit(void);
 void cpu_reset(void);
-int  cpu_run(u32_t ticks, s32_t* ticks_left);
-void cpu_tick(unsigned ticks);
+int  cpu_run(u32_t ticks);
 
 
 #endif  /* __CPU_H */

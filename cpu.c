@@ -89,8 +89,8 @@
 #define TMP  self.tmp
 
 
-/* Not a register, but a shortcut for "clock tick". */
-#define T    clock_ticks
+/* A shortcut to advance the system clock by a number of CPU ticks. */
+#define T    clock_run
 
 
 #define SZ53(value)   self.sz53[value]
@@ -226,7 +226,7 @@ void cpu_reset(void) {
 }
 
 
-int cpu_run(u32_t ticks, s32_t* ticks_left) {
+int cpu_run(u32_t ticks) {
   u8_t  opcode;
 
 #include "opcodes.c"

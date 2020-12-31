@@ -36,6 +36,7 @@ void                 clock_cpu_speed_set(clock_cpu_speed_t speed);
 clock_video_timing_t clock_video_timing_get(void);
 void                 clock_video_timing_set(clock_video_timing_t timing);
 int                  clock_register_callback(clock_callback_t callback);
-void                 clock_ticks(unsigned int cpu_ticks);
+void                 clock_run(u32_t cpu_ticks);
+
 
 #endif  /* __CLOCK_H */

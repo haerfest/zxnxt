@@ -21,22 +21,29 @@ typedef struct {
 } ula_display_spec_t;
 
 
-static const ula_display_spec_t ula_display_spec[5][2][2] = {
+#define N_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_INTERNAL_USE + 1)
+#define N_FREQUENCIES  (E_ULA_DISPLAY_FREQUENCY_60HZ  - E_ULA_DISPLAY_FREQUENCY_50HZ      + 1)
+
+static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
+  /* Internal use. */ {
+    /* 50 Hz */ {   0,   0,  0,  0,  0 },
+    /* 60 Hz */ {   0,   0,  0,  0,  0 }
+  },
   /* ZX Spectrum 48K */ {
-    /* VGA  */ { /* 50 Hz */ { 312, 192, 57, 14, 49 }, /* 60 Hz */ { 262, 192, 33, 14, 23 } },
-    /* HDMI */ { /* 50 Hz */ { 312, 192, 40, 40, 40 }, /* 60 Hz */ { 262, 192, 20, 33, 17 } }
+    /* 50 Hz */ { 312, 192, 57, 14, 49 },
+    /* 60 Hz */ { 262, 192, 33, 14, 23 }
   },
   /* ZX Spectrum 128K/+2 */ {
-    /* VGA  */ { /* 50 Hz */ { 311, 192, 57, 14, 48 }, /* 60 Hz */ { 261, 192, 33, 14, 22 } },
-    /* HDMI */ { /* 50 Hz */ { 312, 192, 40, 40, 40 }, /* 60 Hz */ { 262, 192, 20, 33, 17 } }
+    /* 50 Hz */ { 311, 192, 57, 14, 48 },
+    /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* ZX Spectrum +2A/+2B/+3 */ {
-    /* VGA  */ { /* 50 Hz */ { 311, 192, 57, 14, 48 }, /* 60 Hz */ { 261, 192, 33, 14, 22 } },
-    /* HDMI */ { /* 50 Hz */ { 312, 192, 40, 40, 40 }, /* 60 Hz */ { 262, 192, 20, 33, 17 } }
+    /* 50 Hz */ { 311, 192, 57, 14, 48 },
+    /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* Pentagon */ {
-    /* VGA  */ { /* 50 Hz */ { 320, 192, 49, 14, 65 }, /* 60 Hz */ { 320, 192, 49, 14, 65 } },
-    /* HDMI */ { /* 50 Hz */ { 312, 192, 40, 40, 40 }, /* 60 Hz */ { 262, 192, 20, 33, 17 } }
+    /* 50 Hz */ { 320, 192, 49, 14, 65 },
+    /* 60 Hz */ { 320, 192, 49, 14, 65 }
   }
 };
 
@@ -53,158 +60,183 @@ typedef enum {
 
 
 typedef struct {
-  SDL_Renderer*           renderer;
-  u16_t                   display_offsets[192];
-  u8_t*                   display_ram;
-  u16_t                   display_offset;
-  u8_t                    display_byte;
-  u8_t                    display_pixel_mask;
-  ula_display_timing_t    display_timing;
-  ula_display_frequency_t display_frequency;
-  ula_display_state_t     display_state;
-  unsigned int            display_line;
-  unsigned int            display_column;  
-  u16_t                   attribute_offsets[192];
-  u8_t*                   attribute_ram;
-  u16_t                   attribute_offset;
-  u8_t                    attribute_byte;
-  u8_t                    border_colour;
-  u8_t                    speaker_state;
-  palette_t               palette;
+  SDL_Renderer*             renderer;
+  const ula_display_spec_t* display_spec;
+  u16_t                     display_offsets[192];
+  u8_t*                     display_ram;
+  u16_t                     display_offset;
+  u8_t                      display_byte;
+  u8_t                      display_pixel_mask;
+  ula_display_timing_t      display_timing;
+  ula_display_frequency_t   display_frequency;
+  ula_display_state_t       display_state;
+  unsigned int              display_line;
+  unsigned int              display_column;  
+  u16_t                     attribute_offsets[192];
+  u8_t*                     attribute_ram;
+  u16_t                     attribute_offset;
+  u8_t                      attribute_byte;
+  u8_t                      border_colour;
+  u8_t                      speaker_state;
+  palette_t                 palette;
 } self_t;
 
 
 static self_t self;
 
 
-static void ula_state_machine_run(unsigned int delta, const ula_display_spec_t spec) {
-  unsigned int    tick;
+static void ula_display_state_top_border(void) {
+  const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
+  
+  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
+  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+
+  if (++self.display_column == 32 + 256 + 64) {
+    self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+  }
+}
+
+
+static void ula_display_state_left_border(void) {
+  const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
+  
+  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
+  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+
+  if (++self.display_column == 32) {
+    const u16_t line = self.display_line - self.display_spec->top_border_lines;
+    self.display_offset   = self.display_offsets[line];
+    self.attribute_offset = self.attribute_offsets[line];
+    self.display_state    = E_ULA_DISPLAY_STATE_FRAME_BUFFER;
+  }
+}
+
+
+static void ula_display_state_frame_buffer(void) {
   palette_entry_t colour;
   u8_t            index;
+  
+  if (self.display_pixel_mask == 0x00) {
+    self.display_pixel_mask = 0x80;
+    self.display_byte       = self.display_ram[self.display_offset++];
+    self.attribute_byte     = self.attribute_ram[self.attribute_offset++];
+  }
 
-  /* The ULA uses a 7 MHz clock to refresh the display, which is 28/4 MHz. */
-  for (tick = 0; tick < delta; tick += 4) {
-    switch (self.display_state) {
-      case E_ULA_DISPLAY_STATE_TOP_BORDER:
-        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
-        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
-        self.display_column++;
-        if (self.display_column == 32 + 256 + 64) {
-          self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
-        }
-        break;
+  /* TODO: blinking colours. */
+  if (self.display_byte & self.display_pixel_mask) {
+    /* Ink. */
+    index = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
+  } else {
+    /* Paper. */
+    index = PALETTE_OFFSET_PAPER + (self.attribute_byte >> 3) & 0x07;
+  }
+  if (self.attribute_byte & 0x40) {
+    /* Bright. */
+    index += 8;
+  }
+  colour = palette_read_rgb(self.palette, index);
 
-      case E_ULA_DISPLAY_STATE_LEFT_BORDER:
-        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
-        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
-        self.display_column++;
-        if (self.display_column == 32) {
-          const u16_t line = self.display_line - spec.top_border_lines;
-          self.display_offset   = self.display_offsets[line];
-          self.attribute_offset = self.attribute_offsets[line];
-          self.display_state    = E_ULA_DISPLAY_STATE_FRAME_BUFFER;
-        }
-        break;
+  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
+  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
 
-      case E_ULA_DISPLAY_STATE_FRAME_BUFFER:
-        if (self.display_pixel_mask == 0x00) {
-          self.display_pixel_mask = 0x80;
-          self.display_byte       = self.display_ram[self.display_offset++];
-          self.attribute_byte     = self.attribute_ram[self.attribute_offset++];
-        }
+  self.display_pixel_mask >>= 1;
+  if (++self.display_column == 32 + 256) {
+    self.display_state = E_ULA_DISPLAY_STATE_RIGHT_BORDER;
+  }
+}
 
-        /* TODO: blinking colours. */
-        if (self.display_byte & self.display_pixel_mask) {
-          /* Ink. */
-          index = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
-        } else {
-          /* Paper. */
-          index = PALETTE_OFFSET_PAPER + (self.attribute_byte >> 3) & 0x07;
-        }
-        if (self.attribute_byte & 0x40) {
-          /* Bright. */
-          index += 8;
-        }
-        colour = palette_read_rgb(self.palette, index);
 
-        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+static void ula_display_state_hsync(void) {
+  if (++self.display_column == 32 + 256 + 64 + 96) {
+    self.display_column = 0;
+    self.display_line++;
+    self.display_state = (self.display_line < self.display_spec->top_border_lines)                            ? E_ULA_DISPLAY_STATE_TOP_BORDER
+                       : (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) ? E_ULA_DISPLAY_STATE_LEFT_BORDER
+                       : E_ULA_DISPLAY_STATE_BOTTOM_BORDER;
+  }
+}
 
-        self.display_pixel_mask >>= 1;
-        self.display_column++;
-        if (self.display_column == 32 + 256) {
-          self.display_state = E_ULA_DISPLAY_STATE_RIGHT_BORDER;
-        }
-        break;
 
-      case E_ULA_DISPLAY_STATE_HSYNC:
-        self.display_column++;
-        if (self.display_column == 32 + 256 + 64 + 96) {
-          self.display_column = 0;
-          self.display_line++;
-          if (self.display_line < spec.top_border_lines) {
-            self.display_state = E_ULA_DISPLAY_STATE_TOP_BORDER;
-          } else if (self.display_line < spec.top_border_lines + spec.display_lines) {
-            self.display_state = E_ULA_DISPLAY_STATE_LEFT_BORDER;
-          } else {
-            self.display_state = E_ULA_DISPLAY_STATE_BOTTOM_BORDER;
-          }
-        }
-        break;
+static void ula_display_state_right_border(void) {
+  const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
-      case E_ULA_DISPLAY_STATE_RIGHT_BORDER:
-        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
-        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
-        self.display_column++;
-        if (self.display_column == 32 + 256 + 64) {
-          self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
-        }
-        break;
+  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
+  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
 
-      case E_ULA_DISPLAY_STATE_BOTTOM_BORDER:
-        colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
-        SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-        SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
-        self.display_column++;
-        if (self.display_column == 32 + 256 + 64) {
-          if (self.display_line < spec.total_lines) {
-            self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
-          } else {
-            /* TODO: Generate VSYNC interrupt. */
-            self.display_state = E_ULA_DISPLAY_STATE_VSYNC;
-            SDL_RenderPresent(self.renderer);
-          }
-        }
-        break;
+  if (++self.display_column == 32 + 256 + 64) {
+    self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
+  }
+}
 
-      case E_ULA_DISPLAY_STATE_VSYNC:
-        self.display_column++;
-        if (self.display_column == 32 + 256 + 64 + 96) {
-          self.display_column = 0;
-          self.display_line++;
-          if (self.display_line == spec.total_lines + spec.blanking_period_lines) {
-            self.display_line     = 0;
-            self.display_offset   = 0;
-            self.attribute_offset = 0;
-            self.display_state    = E_ULA_DISPLAY_STATE_TOP_BORDER;
-          }
-        }
-        break;
+
+static void ula_display_state_bottom_border(void) {
+  const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
+  
+  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
+  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+  
+  if (++self.display_column == 32 + 256 + 64) {
+    self.display_state = (self.display_line < self.display_spec->total_lines)
+                       ? E_ULA_DISPLAY_STATE_HSYNC
+                       : E_ULA_DISPLAY_STATE_VSYNC;
+
+    if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
+      /* TODO: Generate VSYNC interrupt. */
+      SDL_RenderPresent(self.renderer);
     }
   }
 }
 
 
-static void ula_ticks_callback(u64_t ticks, unsigned int delta) {
-  const unsigned int       i    = self.display_timing - E_ULA_DISPLAY_TIMING_ZX_48K;
-  const unsigned int       j    = clock_video_timing_get() != E_CLOCK_VIDEO_TIMING_HDMI;
-  const unsigned int       k    = self.display_frequency;
-  const ula_display_spec_t spec = ula_display_spec[i][j][k];
+static void ula_display_state_vsync(void) {
+  if (++self.display_column == 32 + 256 + 64 + 96) {
+    self.display_column = 0;
+    self.display_line++;
 
-  ula_state_machine_run(delta, spec);
+    if (self.display_line == self.display_spec->total_lines + self.display_spec->blanking_period_lines) {
+      self.display_line     = 0;
+      self.display_offset   = 0;
+      self.attribute_offset = 0;
+      self.display_state    = E_ULA_DISPLAY_STATE_TOP_BORDER;
+    }
+  }
+}
+
+
+void ula_run(u32_t ticks) {
+  u32_t tick;
+
+  for (tick = 0; tick < ticks; tick++) {
+    switch (self.display_state) {
+      case E_ULA_DISPLAY_STATE_TOP_BORDER:
+        ula_display_state_top_border();
+        break;
+
+      case E_ULA_DISPLAY_STATE_LEFT_BORDER:
+        ula_display_state_left_border();
+        break;
+
+      case E_ULA_DISPLAY_STATE_FRAME_BUFFER:
+        ula_display_state_frame_buffer();
+        break;
+
+      case E_ULA_DISPLAY_STATE_HSYNC:
+        ula_display_state_hsync();
+        break;
+
+      case E_ULA_DISPLAY_STATE_RIGHT_BORDER:
+        ula_display_state_right_border();
+        break;
+
+      case E_ULA_DISPLAY_STATE_BOTTOM_BORDER:
+        ula_display_state_bottom_border();
+        break;
+
+      case E_ULA_DISPLAY_STATE_VSYNC:
+        ula_display_state_vsync();
+        break;
+    }
+  }
 }
 
 
@@ -232,6 +264,7 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.display_timing     = E_ULA_DISPLAY_TIMING_ZX_48K;
   self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
   self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
+  self.display_spec       = &ula_display_spec[self.display_timing][self.display_frequency];
   self.display_line       = 0;
   self.display_column     = 0;
   self.display_pixel_mask = 0;
@@ -240,10 +273,6 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.palette            = E_PALETTE_ULA_FIRST;
 
   ula_fill_tables();
-
-  if (clock_register_callback(ula_ticks_callback) != 0) {
-    return -1;
-  }
 
   return 0;
 }
@@ -270,6 +299,15 @@ ula_display_timing_t ula_display_timing_get(void) {
 }
 
 
+static void ula_reset_display_spec(void) {
+  self.display_spec       = &ula_display_spec[self.display_timing][self.display_frequency];
+  self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
+  self.display_line       = 0;
+  self.display_column     = 0;
+  self.display_pixel_mask = 0;
+}
+
+
 void ula_display_timing_set(ula_display_timing_t timing) {
   const char* descriptions[] = {
     "internal use",
@@ -284,6 +322,8 @@ void ula_display_timing_set(ula_display_timing_t timing) {
 
   self.display_timing = timing;
   log_dbg("ula: display timing set to %s\n", descriptions[timing]);
+
+  ula_reset_display_spec();
 }
 
 
@@ -296,10 +336,7 @@ void ula_display_frequency_set(ula_display_frequency_t frequency) {
   self.display_frequency = frequency;
   log_dbg("ula: display frequency set to %s Hz\n", descriptions[frequency]);
 
-  self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
-  self.display_line       = 0;
-  self.display_column     = 0;
-  self.display_pixel_mask = 0;
+  ula_reset_display_spec();
 }
 
 

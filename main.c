@@ -194,14 +194,12 @@ exit:
 
 
 static void main_eventloop(void) {
-  s32_t ticks_left = 0;
-
   for (;;) {
     if (SDL_QuitRequested() == SDL_TRUE) {
       break;
     }
 
-    if (cpu_run(1000000 + ticks_left, &ticks_left) != 0) {
+    if (cpu_run(1000000) != 0) {
       break;
     }
   }
