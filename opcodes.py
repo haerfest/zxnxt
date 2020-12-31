@@ -1458,10 +1458,13 @@ log_dbg("%04X ", PC);
         read_opcode    = 'opcode = memory_read(PC++)'
         post_increment = ''
 
-    f.write(f'{read_opcode}; T(4);')
+    f.write(f'''
+{read_opcode};
+T(4);
+''')
     if not prefix:
-        f.write('R = (R & 0x80) | (++R & 0x7F);')
-    f.write('switch (opcode) {')
+        f.write('R = (R & 0x80) | (++R & 0x7F);\n')
+    f.write('switch (opcode) {\n')
 
     for opcode in sorted(instructions):
         item = instructions[opcode]
