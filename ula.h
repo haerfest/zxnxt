@@ -30,6 +30,6 @@ void                 ula_display_timing_set(ula_display_timing_t timing);
 void                 ula_display_frequency_set(ula_display_frequency_t frequency);
 void                 ula_palette_set(int use_second);
 void                 ula_run(u32_t ticks);
-
+void                 ula_clip_set(int x1, int x2, int y1, int y2);
 
 #endif  /* __ULA_H */

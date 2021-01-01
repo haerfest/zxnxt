@@ -83,6 +83,10 @@ typedef struct {
   palette_t                 palette;
   u8_t*                     frame_buffer;
   u8_t*                     pixel;
+  int                       clip_x1;
+  int                       clip_x2;
+  int                       clip_y1;
+  int                       clip_y2;
 } self_t;
 
 
@@ -151,19 +155,24 @@ static void ula_display_state_frame_buffer(void) {
   }
 
   /* TODO: blinking colours. */
-  if (self.display_byte & self.display_pixel_mask) {
-    /* Ink. */
-    index = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
+  if (self.display_line   >= self.clip_y1 && self.display_line   <= self.clip_y2 &&
+      self.display_column >= self.clip_x1 && self.display_column <= self.clip_x2) {
+    if (self.display_byte & self.display_pixel_mask) {
+      /* Ink. */
+      index = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
+    } else {
+      /* Paper. */
+      index = PALETTE_OFFSET_PAPER + (self.attribute_byte >> 3) & 0x07;
+    }
+    if (self.attribute_byte & 0x40) {
+      /* Bright. */
+      index += 8;
+    }
   } else {
-    /* Paper. */
-    index = PALETTE_OFFSET_PAPER + (self.attribute_byte >> 3) & 0x07;
+    index = PALETTE_OFFSET_BORDER + self.border_colour;
   }
-  if (self.attribute_byte & 0x40) {
-    /* Bright. */
-    index += 8;
-  }
-  colour = palette_read_rgb(self.palette, index);
 
+  colour = palette_read_rgb(self.palette, index);
   PLOT(colour);
 
   self.display_pixel_mask >>= 1;
@@ -318,7 +327,10 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.border_colour      = 0;
   self.speaker_state      = 0;
   self.palette            = E_PALETTE_ULA_FIRST;
-
+  self.clip_x1            = 0;
+  self.clip_x2            = 159 * 2;
+  self.clip_y1            = 0;
+  self.clip_y2            = 255;
   ula_fill_tables();
 
   return 0;
@@ -390,4 +402,14 @@ void ula_display_frequency_set(ula_display_frequency_t frequency) {
 
 void ula_palette_set(int use_second) {
   self.palette = use_second ? E_PALETTE_ULA_SECOND : E_PALETTE_ULA_FIRST;
+}
+
+
+void ula_clip_set(int x1, int x2, int y1, int y2) {
+  self.clip_x1 = x1;
+  self.clip_x2 = x2;
+  self.clip_y1 = y1;
+  self.clip_y2 = y2;
+
+  log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", x1, x2, y1, y2);
 }

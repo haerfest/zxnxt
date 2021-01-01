@@ -33,6 +33,8 @@
 #define REGISTER_CORE_VERSION_SUB_MINOR  0x0E
 #define REGISTER_PERIPHERAL_5_SETTING    0x10
 #define REGISTER_VIDEO_TIMING            0x11
+#define REGISTER_CLIP_WINDOW_ULA         0x1A
+#define REGISTER_CLIP_WINDOW_CONTROL     0x1C
 #define REGISTER_PALETTE_INDEX           0x40
 #define REGISTER_PALETTE_VALUE_8BITS     0x41
 #define REGISTER_PALETTE_CONTROL         0x43
@@ -63,6 +65,11 @@ typedef struct {
   int       palette_index_9bit_is_first_write;
   u8_t      fallback_colour;
   int       ula_next_mode;
+  int       ula_clip_index;
+  int       ula_clip_x1;
+  int       ula_clip_x2;
+  int       ula_clip_y1;
+  int       ula_clip_y2;
 } nextreg_t;
 
 
@@ -79,7 +86,13 @@ static void nextreg_reset_soft(void) {
   self.palette_ula                       = E_PALETTE_ULA_FIRST;
   self.fallback_colour                   = 0xE3;
   self.ula_next_mode                     = 0;
+  self.ula_clip_index                    = 0;
+  self.ula_clip_x1                       = 0;
+  self.ula_clip_x2                       = 159;
+  self.ula_clip_y1                       = 0;
+  self.ula_clip_y2                       = 255;
 
+  ula_clip_set(self.ula_clip_x1, self.ula_clip_x2, self.ula_clip_y1, self.ula_clip_y2);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
 }
 
@@ -236,6 +249,37 @@ static void nextreg_alternate_rom_write(u8_t value) {
 }
 
 
+static void nextreg_clip_window_ula_write(u8_t value) {
+  switch (self.ula_clip_index++) {
+    case 0:
+      self.ula_clip_x1 = value * 2;
+      break;
+
+    case 1:
+      self.ula_clip_x2 = value * 2;
+      break;
+
+    case 2:
+      self.ula_clip_y1 = value;
+      break;
+
+    case 3:
+      self.ula_clip_y2 = value;
+      ula_clip_set(self.ula_clip_x1, self.ula_clip_x2, self.ula_clip_y1, self.ula_clip_y2);
+      break;
+  }
+
+  self.ula_clip_index &= 0x03;
+}
+
+
+static void nextreg_clip_window_control_write(u8_t value) {
+  if (value & 0x04) {
+    self.ula_clip_index = 0;
+  }
+}
+
+
 static u8_t nextreg_palette_control_read(void) {
   return self.palette_disable_auto_increment                << 7
        | self.palette_selected                              << 4
@@ -347,6 +391,14 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
     case REGISTER_VIDEO_TIMING:
       nextreg_video_timing_write(value);
+      break;
+
+    case REGISTER_CLIP_WINDOW_ULA:
+      nextreg_clip_window_ula_write(value);
+      break;
+
+    case REGISTER_CLIP_WINDOW_CONTROL:
+      nextreg_clip_window_control_write(value);
       break;
 
     case REGISTER_PALETTE_INDEX:
