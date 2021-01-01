@@ -1,3 +1,4 @@
+#include "altrom.h"
 #include "bootrom.h"
 #include "config.h"
 #include "defs.h"
@@ -99,8 +100,8 @@ void memory_refresh_accessors(int page, int n_pages) {
         self.readers[i] = mmu_read;
         self.writers[i] = mmu_write;
       } else {
-        self.readers[i] = rom_read;
-        self.writers[i] = rom_write;
+        self.readers[i] = altrom_is_active_on_read()  ? altrom_read  : rom_read;
+        self.writers[i] = altrom_is_active_on_write() ? altrom_write : rom_write;
       }
     } else {
       /* Addresses 0x4000 - 0xFFFF. */

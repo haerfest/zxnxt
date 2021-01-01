@@ -43,10 +43,17 @@ u8_t mmu_page_get(u8_t slot) {
 
 
 void mmu_page_set(u8_t slot, u8_t page) {
-  self.pages[slot] = page;
-  log_dbg("mmu: slot %u contains page %u\n", slot, page);
+  if (page != self.pages[slot]) {
+    const int was_rom = self.pages[slot] == MMU_ROM_PAGE;
+    const int is_rom  = page == MMU_ROM_PAGE;
 
-  memory_refresh_accessors(slot, 1);
+    self.pages[slot] = page;
+    log_dbg("mmu: slot %u contains page %u\n", slot, page);
+
+    if (slot < 2 && was_rom != is_rom) {
+      memory_refresh_accessors(slot, 1);
+    }
+  }
 }
 
 

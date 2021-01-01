@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include "altrom.h"
 #include "bootrom.h"
 #include "clock.h"
 #include "config.h"
@@ -111,8 +112,12 @@ static int main_init(void) {
     goto exit_bootrom;
   }
 
-  if (rom_init(sram) != 0) {
+  if (altrom_init(sram) != 0) {
     goto exit_config;
+  }
+
+  if (rom_init(sram) != 0) {
+    goto exit_altrom;
   }
 
   if (mmu_init(sram) != 0) {
@@ -161,6 +166,8 @@ exit_mmu:
   mmu_finit();
 exit_rom:
   rom_finit();
+exit_altrom:
+  altrom_finit();
 exit_config:
   config_finit();
 exit_bootrom:
@@ -217,6 +224,7 @@ static void main_finit(void) {
   divmmc_finit();
   mmu_finit();
   rom_finit();
+  altrom_finit();
   config_finit();
   bootrom_finit();
   memory_finit();

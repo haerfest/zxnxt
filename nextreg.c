@@ -1,3 +1,4 @@
+#include "altrom.h"
 #include "bootrom.h"
 #include "clock.h"
 #include "config.h"
@@ -51,18 +52,17 @@
 
 
 typedef struct {
-  u8_t                   selected_register;
-  nextreg_machine_type_t machine_type;
-  int                    is_hard_reset;
-  int                    palette_disable_auto_increment;
-  palette_t              palette_sprites;
-  palette_t              palette_layer2;
-  palette_t              palette_ula;
-  palette_t              palette_selected;
-  u8_t                   palette_index;
-  int                    palette_index_9bit_is_first_write;
-  u8_t                   fallback_colour;
-  int                    ula_next_mode;
+  u8_t      selected_register;
+  int       is_hard_reset;
+  int       palette_disable_auto_increment;
+  palette_t palette_sprites;
+  palette_t palette_layer2;
+  palette_t palette_ula;
+  palette_t palette_selected;
+  u8_t      palette_index;
+  int       palette_index_9bit_is_first_write;
+  u8_t      fallback_colour;
+  int       ula_next_mode;
 } nextreg_t;
 
 
@@ -86,7 +86,6 @@ static void nextreg_reset_soft(void) {
 
 static void nextreg_reset_hard(void) {
   self.selected_register = 0x00;
-  self.machine_type      = E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
   self.is_hard_reset     = 1;
 
   nextreg_reset_soft();
@@ -144,11 +143,6 @@ static void nextreg_config_mapping_write(u8_t value) {
 }
 
 
-nextreg_machine_type_t nextreg_get_machine_type(void) {
-  return self.machine_type;
-}
-
-
 static void nextreg_machine_type_write(u8_t value) {
   if (value & 0x80) {
     const u8_t display_timing = (value >> 4) & 0x03;
@@ -157,7 +151,7 @@ static void nextreg_machine_type_write(u8_t value) {
     }
   }
 
-  if (self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIG_MODE) {
+  if (config_is_active()) {
     const char* descriptions[8] = {
       "configuration mode",
       "ZX Spectrum 48K",
@@ -165,21 +159,23 @@ static void nextreg_machine_type_write(u8_t value) {
       "ZX Spectrum +2A/+2B/+3",
       "Pentagon"
     };
-    const u8_t machine_type = value & 0x03;
+    u8_t machine_type = value & 0x03;
 
-    self.machine_type = (machine_type <= E_NEXTREG_MACHINE_TYPE_PENTAGON)
-                      ? machine_type
-                      : E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+    if (machine_type > E_MACHINE_TYPE_PENTAGON) {
+      machine_type = E_MACHINE_TYPE_CONFIG_MODE;
+    }
 
-    log_dbg("nextreg: machine type set to %s\n", descriptions[self.machine_type]);
+    log_dbg("nextreg: machine type set to %s\n", descriptions[machine_type]);
 
     bootrom_deactivate();
 
-    if (self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIG_MODE) {
+    if (machine_type == E_MACHINE_TYPE_CONFIG_MODE) {
       config_activate();
     } else {
       config_deactivate();
     }
+
+    rom_set_machine_type(machine_type);
   }
 }
 
@@ -233,9 +229,10 @@ static void nextreg_spectrum_memory_mapping_write(u8_t value) {
 static void nextreg_alternate_rom_write(u8_t value) {
   const int  enable        = value & 0x80;
   const int  during_writes = value & 0x40;
-  const u8_t lock_rom      = (value & 0x30) >> 4;
+  const u8_t lock          = (value & 0x30) >> 4;
 
-  rom_configure_altrom(enable, during_writes, lock_rom);
+  rom_set_lock(lock);
+  altrom_activate(enable, during_writes);
 }
 
 

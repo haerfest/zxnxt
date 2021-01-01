@@ -60,22 +60,20 @@ u8_t divmmc_control_read(u16_t address) {
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
-  const int was_conmem_enabled = self.conmem_enabled;
+  if (value != (self.conmem_enabled << 7 | self.bank_number)) {
+    self.conmem_enabled = value >> 7;
+    self.bank_number    = value & 0x0F;
 
-  self.conmem_enabled = value >> 7;
-  self.bank_number    = value & 0x0F;
+    if (self.conmem_enabled) {
+      log_dbg("divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);
+    } else {
+      log_dbg("divmmc: CONMEM disabled\n");
+    }
 
-  if (self.conmem_enabled) {
-    log_dbg("divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);
-  } else {
-    log_dbg("divmmc: CONMEM disabled\n");
-  }
+    if (value & 0x40) {
+      log_wrn("divmmc: MAPRAM functionality not implemented\n");
+    }
 
-  if (value & 0x40) {
-    log_wrn("divmmc: MAPRAM functionality not implemented\n");
-  }
-
-  if (self.conmem_enabled != was_conmem_enabled) {
     memory_refresh_accessors(0, 2);
   }
 }
