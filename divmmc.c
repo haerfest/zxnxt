@@ -35,31 +35,22 @@ void divmmc_finit(void) {
 }
 
 
-int divmmc_read(u16_t address, u8_t* value) {
-  if (!self.conmem_enabled) {
-    return -1;
-  }
-
-  if (address < 0x2000) {
-    *value = self.rom[address];
-  } else {
-    *value = self.ram[self.bank_number * 8 * 1024 + address - 0x2000];
-  }
-
-  return 0;
+int divmmc_is_active(void) {
+  return self.conmem_enabled;
 }
 
 
-int divmmc_write(u16_t address, u8_t value) {
-  if (!self.conmem_enabled) {
-    return -1;
+u8_t divmmc_read(u16_t address, u8_t* value) {
+  if (address < 0x2000) {
+    return self.rom[address];
   }
+  
+  return self.ram[self.bank_number * 8 * 1024 + address - 0x2000];
+}
 
-  if (address >= 0x2000) {
-    self.ram[self.bank_number * 8 * 1024 + address - 0x2000] = value;
-  }
 
-  return 0;
+void divmmc_write(u16_t address, u8_t value) {
+  self.ram[self.bank_number * 8 * 1024 + address - 0x2000] = value;
 }
 
 
@@ -69,6 +60,8 @@ u8_t divmmc_control_read(u16_t address) {
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
+  const int was_conmem_enabled = self.conmem_enabled;
+
   self.conmem_enabled = value >> 7;
   self.bank_number    = value & 0x0F;
 
@@ -80,5 +73,9 @@ void divmmc_control_write(u16_t address, u8_t value) {
 
   if (value & 0x40) {
     log_wrn("divmmc: MAPRAM functionality not implemented\n");
+  }
+
+  if (self.conmem_enabled != was_conmem_enabled) {
+    memory_refresh_accessors(0, 2);
   }
 }

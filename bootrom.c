@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "defs.h"
 #include "log.h"
+#include "memory.h"
 #include "nextreg.h"
 #include "utils.h"
 
@@ -14,6 +15,7 @@
 typedef struct {
   u8_t* rom;
   u8_t* sram;
+  int   is_active;
 } bootrom_t;
 
 
@@ -34,6 +36,7 @@ int bootrom_init(u8_t* sram) {
     return -1;
   }
 
+  self.is_active = 1;
   return 0;
 }
 
@@ -46,34 +49,45 @@ void bootrom_finit(void) {
 }
 
 
-int bootrom_read(u16_t address, u8_t* value) {
-  if (!nextreg_is_bootrom_active()) {
-    return -1;
-  }
+int bootrom_is_active(void) {
+  return self.is_active;
+}
 
-  if (address >= 2 * BOOT_ROM_SIZE) {
-    return -1;
-  }
 
+void bootrom_activate(void) {
+  const int was_active = self.is_active;
+
+  self.is_active = 1;
+
+  if (!was_active) {
+    log_dbg("bootrom: activated\n");
+    memory_refresh_accessors(0, 2);
+  }
+}
+
+
+void bootrom_deactivate(void) {
+  const int was_active = self.is_active;
+  
+  self.is_active = 0;
+
+  if (was_active) {
+    log_dbg("bootrom: deactivated\n");
+    memory_refresh_accessors(0, 2);
+  }
+}
+
+
+u8_t bootrom_read(u16_t address) {
   /**
    * https://www.specnext.com/boot-system/:
    *   "The IPL [Initial Program Loader] contains 8KB of code, mirrored
    *   in the 16K ROM space."
    */
-  *value = self.rom[address & (BOOT_ROM_SIZE - 1)];
-  return 0;
+  return self.rom[address & (BOOT_ROM_SIZE - 1)];
 }
 
 
-int bootrom_write(u16_t address, u8_t value) {
-  if (!nextreg_is_bootrom_active()) {
-    return -1;
-  }
-
-  if (address >= 2 * BOOT_ROM_SIZE) {
-    return -1;
-  }
-
+void bootrom_write(u16_t address, u8_t value) {
   log_inf("bootrom: attempt to write $%02X to $%04X\n", value, address);
-  return -1;
 }

@@ -16,11 +16,19 @@
  */
 
 
-#define RAM_SIZE  (2 * 1024 * 1024)
+#define RAM_SIZE            (2 * 1024 * 1024)
+#define ADDRESS_SPACE_SIZE  0x10000
+#define ADDRESS_PAGE_SIZE   0x2000
+
+
+typedef u8_t (*reader_t)(u16_t address);
+typedef void (*writer_t)(u16_t address, u8_t value);
 
 
 typedef struct {
-  u8_t* sram;
+  u8_t*    sram;
+  reader_t readers[ADDRESS_SPACE_SIZE / ADDRESS_PAGE_SIZE];
+  writer_t writers[ADDRESS_SPACE_SIZE / ADDRESS_PAGE_SIZE];
 } memory_t;
 
 
@@ -72,50 +80,48 @@ void memory_finit(void) {
  * 48k-64k:
  *   1. mmu
  */
-u8_t memory_read(u16_t address) {
-  u8_t value;
-  
-  if (address < 0x4000) {
-    if (bootrom_read(address, &value) == 0 ||
-        config_read(address, &value)  == 0 ||
-        divmmc_read(address, &value)  == 0 ||
-        mmu_read(address, &value)     == 0 ||
-        rom_read(address, &value)     == 0) {
-      return value;
-    }
-  } else if (address < 0xC000) {
-    if (mmu_read(address, &value) == 0) {
-      return value;
-    }
-  } else {
-    if (mmu_read(address, &value) == 0) {
-      return value;
+void memory_refresh_accessors(int page, int n_pages) {
+  int i;
+
+  for (i = page; i < page + n_pages; i++) {
+    if (i < 2) {
+      /* Addresses 0x0000 - 0x3FFF. */
+      if (bootrom_is_active()) {
+        self.readers[i] = bootrom_read;
+        self.writers[i] = bootrom_write;
+      } else if (config_is_active()) {
+        self.readers[i] = config_read;
+        self.writers[i] = config_write;
+      } else if (divmmc_is_active()) {
+        self.readers[i] = divmmc_read;
+        self.writers[i] = divmmc_write;
+      } else if (mmu_page_get(i) != MMU_ROM_PAGE) {
+        self.readers[i] = mmu_read;
+        self.writers[i] = mmu_write;
+      } else {
+        self.readers[i] = rom_read;
+        self.writers[i] = rom_write;
+      }
+    } else {
+      /* Addresses 0x4000 - 0xFFFF. */
+      self.readers[i] = mmu_read;
+      self.writers[i] = mmu_write;
     }
   }
 
-  log_err("memory: cannot read from $%04X\n", address);
-  return 0xFF;
+  log_dbg("memory: refreshed accessors for pages %u to %u\n", page, page + n_pages - 1);
+}
+
+
+u8_t memory_read(u16_t address) {
+  const u8_t page = address / ADDRESS_PAGE_SIZE;
+  return self.readers[page](address);
 }
 
 
 void memory_write(u16_t address, u8_t value) {
-  if (address < 0x4000) {
-    if (bootrom_write(address, value) == 0 ||
-        config_write(address, value)  == 0 ||
-        divmmc_write(address, value)  == 0 ||
-        mmu_write(address, value)     == 0 ||
-        rom_write(address, value)     == 0) {
-      return;
-    }
-  } else if (address < 0xC000) {
-    if (mmu_write(address, value) == 0) {
-      return;
-    }
-  } else {
-    if (mmu_write(address, value) == 0) {
-      return;
-    }
-  }
+  const u8_t page = address / ADDRESS_PAGE_SIZE;
+  self.writers[page](address, value);
 }
 
 

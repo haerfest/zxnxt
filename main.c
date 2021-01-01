@@ -143,6 +143,8 @@ static int main_init(void) {
     goto exit_layer2;
   }
 
+  memory_refresh_accessors(0, 8);
+
   return 0;
 
 exit_layer2:

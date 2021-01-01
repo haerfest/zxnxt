@@ -20,8 +20,8 @@ static mmu_t self;
 int mmu_init(u8_t* sram) {
   self.ram = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM];
 
-  mmu_page_set(0, 0xFF);
-  mmu_page_set(1, 0xFF);
+  mmu_page_set(0, MMU_ROM_PAGE);
+  mmu_page_set(1, MMU_ROM_PAGE);
   mmu_page_set(2, 10);
   mmu_page_set(3, 11);
   mmu_page_set(4, 4);
@@ -45,6 +45,8 @@ u8_t mmu_page_get(u8_t slot) {
 void mmu_page_set(u8_t slot, u8_t page) {
   self.pages[slot] = page;
   log_dbg("mmu: slot %u contains page %u\n", slot, page);
+
+  memory_refresh_accessors(slot, 1);
 }
 
 
@@ -61,36 +63,17 @@ static u32_t mmu_translate(u16_t address) {
   const u8_t  slot   = address / PAGE_SIZE;
   const u16_t offset = address & (PAGE_SIZE - 1);
 
-  /* Assertion: self.pages[slot] != 0xFF. */
+  /* Assertion: self.pages[slot] != MMU_ROM_PAGE. */
 
   return self.pages[slot] * PAGE_SIZE + offset;
 }
 
 
-int mmu_read(u16_t address, u8_t* value) {
-  const u8_t slot = address / PAGE_SIZE;
-  u32_t      offset;
-
-  if (self.pages[slot] == 0xFF) {
-    return -1;
-  }
-
-  offset = mmu_translate(address);
-  *value = self.ram[offset];
-  return 0;
+u8_t mmu_read(u16_t address) {
+  return self.ram[mmu_translate(address)];
 }
 
 
-int mmu_write(u16_t address, u8_t value) {
-  const u8_t slot = address / PAGE_SIZE;
-  u32_t      offset;
-
-  if (self.pages[slot] == 0xFF) {
-    return -1;
-  }
-
-  offset = mmu_translate(address);
-  self.ram[offset] = value;
-
-  return 0;
+void mmu_write(u16_t address, u8_t value) {
+  self.ram[mmu_translate(address)] = value;
 }

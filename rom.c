@@ -121,27 +121,23 @@ static int rom_translate(u16_t address, u8_t** sram, rom_action_t action) {
 }
 
 
-int rom_read(u16_t address, u8_t* value) {
+u8_t rom_read(u16_t address) {
   u8_t* sram;
 
   if (rom_translate(address, &sram, E_ROM_ACTION_READ) != 0) {
-    return -1;
+    return 0xFF;
   }
 
-  *value = *sram;
-  return 0;
+  return *sram;
 }
 
 
-int rom_write(u16_t address, u8_t value) {
+void rom_write(u16_t address, u8_t value) {
   u8_t* sram;
 
-  if (rom_translate(address, &sram, E_ROM_ACTION_WRITE) != 0) {
-    return -1;
+  if (rom_translate(address, &sram, E_ROM_ACTION_WRITE) == 0) {
+    *sram = value;
   }
-
-  *sram = value;
-  return 0;
 }
 
 

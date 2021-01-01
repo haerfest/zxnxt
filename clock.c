@@ -116,14 +116,13 @@ void clock_run(u32_t cpu_ticks) {
     self.sync_7mhz += ticks_7mhz * 4;
   }
 
-  /* Align with reality roughly once a second. */
+  /* Align with reality roughly once an emulated second. */
   ticks_elapsed = self.ticks_28mhz - self.sync_reality;
   if (ticks_elapsed >= frequency_28mhz[self.video_timing]) {
-    const u64_t now           = SDL_GetPerformanceCounter();
-    const u64_t ticks_reality = frequency_28mhz[self.video_timing] * (now - self.time_reality) / self.time_frequency;
-    const float percentage    = 100.0 * ticks_elapsed / ticks_reality;
+    const u64_t  now     = SDL_GetPerformanceCounter();
+    const double seconds = (double) (now - self.time_reality) / self.time_frequency;
 
-    log_inf("clock: emulating at %.1f%% speed\n", percentage);
+    log_inf("clock: %llu %u Hz ticks took %f seconds\n", ticks_elapsed, frequency_28mhz[self.video_timing], seconds);
 
     self.sync_reality = self.ticks_28mhz;
     self.time_reality = now;

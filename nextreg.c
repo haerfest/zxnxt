@@ -1,4 +1,6 @@
+#include "bootrom.h"
 #include "clock.h"
+#include "config.h"
 #include "cpu.h"
 #include "defs.h"
 #include "log.h"
@@ -50,9 +52,7 @@
 
 typedef struct {
   u8_t                   selected_register;
-  u8_t                   rom_ram_bank;
   nextreg_machine_type_t machine_type;
-  int                    is_bootrom_active;
   int                    is_hard_reset;
   int                    palette_disable_auto_increment;
   palette_t              palette_sprites;
@@ -85,13 +85,14 @@ static void nextreg_reset_soft(void) {
 
 
 static void nextreg_reset_hard(void) {
-  self.selected_register            = 0x00;
-  self.machine_type                 = E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
-  self.is_bootrom_active            = 1;
-  self.is_hard_reset                = 1;
-  self.rom_ram_bank                 = 0;
+  self.selected_register = 0x00;
+  self.machine_type      = E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
+  self.is_hard_reset     = 1;
 
   nextreg_reset_soft();
+
+  bootrom_activate();
+  config_activate();
 }
 
 
@@ -102,11 +103,6 @@ int nextreg_init(void) {
 
 
 void nextreg_finit(void) {
-}
-
-
-int nextreg_is_bootrom_active(void) {
-  return self.is_bootrom_active;
 }
 
 
@@ -144,13 +140,7 @@ static void nextreg_reset_write(u8_t value) {
 
 static void nextreg_config_mapping_write(u8_t value) {
   /* Only bits 4:0 are specified, but FPGA uses bits 6:0. */
-  self.rom_ram_bank = value & 0x7F;
-  log_dbg("nextreg: ROM/RAM bank in lower 16 KiB set to %u\n", self.rom_ram_bank);
-}
-
-
-u8_t nextreg_get_rom_ram_bank(void) {
-  return self.rom_ram_bank;
+  config_set_rom_ram_bank(value & 0x7F);
 }
 
 
@@ -183,8 +173,13 @@ static void nextreg_machine_type_write(u8_t value) {
 
     log_dbg("nextreg: machine type set to %s\n", descriptions[self.machine_type]);
 
-    self.is_bootrom_active = 0;
-    log_dbg("nextreg: bootrom disabled\n");
+    bootrom_deactivate();
+
+    if (self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIG_MODE) {
+      config_activate();
+    } else {
+      config_deactivate();
+    }
   }
 }
 
@@ -200,7 +195,7 @@ static void nextreg_cpu_speed_write(u8_t value) {
 
 
 static void nextreg_video_timing_write(u8_t value) {
-  if (nextreg_is_config_mode_active()) {
+  if (config_is_active()) {
     clock_video_timing_set(value & 0x03);
   }
 }
@@ -241,11 +236,6 @@ static void nextreg_alternate_rom_write(u8_t value) {
   const u8_t lock_rom      = (value & 0x30) >> 4;
 
   rom_configure_altrom(enable, during_writes, lock_rom);
-}
-
-
-int nextreg_is_config_mode_active(void) {
-  return self.machine_type == E_NEXTREG_MACHINE_TYPE_CONFIG_MODE;
 }
 
 
