@@ -212,7 +212,7 @@ static void main_eventloop(void) {
       break;
     }
 
-    if (cpu_run(1000000) != 0) {
+    if (cpu_run(250000) != 0) {
       break;
     }
   }
