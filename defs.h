@@ -2,6 +2,10 @@
 #define __DEFS_H
 
 
+#define FRAME_BUFFER_WIDTH  (32 + 256 + 64)
+#define FRAME_BUFFER_HEIGHT 312
+
+
 typedef enum {
   E_MACHINE_TYPE_CONFIG_MODE = 0,
   E_MACHINE_TYPE_ZX_48K,

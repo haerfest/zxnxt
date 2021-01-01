@@ -22,9 +22,6 @@
 #include "utils.h"
 
 
-#define FRAME_BUFFER_WIDTH  (32 + 256 + 64)
-#define FRAME_BUFFER_HEIGHT 312
-
 #define RENDER_SCALE_X 2
 #define RENDER_SCALE_Y 2
 
@@ -50,8 +47,15 @@ static int main_init(void) {
     goto exit;
   }
 
-  if (SDL_CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0, &self.window, &self.renderer) != 0) {
-    fprintf(stderr, "main: SDL_CreateWindowAndRenderer error: %s\n", SDL_GetError());
+  self.window = SDL_CreateWindow("zxnxt", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+  if (self.window == NULL) {
+    fprintf(stderr, "main: SDL_CreateWindow error: %s\n", SDL_GetError());
+    goto exit_sdl;
+  }
+
+  self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED);
+  if (self.renderer == NULL) {
+    fprintf(stderr, "main: SDL_CreateRenderer error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
 
@@ -60,7 +64,7 @@ static int main_init(void) {
     goto exit_window_and_renderer;
   }
 
-  self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
+  self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGBA4444, SDL_TEXTUREACCESS_STREAMING, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
     fprintf(stderr, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;

@@ -61,6 +61,7 @@ typedef enum {
 
 typedef struct {
   SDL_Renderer*             renderer;
+  SDL_Texture*              texture;
   const ula_display_spec_t* display_spec;
   u16_t                     display_offsets[192];
   u8_t*                     display_ram;
@@ -79,7 +80,14 @@ typedef struct {
   u8_t                      border_colour;
   u8_t                      speaker_state;
   palette_t                 palette;
+  u8_t*                     frame_buffer;
+  u8_t*                     pixel;
 } self_t;
+
+
+#define PLOT(colour) \
+  *self.pixel++ = colour.blue << 4 | 0; \
+  *self.pixel++ = colour.red  << 4 | colour.green;
 
 
 static self_t self;
@@ -87,9 +95,8 @@ static self_t self;
 
 static void ula_display_state_top_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
-  
-  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+
+  PLOT(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
     self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
@@ -99,9 +106,8 @@ static void ula_display_state_top_border(void) {
 
 static void ula_display_state_left_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
-  
-  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+
+  PLOT(colour);
 
   if (++self.display_column == 32) {
     const u16_t line = self.display_line - self.display_spec->top_border_lines;
@@ -136,8 +142,7 @@ static void ula_display_state_frame_buffer(void) {
   }
   colour = palette_read_rgb(self.palette, index);
 
-  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+  PLOT(colour);
 
   self.display_pixel_mask >>= 1;
   if (++self.display_column == 32 + 256) {
@@ -150,7 +155,7 @@ static void ula_display_state_hsync(void) {
   if (++self.display_column == 32 + 256 + 64 + 96) {
     self.display_column = 0;
     self.display_line++;
-    self.display_state = (self.display_line < self.display_spec->top_border_lines)                            ? E_ULA_DISPLAY_STATE_TOP_BORDER
+    self.display_state = (self.display_line < self.display_spec->top_border_lines)                                    ? E_ULA_DISPLAY_STATE_TOP_BORDER
                        : (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) ? E_ULA_DISPLAY_STATE_LEFT_BORDER
                        : E_ULA_DISPLAY_STATE_BOTTOM_BORDER;
   }
@@ -160,8 +165,7 @@ static void ula_display_state_hsync(void) {
 static void ula_display_state_right_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
-  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
+  PLOT(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
     self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
@@ -171,10 +175,9 @@ static void ula_display_state_right_border(void) {
 
 static void ula_display_state_bottom_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
-  
-  SDL_SetRenderDrawColor(self.renderer, colour.red, colour.green, colour.blue, SDL_ALPHA_OPAQUE);
-  SDL_RenderDrawPoint(self.renderer, self.display_column, self.display_line);
-  
+
+  PLOT(colour);
+
   if (++self.display_column == 32 + 256 + 64) {
     self.display_state = (self.display_line < self.display_spec->total_lines)
                        ? E_ULA_DISPLAY_STATE_HSYNC
@@ -182,6 +185,19 @@ static void ula_display_state_bottom_border(void) {
 
     if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
       /* TODO: Generate VSYNC interrupt. */
+      void* pixels;
+      int   pitch;
+      if (SDL_LockTexture(self.texture, NULL, &pixels, &pitch) != 0) {
+        log_err("ula: SDL_LockTexture error: %s\n", SDL_GetError());
+        return;
+      }
+      memcpy(pixels, self.frame_buffer, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
+      SDL_UnlockTexture(self.texture);
+
+      if (SDL_RenderCopy(self.renderer, self.texture, NULL, NULL) != 0) {
+        log_err("ula: SDL_RenderCopy error: %s\n", SDL_GetError());
+        return;
+      }
       SDL_RenderPresent(self.renderer);
     }
   }
@@ -194,10 +210,11 @@ static void ula_display_state_vsync(void) {
     self.display_line++;
 
     if (self.display_line == self.display_spec->total_lines + self.display_spec->blanking_period_lines) {
-      self.display_line     = 0;
-      self.display_offset   = 0;
-      self.attribute_offset = 0;
-      self.display_state    = E_ULA_DISPLAY_STATE_TOP_BORDER;
+      self.display_line       = 0;
+      self.display_offset     = 0;
+      self.attribute_offset   = 0;
+      self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
+      self.pixel              = self.frame_buffer;
     }
   }
 }
@@ -256,7 +273,15 @@ static void ula_fill_tables(void) {
 
 
 int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
+  self.frame_buffer = malloc(FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
+  if (self.frame_buffer == NULL) {
+    log_err("ula: out of memory\n");
+    return -1;
+  }
+
+  self.pixel              = self.frame_buffer;
   self.renderer           = renderer;
+  self.texture            = texture;
   self.display_ram        = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
   self.attribute_ram      = &self.display_ram[192 * 32];
   self.display_offset     = 0;
@@ -305,6 +330,7 @@ static void ula_reset_display_spec(void) {
   self.display_line       = 0;
   self.display_column     = 0;
   self.display_pixel_mask = 0;
+  self.pixel              = self.frame_buffer;
 }
 
 

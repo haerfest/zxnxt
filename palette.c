@@ -40,16 +40,16 @@ palette_entry_t palette_read_rgb(palette_t palette, u8_t index) {
 
 palette_entry_t palette_read(palette_t palette, u8_t index) {
   palette_entry_t entry = self.palette[palette][index];
-  entry.red   >>= 5;
-  entry.green >>= 5;
-  entry.blue  >>= 5;
+  entry.red   >>= 1;
+  entry.green >>= 1;
+  entry.blue  >>= 1;
   return entry;
 }
 
 
 void palette_write(palette_t palette, u8_t index, palette_entry_t entry) {
-  entry.red   <<= 5;
-  entry.green <<= 5;
-  entry.blue  <<= 5;
+  entry.red   <<= 1;
+  entry.green <<= 1;
+  entry.blue  <<= 1;
   self.palette[palette][index] = entry;
 }
