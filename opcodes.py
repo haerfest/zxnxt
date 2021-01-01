@@ -1546,7 +1546,7 @@ def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str
     return f'{name}[memory_read(PC++)]();'
 
 
-def main() -> None:
+def main_fast() -> None:
     functions    = {}
     tables       = {}
     instructions = table()
@@ -1584,5 +1584,10 @@ void cpu_step(void) {{
 ''')
 
 
+def main() -> None:
+    with open('opcodes.c', 'w') as f:
+        generate(table(), f)
+
+
 if __name__ == '__main__':
-    main()
+    main_fast()
