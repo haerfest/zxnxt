@@ -186,6 +186,9 @@ typedef struct {
 static cpu_t self;
 
 
+#include "opcodes.c"
+
+
 static void cpu_fill_tables(void) {
   int value;
   
@@ -228,10 +231,9 @@ void cpu_reset(void) {
 
 int cpu_run(u32_t ticks) {
   u32_t tick;
-  u8_t  opcode;
 
   for (tick = 0; tick < ticks; tick++) {
-#include "opcodes.c"
+    cpu_step();
   }
 
   return 0;

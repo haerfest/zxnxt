@@ -232,7 +232,7 @@ def cpl() -> C:
 
 def daa() -> C:
     # TODO: implement DAA.
-    return None
+    return 'log_wrn("cpu: DAA not implemented\\n");'
 
 def dec_pdd(xy: Optional[str] = None) -> C:
     return f'''
@@ -251,6 +251,9 @@ def dec_r(r: str) -> C:
 def dec_ss(ss: str) -> C:
     return f'{ss}--; T(2);'
 
+def di() -> C:
+    return 'IFF1 = IFF2 = 0;'
+
 def djnz() -> C:
     return f'''
         T(1);
@@ -259,6 +262,10 @@ def djnz() -> C:
             PC += (s8_t) Z; T(5);
         }}
     '''
+
+def ei() -> C:
+    # TODO: enabled maskable interrupt only AFTER NEXT instruction
+    return 'IFF1 = IFF2 = 1;'
 
 def ex(r1: str, r2: str) -> C:
     return f'''
@@ -376,6 +383,9 @@ def jp(cond: Optional[str] = None) -> C:
         s += '}'
 
     return s
+
+def jp_pss(ss: str) -> C:
+    return f'PC = {ss};'
 
 def ld_A_I() -> C:
     return '''
@@ -529,6 +539,9 @@ def neg() -> C:
         A = -A;
         F = SZ53(A) | HF_SUB(0, prev, A) | (prev == 0x80) << VF_SHIFT | NF_MASK | (prev != 0x00) << CF_SHIFT;
     '''
+
+def nop() -> C:
+    return ''
 
 def nreg_reg_A() -> C:
     return '''
@@ -1087,7 +1100,7 @@ def table(xy: Optional[str] = None) -> Table:
 
     t = {
         # 1x: complete.
-        0x00: (f'NOP',          ''),
+        0x00: (f'NOP',          nop),
         0x01: (f'LD BC,nn',     partial(ld_dd_nn, 'BC')),
         0x02: (f'LD (BC),A',    partial(ld_pdd_r, 'BC', 'A')),
         0x03: (f'INC BC',       partial(inc_ss,   'BC')),
@@ -1144,7 +1157,7 @@ def table(xy: Optional[str] = None) -> Table:
         0x30: (f'JR NC,e',      partial(jr_c_e, '!CF')),
         0x31: (f'LD SP,nn',     partial(ld_dd_nn, 'SP')),
         0x32: (f'LD (nn),A',    ld_pnn_a),
-        0x33: (f'INC SP',       inc_ss(f'SP')),
+        0x33: (f'INC SP',       partial(inc_ss, 'SP')),
         0x34: (f'INC ({hld})',  partial(inc_pdd, xy)),
         0x35: (f'DEC ({hld})',  partial(dec_pdd, xy)),
         0x36: (f'LD ({hld}),n', partial(ld_pss_n, xy)),
@@ -1348,7 +1361,7 @@ def table(xy: Optional[str] = None) -> Table:
         0xE6: (f'AND n',        partial(logical_n, '&')),
         0xE7: (f'RST $20',      partial(rst, 0x20)),
         0xE8: (f'RET PE',       partial(ret,  'F & PF_MASK')),
-        0xE9: (f'JP ({hl})',    f'PC = {hl};'),
+        0xE9: (f'JP ({hl})',    partial(jp_pss, hl)),
         0xEA: (f'JP PE,nn',     partial(jp,   'F & PF_MASK')),
         0xEB: (f'EX DE,HL',     partial(ex, 'DE', 'HL')),
         0xEC: (f'CALL PE,nn',   partial(call, 'F & PF_MASK')),
@@ -1360,7 +1373,7 @@ def table(xy: Optional[str] = None) -> Table:
         0xF0: (f'RET P',       partial(ret,   '!(F & SF_MASK)')),
         0xF1: (f'POP AF',      partial(pop_qq, 'AF')),
         0xF2: (f'JP P,nn',     partial(jp,   '!(F & SF_MASK)')),
-        0xF3: (f'DI',          'IFF1 = IFF2 = 0;'),
+        0xF3: (f'DI',          di),
         0xF4: (f'CALL P,nn',   partial(call, '!(F & SF_MASK)')),
         0xF5: (f'PUSH AF',     partial(push_qq, 'AF')),
         0xF6: (f'OR n',        partial(logical_n, '|')),
@@ -1368,7 +1381,7 @@ def table(xy: Optional[str] = None) -> Table:
         0xF8: (f'RET M',       partial(ret,  'F & SF_MASK')),
         0xF9: (f'LD SP,{hl}',  partial(ld_dd_ss, 'SP', hl)),
         0xFA: (f'JP M,nn',     partial(jp,   'F & SF_MASK')),
-        0xFB: (f'EI',          'IFF1 = IFF2 = 1;'),  # TODO: enabled maskable interrupt only AFTER NEXT instruction
+        0xFB: (f'EI',          ei),
         0xFC: (f'CALL M,nn',   partial(call, 'F & SF_MASK')),
         0xFD: None,
         0xFE: (f'CP n',        cp_n),
@@ -1500,10 +1513,75 @@ default:
 ''')
 
 
+def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str, C], tables: Dict[str, C]) -> C:
+    # First add functions for all opcode implementations, and build a look-up
+    # table to jump to them quickly.
+    table = dict((opcode, 'opcode_00') for opcode in range(256))
+
+    for opcode, entry in instructions.items():
+        name = 'opcode_' + '_'.join(f'{op:02X}' for op in prefix + [opcode])
+
+        if isinstance(entry, tuple):
+            mnemonic, implementation = entry
+            body                     = implementation()
+
+        elif isinstance(entry, dict):
+            mnemonic = 'prefix'
+            body     = generate_fast(entry, prefix + [opcode], functions, tables)
+
+        functions[name]          = (mnemonic, body)
+        table[opcode]            = name
+
+    # Write the lookup table.
+    name         = 'lookup_' + '_'.join(f'{op:02X}' for op in prefix) if prefix else 'lookup'
+    body         = ',\n'.join(table[op] for op in sorted(table))
+    tables[name] = body
+
+    if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
+        # Special opcode where 3rd byte is parameter and 4th byte needed for
+        # decoding. Read 4th byte, but keep PC at 3rd byte.
+        return f'{name}[memory_read(PC + 1)](); PC++;'
+
+    # Return the body that uses the table.
+    return f'{name}[memory_read(PC++)]();'
+
+
 def main() -> None:
+    functions    = {}
+    tables       = {}
+    instructions = table()
+    decoder      = generate_fast(instructions, [], functions, tables)
+
     with open('opcodes.c', 'w') as f:
-        instructions = table()
-        generate(instructions, f)
+        f.write('typedef void (*opcode_impl_t)(void);\n')
+
+        for name in sorted(functions):
+            f.write(f'static void {name}(void);\n')
+
+        f.write('\n');
+        for name in sorted(tables):
+            body = tables[name]
+            f.write(f'''
+static opcode_impl_t {name}[256] = {{
+{body}
+}};
+''')
+
+        f.write('\n');
+        for name in sorted(functions):
+            (comment, body) = functions[name];
+            f.write(f'''
+/* {comment} */
+static void {name}(void) {{
+{body}
+}}
+''')
+
+        f.write(f'''
+void cpu_step(void) {{
+  {decoder}
+}}
+''')
 
 
 if __name__ == '__main__':
