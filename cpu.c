@@ -171,6 +171,7 @@ typedef struct {
 
   /* Interrupt mode. */
   u8_t im;
+  int  irq_pending;
 
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
@@ -225,7 +226,24 @@ void cpu_reset(void) {
   I    = 0;
   R    = 0;
   IM   = 0;
+
+  self.irq_pending = 0;
+
   T(3);
+}
+
+
+void cpu_irq(void) {
+  if (self.iff1 != 1) {
+    return;
+  }
+  
+  if (self.im != 1) {
+    log_wrn("cpu: IRQ, but interrupt mode %d not implemented\n", I);
+    return;
+  }
+
+  self.irq_pending = 1;
 }
 
 
@@ -234,6 +252,17 @@ int cpu_run(u32_t ticks) {
 
   for (tick = 0; tick < ticks; tick++) {
     cpu_step();
+
+    if (self.irq_pending) {
+      self.irq_pending = 0;
+
+      /* The number of cycles required to complete the restart instruction is two
+       * more than normal due to the two added wait states. */
+      T(2);
+      memory_write(--SP, PCH); T(3);
+      memory_write(--SP, PCL); T(3);
+      PC = 0x0038;
+    }
   }
 
   return 0;

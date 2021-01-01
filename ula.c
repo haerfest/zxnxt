@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include "cpu.h"
 #include "defs.h"
 #include "log.h"
 #include "memory.h"
@@ -93,6 +94,27 @@ typedef struct {
 static self_t self;
 
 
+static void ula_blit(void) {
+  void* pixels;
+  int   pitch;
+
+  if (SDL_LockTexture(self.texture, NULL, &pixels, &pitch) != 0) {
+    log_err("ula: SDL_LockTexture error: %s\n", SDL_GetError());
+    return;
+  }
+
+  memcpy(pixels, self.frame_buffer, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
+  SDL_UnlockTexture(self.texture);
+
+  if (SDL_RenderCopy(self.renderer, self.texture, NULL, NULL) != 0) {
+    log_err("ula: SDL_RenderCopy error: %s\n", SDL_GetError());
+    return;
+  }
+
+  SDL_RenderPresent(self.renderer);
+}
+
+
 static void ula_display_state_top_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
@@ -173,6 +195,19 @@ static void ula_display_state_right_border(void) {
 }
 
 
+/**
+ * https://wiki.specnext.dev/Reference_machines
+ *
+ * "The ULA VBLANK Interrupt is the point at which the ULA sends an interrupt
+ * to the Z80 causing it to wake from HALT instructions and run the frame
+ * service routine. On all non-HDMI machines, this happens immediately before
+ * the blanking period begins, except for Pentagon where it happens 1 line
+ * earlier. On HDMI, because of the longer blanking period, it happens during
+ * the blanking period rather than before. At 50Hz, it happens 25 lines into
+ * the blanking period, leaving 15 lines between the interrupt and the actual
+ * start of the top border (close to the 14 lines it would be on VGA output).
+ * At 60Hz, it happens 24 lines into blanking, leaving only 9 lines."
+ */
 static void ula_display_state_bottom_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
@@ -184,21 +219,8 @@ static void ula_display_state_bottom_border(void) {
                        : E_ULA_DISPLAY_STATE_VSYNC;
 
     if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
-      /* TODO: Generate VSYNC interrupt. */
-      void* pixels;
-      int   pitch;
-      if (SDL_LockTexture(self.texture, NULL, &pixels, &pitch) != 0) {
-        log_err("ula: SDL_LockTexture error: %s\n", SDL_GetError());
-        return;
-      }
-      memcpy(pixels, self.frame_buffer, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
-      SDL_UnlockTexture(self.texture);
-
-      if (SDL_RenderCopy(self.renderer, self.texture, NULL, NULL) != 0) {
-        log_err("ula: SDL_RenderCopy error: %s\n", SDL_GetError());
-        return;
-      }
-      SDL_RenderPresent(self.renderer);
+      cpu_irq();
+      ula_blit();
     }
   }
 }
