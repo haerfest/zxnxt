@@ -1,4 +1,3 @@
-#include <SDL2/SDL.h>
 #include <stdlib.h>
 #include "clock.h"
 #include "defs.h"
@@ -7,7 +6,7 @@
 
 
 /**
- * See https://wiki.specnext.dev/Refresh_Rates:
+ * https://wiki.specnext.dev/Refresh_Rates
  *
  * "[...] VGA 0, the perfect timings where the system clock is 28MHz. As you
  * move up through VGA 1 to VGA 6, the system clock is increased according to
@@ -33,11 +32,7 @@ typedef struct {
   clock_video_timing_t video_timing;
   clock_cpu_speed_t    cpu_speed;
   u64_t                ticks_28mhz;   /* At max dot clock overflows in 20k years. */
-  u64_t                sync_7mhz;     /* Last 28 MHz tick where we synced the 7 MHz clock. */
-  u64_t                sync_reality;  /* Last 28 MHz tick where we synced with reality. */
-  u64_t                time_reality;  /* Time at the last reality check. */
-  u64_t                time_frequency;
-  
+  u64_t                sync_7mhz;     /* Last 28 MHz tick where we synced the 7 MHz clock. */  
 } next_clock_t;
 
 
@@ -49,9 +44,6 @@ int clock_init(void) {
   self.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
   self.ticks_28mhz    = 0;
   self.sync_7mhz      = self.ticks_28mhz;
-  self.sync_reality   = self.ticks_28mhz;
-  self.time_reality   = SDL_GetPerformanceCounter();
-  self.time_frequency = SDL_GetPerformanceFrequency();
 
   return 0;
 }
@@ -114,17 +106,5 @@ void clock_run(u32_t cpu_ticks) {
   if (ticks_7mhz > 0) {
     ula_run(ticks_7mhz);
     self.sync_7mhz += ticks_7mhz * 4;
-  }
-
-  /* Align with reality roughly once an emulated second. */
-  ticks_elapsed = self.ticks_28mhz - self.sync_reality;
-  if (ticks_elapsed >= frequency_28mhz[self.video_timing]) {
-    const u64_t  now     = SDL_GetPerformanceCounter();
-    const double seconds = (double) (now - self.time_reality) / self.time_frequency;
-
-    log_inf("clock: %llu %u Hz ticks took %f seconds\n", ticks_elapsed, frequency_28mhz[self.video_timing], seconds);
-
-    self.sync_reality = self.ticks_28mhz;
-    self.time_reality = now;
   }
 }
