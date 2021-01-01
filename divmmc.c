@@ -11,6 +11,7 @@
 
 
 typedef struct {
+  u8_t* sram;
   u8_t* rom;
   u8_t* ram;
   int   conmem_enabled;
@@ -21,11 +22,21 @@ typedef struct {
 static divmmc_t self;
 
 
+static void divmmc_refresh_ptr(void) {
+  /* We subtract 0x2000 because RAM is paged in starting at 0x2000, so all
+   * addresses are offset 0x2000. This saves us a subtraction on every
+   * access. */
+  self.ram = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_RAM + self.bank_number * 8 * 1024 - 0x2000];
+}
+
+
 int divmmc_init(u8_t* sram) {
+  self.sram           = sram;
   self.rom            = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
-  self.ram            = &sram[MEMORY_RAM_OFFSET_DIVMMC_RAM];
   self.conmem_enabled = 0;
   self.bank_number    = 0;
+
+  divmmc_refresh_ptr();
 
   return 0;
 }
@@ -40,17 +51,23 @@ int divmmc_is_active(void) {
 }
 
 
-u8_t divmmc_read(u16_t address, u8_t* value) {
-  if (address < 0x2000) {
-    return self.rom[address];
-  }
-  
-  return self.ram[self.bank_number * 8 * 1024 + address - 0x2000];
+u8_t divmmc_rom_read(u16_t address) {
+  return self.rom[address];
 }
 
 
-void divmmc_write(u16_t address, u8_t value) {
-  self.ram[self.bank_number * 8 * 1024 + address - 0x2000] = value;
+void divmmc_rom_write(u16_t address, u8_t value) {
+  log_wrn("rom: unsupported write of $%02X to $%02X\n", value, address);
+}
+
+
+u8_t divmmc_ram_read(u16_t address) {
+  return self.ram[address];
+}
+
+
+void divmmc_ram_write(u16_t address, u8_t value) {
+  self.ram[address] = value;
 }
 
 
@@ -63,6 +80,8 @@ void divmmc_control_write(u16_t address, u8_t value) {
   if (value != (self.conmem_enabled << 7 | self.bank_number)) {
     self.conmem_enabled = value >> 7;
     self.bank_number    = value & 0x0F;
+
+    divmmc_refresh_ptr();
 
     if (self.conmem_enabled) {
       log_dbg("divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);

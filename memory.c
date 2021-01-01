@@ -94,8 +94,8 @@ void memory_refresh_accessors(int page, int n_pages) {
         self.readers[i] = config_read;
         self.writers[i] = config_write;
       } else if (divmmc_is_active()) {
-        self.readers[i] = divmmc_read;
-        self.writers[i] = divmmc_write;
+        self.readers[i] = (i == 0) ? divmmc_rom_read  : divmmc_ram_read;
+        self.writers[i] = (i == 0) ? divmmc_rom_write : divmmc_ram_write;
       } else if (mmu_page_get(i) != MMU_ROM_PAGE) {
         self.readers[i] = mmu_read;
         self.writers[i] = mmu_write;
