@@ -2,6 +2,7 @@
 #include <time.h>
 #include "cpu.h"
 #include "defs.h"
+#include "keyboard.h"
 #include "log.h"
 #include "memory.h"
 #include "palette.h"
@@ -364,8 +365,7 @@ void ula_finit(void) {
 
 
 u8_t ula_read(u16_t address) {
-  log_wrn("ula: unimplemented read from $%04X\n", address);
-  return 0x1F;  /* No keys pressed. */
+  return keyboard_read(address);
 }
 
 

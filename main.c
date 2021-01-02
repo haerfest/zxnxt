@@ -8,6 +8,7 @@
 #include "divmmc.h"
 #include "i2c.h"
 #include "io.h"
+#include "keyboard.h"
 #include "layer2.h"
 #include "log.h"
 #include "memory.h"
@@ -136,8 +137,12 @@ static int main_init(void) {
     goto exit_divmmc;
   }
 
-  if (ula_init(self.renderer, self.texture, sram) != 0) {
+  if (keyboard_init() != 0) {
     goto exit_clock;
+  }
+
+  if (ula_init(self.renderer, self.texture, sram) != 0) {
+    goto exit_keyboard;
   }
 
   if (timex_init() != 0) {
@@ -162,6 +167,8 @@ exit_timex:
   timex_finit();
 exit_ula:
   ula_finit();
+exit_keyboard:
+  keyboard_finit();
 exit_clock:
   clock_finit();
 exit_divmmc:
@@ -224,6 +231,7 @@ static void main_finit(void) {
   layer2_finit();
   timex_finit();
   ula_finit();
+  keyboard_finit();
   clock_finit();
   divmmc_finit();
   mmu_finit();
