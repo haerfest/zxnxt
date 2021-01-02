@@ -966,7 +966,7 @@ def swap() -> C:
 def test() -> C:
     return '''
        TMP = A & memory_read(PC++); T(3);
-       F = SZ53P(A) | HF_MASK;
+       F   = SZ53P(TMP) | HF_MASK;
     '''
 
 
