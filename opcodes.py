@@ -231,10 +231,23 @@ def cpl() -> C:
     '''
 
 def daa() -> C:
-    # TODO: implement DAA.
     return '''
-        log_err("cpu: DAA not implemented\\n");
-        exit(1);
+        /* The Undocumented Z80 Documented, Version 0.91, section 4.7. */
+        const int  hn9f = A >= 0x90;          /* High nibble 9-F. */
+        const int  hnaf = A >= 0xA0;          /* High nibble A-F. */
+        const int  ln05 = (A & 0x0F) < 0x06;  /* Low  nibble 0-5. */
+        const int  ln09 = (A & 0x0F) < 0x0A;  /* Low  nibble 0-9. */
+        const int  lnaf = !ln09;              /* Low  nibble A-F. */
+        const u8_t cf   = (F & CF_MASK) >> CF_SHIFT;
+        const u8_t hf   = (F & HF_MASK) >> HF_SHIFT;
+        const u8_t nf   = (F & NF_MASK) >> NF_SHIFT;
+        const u8_t diff = 0x06 * (lnaf | hf)
+                        + 0x60 * (cf | (hnaf & ln09) | hn9f);
+        const u8_t cf_  = cf | hnaf | (hn9f & lnaf);
+        const u8_t hf_  = ((!nf) & lnaf) | (nf & hf & ln05);
+
+        A += nf ? -diff : diff;
+        F  = SZ53P(A) | hf_ << HF_SHIFT | nf << NF_SHIFT | cf_ << CF_SHIFT;
     '''
 
 def dec_pdd(xy: Optional[str] = None) -> C:
