@@ -238,13 +238,13 @@ static void ula_display_state_bottom_border(void) {
       ula_blit();
 
       if (elapsed_ns < desired_ns) {
-        const struct timespec t = {
+        struct timespec t = {
           .tv_sec  = 0,
           .tv_nsec = desired_ns - elapsed_ns
         };
 
         log_inf("ula: sleeping %lld nanoseconds\n", t.tv_nsec);
-        (void) nanosleep(&t, NULL);
+        while (nanosleep(&t, &t) != 0);
       }
 
       self.vsync_time = now;
