@@ -157,8 +157,10 @@ static void ula_display_state_frame_buffer(void) {
   }
 
   /* TODO: blinking colours. */
-  if (self.display_line   >= self.clip_y1 && self.display_line   <= self.clip_y2 &&
-      self.display_column >= self.clip_x1 && self.display_column <= self.clip_x2) {
+  if (self.display_line   >= self.display_spec->top_border_lines + self.clip_y1 &&
+      self.display_line   <= self.display_spec->top_border_lines + self.clip_y2 &&
+      self.display_column >= 32 + self.clip_x1 &&
+      self.display_column <= 32 + self.clip_x2) {
     if (self.display_byte & self.display_pixel_mask) {
       /* Ink. */
       index = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
