@@ -7,12 +7,11 @@
 
 #define log_err(...) fprintf(stderr, __VA_ARGS__)
 #define log_inf(...) fprintf(stderr, __VA_ARGS__)
+#define log_wrn(...) fprintf(stderr, __VA_ARGS__)
 
 #ifdef DEBUG
-#define log_wrn(...) fprintf(stderr, __VA_ARGS__)
 #define log_dbg(...) fprintf(stderr, __VA_ARGS__)
 #else
-#define log_wrn(...)
 #define log_dbg(...)
 #endif
 
