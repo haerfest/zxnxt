@@ -63,6 +63,7 @@ typedef enum {
 typedef struct {
   SDL_Renderer*             renderer;
   SDL_Texture*              texture;
+  u64_t                     vsync_time;
   const ula_display_spec_t* display_spec;
   u16_t                     display_offsets[192];
   u8_t*                     display_ram;
@@ -228,8 +229,18 @@ static void ula_display_state_bottom_border(void) {
                        : E_ULA_DISPLAY_STATE_VSYNC;
 
     if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
+      const u64_t  now        = SDL_GetPerformanceCounter();
+      const int    elapsed_ms = (double) (now - self.vsync_time) / SDL_GetPerformanceFrequency();
+      const int    desired_ms = (self.display_frequency == E_ULA_DISPLAY_FREQUENCY_50HZ) ? 20 : 16;
+
       cpu_irq();
       ula_blit();
+
+      if (elapsed_ms < desired_ms) {
+        SDL_Delay(desired_ms - elapsed_ms);
+      }
+
+      self.vsync_time = now;
     }
   }
 }
@@ -313,6 +324,7 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.pixel              = self.frame_buffer;
   self.renderer           = renderer;
   self.texture            = texture;
+  self.vsync_time         = SDL_GetPerformanceCounter();
   self.display_ram        = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
   self.attribute_ram      = &self.display_ram[192 * 32];
   self.display_offset     = 0;
@@ -328,9 +340,10 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.speaker_state      = 0;
   self.palette            = E_PALETTE_ULA_FIRST;
   self.clip_x1            = 0;
-  self.clip_x2            = 159 * 2;
+  self.clip_x2            = 255 * 2;
   self.clip_y1            = 0;
-  self.clip_y2            = 255;
+  self.clip_y2            = 191;
+
   ula_fill_tables();
 
   return 0;
@@ -405,11 +418,11 @@ void ula_palette_set(int use_second) {
 }
 
 
-void ula_clip_set(int x1, int x2, int y1, int y2) {
+void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_x1 = x1;
   self.clip_x2 = x2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
 
-  log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", x1, x2, y1, y2);
+  log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", self.clip_x1, self.clip_x2, self.clip_y1, self.clip_y2);
 }

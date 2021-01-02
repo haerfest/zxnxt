@@ -65,11 +65,8 @@ typedef struct {
   int       palette_index_9bit_is_first_write;
   u8_t      fallback_colour;
   int       ula_next_mode;
-  int       ula_clip_index;
-  int       ula_clip_x1;
-  int       ula_clip_x2;
-  int       ula_clip_y1;
-  int       ula_clip_y2;
+  u8_t      ula_clip_index;
+  u8_t      ula_clip[4];  /* Elements: x1, x2, y1, y2. */
 } nextreg_t;
 
 
@@ -87,12 +84,12 @@ static void nextreg_reset_soft(void) {
   self.fallback_colour                   = 0xE3;
   self.ula_next_mode                     = 0;
   self.ula_clip_index                    = 0;
-  self.ula_clip_x1                       = 0;
-  self.ula_clip_x2                       = 159;
-  self.ula_clip_y1                       = 0;
-  self.ula_clip_y2                       = 255;
+  self.ula_clip[0]                       = 0;
+  self.ula_clip[1]                       = 255;
+  self.ula_clip[2]                       = 0;
+  self.ula_clip[3]                       = 191;
 
-  ula_clip_set(self.ula_clip_x1, self.ula_clip_x2, self.ula_clip_y1, self.ula_clip_y2);
+  ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
 }
 
@@ -249,27 +246,23 @@ static void nextreg_alternate_rom_write(u8_t value) {
 }
 
 
+static u8_t nextreg_clip_window_ula_read(void) {
+  return self.ula_clip[self.ula_clip_index];
+}
+
+
 static void nextreg_clip_window_ula_write(u8_t value) {
-  switch (self.ula_clip_index++) {
-    case 0:
-      self.ula_clip_x1 = value * 2;
-      break;
+  self.ula_clip[self.ula_clip_index] = value;
 
-    case 1:
-      self.ula_clip_x2 = value * 2;
-      break;
-
-    case 2:
-      self.ula_clip_y1 = value;
-      break;
-
-    case 3:
-      self.ula_clip_y2 = value;
-      ula_clip_set(self.ula_clip_x1, self.ula_clip_x2, self.ula_clip_y1, self.ula_clip_y2);
-      break;
+  if (++self.ula_clip_index == 4) {
+    self.ula_clip_index = 0;
+    ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
   }
+}
 
-  self.ula_clip_index &= 0x03;
+
+static u8_t nextreg_clip_window_control_read(void) {
+  return self.ula_clip_index << 4;
 }
 
 
@@ -460,6 +453,12 @@ u8_t nextreg_data_read(u16_t address) {
 
     case REGISTER_RESET:
       return nextreg_reset_read();
+
+    case REGISTER_CLIP_WINDOW_ULA:
+      return nextreg_clip_window_ula_read();
+
+    case REGISTER_CLIP_WINDOW_CONTROL:
+      return nextreg_clip_window_control_read();
 
     case REGISTER_PALETTE_INDEX:
       return self.palette_index;
