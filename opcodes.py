@@ -666,7 +666,6 @@ def push_qq(qq: str) -> C:
 def pxad() -> C:
     return '''
         HL = 0x4000 + ((D & 0xC0) << 5) + ((D & 0x07) << 8) + ((D & 0x38) << 2) + (E >> 3);
-        T(8);
     '''
 
 def pxdn() -> C:
