@@ -253,9 +253,9 @@ static void cpu_tick(u32_t ticks) {
 }
 
 
-void cpu_irq(u32_t ticks) {
+void cpu_irq(u32_t duration) {
   self.irq_pending  = 1;
-  self.irq_duration = ticks;
+  self.irq_duration = duration;  /* In T-states. */
 }
 
 
@@ -308,14 +308,10 @@ static void cpu_irq_pending(void) {
 }
 
 
-int cpu_run(u32_t ticks) {
-  u32_t tick;
+int cpu_run(u32_t n_instructions) {
+  u32_t i;
 
-  for (tick = 0; tick < ticks; tick++) {
-#ifdef DEBUG
-    log_inf("cpu: PC=%04X IFF1=%d\n", PC, IFF1);
-#endif
-
+  for (i = 0; i < n_instructions; i++) {
     cpu_step();
 
     if (self.irq_pending) {
