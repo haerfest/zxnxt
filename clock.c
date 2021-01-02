@@ -33,10 +33,10 @@ typedef struct {
   clock_cpu_speed_t    cpu_speed;
   u64_t                ticks_28mhz;   /* At max dot clock overflows in 20k years. */
   u64_t                sync_7mhz;     /* Last 28 MHz tick where we synced the 7 MHz clock. */  
-} next_clock_t;
+} self_t;
 
 
-static next_clock_t self;
+static self_t self;
 
 
 int clock_init(void) {
