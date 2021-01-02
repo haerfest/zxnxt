@@ -234,7 +234,7 @@ static void ula_display_state_bottom_border(void) {
       const long  elapsed_ns = 1e9 * (now - self.vsync_time) / SDL_GetPerformanceFrequency();
       const long  desired_ns = 1e6 * (self.display_frequency == E_ULA_DISPLAY_FREQUENCY_50HZ ? 20 : 16);
 
-      cpu_irq();
+      cpu_irq(32);
       ula_blit();
 
       if (elapsed_ns < desired_ns) {
@@ -243,7 +243,7 @@ static void ula_display_state_bottom_border(void) {
           .tv_nsec = desired_ns - elapsed_ns
         };
 
-        log_inf("ula: sleeping %lld nanoseconds\n", t.tv_nsec);
+        log_dbg("ula: sleeping %lld nanoseconds\n", t.tv_nsec);
         while (nanosleep(&t, &t) != 0);
       }
 

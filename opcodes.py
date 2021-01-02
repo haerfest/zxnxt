@@ -264,8 +264,10 @@ def djnz() -> C:
     '''
 
 def ei() -> C:
-    # TODO: enabled maskable interrupt only AFTER NEXT instruction
-    return 'IFF1 = IFF2 = 1;'
+    return '''
+        IFF1 = IFF2 = 1;
+        self.irq_delay = 1;
+    '''
 
 def ex(r1: str, r2: str) -> C:
     return f'''
@@ -293,8 +295,11 @@ def exx() -> C:
     '''
 
 def halt() -> C:
-    # TODO: Wait for interrupt.
-    return ''
+    return '''
+        if (!self.irq_pending || IFF1 == 0) {
+          PC--;
+        }
+    '''
 
 def im(mode: int) -> C:
     return f'''
@@ -1540,10 +1545,17 @@ def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str
     if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
         # Special opcode where 3rd byte is parameter and 4th byte needed for
         # decoding. Read 4th byte, but keep PC at 3rd byte.
-        return f'{name}[memory_read(PC + 1)](); PC++;'
+        return f'''
+const u8_t opcode = memory_read(PC + 1); T(4);
+{name}[opcode]();
+PC++;
+'''
 
     # Return the body that uses the table.
-    return f'{name}[memory_read(PC++)]();'
+    return f'''
+const u8_t opcode = memory_read(PC++); T(4);
+{name}[opcode]();
+'''
 
 
 def main_fast() -> None:

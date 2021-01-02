@@ -90,7 +90,8 @@
 
 
 /* A shortcut to advance the system clock by a number of CPU ticks. */
-#define T    clock_run
+static void cpu_tick(u32_t);
+#define T    cpu_tick
 
 
 #define SZ53(value)   self.sz53[value]
@@ -170,8 +171,10 @@ typedef struct {
   u8_t r;
 
   /* Interrupt mode. */
-  u8_t im;
-  int  irq_pending;
+  u8_t  im;
+  int   irq_pending;   /* Non-zero if IRQ pending.                  */
+  u32_t irq_duration;  /* T-states until irq_pending resets.        */
+  u32_t irq_delay;     /* Instructions until irq_pending processed. */
 
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
@@ -227,23 +230,80 @@ void cpu_reset(void) {
   R    = 0;
   IM   = 0;
 
-  self.irq_pending = 0;
+  self.irq_pending  = 0;
+  self.irq_duration = 0;
+  self.irq_delay    = 0;
 
   T(3);
 }
 
 
-void cpu_irq(void) {
-  if (self.iff1 != 1) {
-    return;
+static void cpu_tick(u32_t ticks) {
+  if (self.irq_pending) {
+    if (self.irq_duration > ticks) {
+      self.irq_duration -= ticks;
+    } else {
+      self.irq_duration = 0;
+      self.irq_pending  = 0;
+    }
   }
   
-  if (self.im != 1) {
-    log_wrn("cpu: IRQ, but interrupt mode %d not implemented\n", I);
+  clock_run(ticks);
+}
+
+
+void cpu_irq(u32_t ticks) {
+  self.irq_pending  = 1;
+  self.irq_duration = ticks;
+}
+
+
+static void cpu_irq_pending(void) {
+  /* After EI the next RETN must complete before servicing IRQ. */
+  if (self.irq_delay) {
+    self.irq_delay = 0;
     return;
   }
 
-  self.irq_pending = 1;
+  /* Interrupts must be enabled. */
+  if (IFF1 == 0) {
+    return;
+  }
+
+  if (IM == 0) {
+    log_wrn("cpu: interrupt mode 0 not implemented\n");
+    return;
+  }
+
+  /* Disable further interrupts. */
+  IFF1 = IFF2 = 0;
+
+  /* Save the program counter. */
+  memory_write(--SP, PCH); T(3);
+  memory_write(--SP, PCL); T(3);
+
+  if (IM == 1) {
+    PC = 0x0038;
+
+    /* Z80 CPU User Manual:
+     *
+     * "The number of cycles required to complete the restart instruction is two
+     * more than normal due to the two added wait states." */
+    T(2);
+  } else {
+    const u16_t vector = I << 8;
+
+    PC = memory_read(vector) | memory_read(vector + 1) << 8;
+    T(6);
+
+    /* Z80 CPU User Manual:
+     *
+     * "This mode of response requires 19 clock periods to complete (seven to
+     * fetch the lower eight bits from the interrupting device, six to save the
+     * program counter, and six to obtain the jump address)."
+     */
+    T(7);
+  }
 }
 
 
@@ -251,17 +311,14 @@ int cpu_run(u32_t ticks) {
   u32_t tick;
 
   for (tick = 0; tick < ticks; tick++) {
+#ifdef DEBUG
+    log_inf("cpu: PC=%04X IFF1=%d\n", PC, IFF1);
+#endif
+
     cpu_step();
 
     if (self.irq_pending) {
-      self.irq_pending = 0;
-
-      /* The number of cycles required to complete the restart instruction is two
-       * more than normal due to the two added wait states. */
-      T(2);
-      memory_write(--SP, PCH); T(3);
-      memory_write(--SP, PCL); T(3);
-      PC = 0x0038;
+      cpu_irq_pending();
     }
   }
 
