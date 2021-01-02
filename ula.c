@@ -25,7 +25,7 @@ typedef struct {
 
 
 #define N_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_INTERNAL_USE + 1)
-#define N_FREQUENCIES  (E_ULA_DISPLAY_FREQUENCY_60HZ  - E_ULA_DISPLAY_FREQUENCY_50HZ      + 1)
+#define N_FREQUENCIES  2
 
 static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
   /* Internal use. */ {
@@ -73,7 +73,7 @@ typedef struct {
   u8_t                      display_byte;
   u8_t                      display_pixel_mask;
   ula_display_timing_t      display_timing;
-  ula_display_frequency_t   display_frequency;
+  int                       display_frequency;
   ula_display_state_t       display_state;
   unsigned int              display_line;
   unsigned int              display_column;  
@@ -90,6 +90,8 @@ typedef struct {
   int                       clip_x2;
   int                       clip_y1;
   int                       clip_y2;
+  int                       frame_counter;
+  int                       blink_state;
 } self_t;
 
 
@@ -99,6 +101,18 @@ typedef struct {
 
 
 static self_t self;
+
+
+static void ula_reset_display_spec(void) {
+  self.display_spec       = &ula_display_spec[self.display_timing][self.display_frequency == 60];
+  self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
+  self.display_line       = 0;
+  self.display_column     = 0;
+  self.display_pixel_mask = 0;
+  self.pixel              = self.frame_buffer;
+  self.frame_counter      = 0;
+  self.blink_state        = 0;
+}
 
 
 static void ula_blit(void) {
@@ -157,17 +171,19 @@ static void ula_display_state_frame_buffer(void) {
     self.attribute_byte     = self.attribute_ram[self.attribute_offset++];
   }
 
-  /* TODO: blinking colours. */
   if (self.display_line   >= self.display_spec->top_border_lines + self.clip_y1 &&
       self.display_line   <= self.display_spec->top_border_lines + self.clip_y2 &&
       self.display_column >= 32 + self.clip_x1 &&
       self.display_column <= 32 + self.clip_x2) {
+
+    const u8_t ink   = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
+    const u8_t paper = PALETTE_OFFSET_PAPER + (self.attribute_byte >> 3) & 0x07;
+    const int  blink = self.attribute_byte & 0x80;
+ 
     if (self.display_byte & self.display_pixel_mask) {
-      /* Ink. */
-      index = PALETTE_OFFSET_INK   + (self.attribute_byte & 0x07);
+      index = blink && self.blink_state ? paper : ink;
     } else {
-      /* Paper. */
-      index = PALETTE_OFFSET_PAPER + (self.attribute_byte >> 3) & 0x07;
+      index = blink && self.blink_state ? ink : paper;
     }
     if (self.attribute_byte & 0x40) {
       /* Bright. */
@@ -235,7 +251,7 @@ static void ula_display_state_bottom_border(void) {
     if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
       const u64_t now        = SDL_GetPerformanceCounter();
       const long  elapsed_ns = 1e9 * (now - self.vsync_time) / SDL_GetPerformanceFrequency();
-      const long  desired_ns = 1e6 * (self.display_frequency == E_ULA_DISPLAY_FREQUENCY_50HZ ? 20 : 16);
+      const long  desired_ns = 1e6 * 1000 / self.display_frequency;
 
       cpu_irq(32);
       ula_blit();
@@ -251,6 +267,14 @@ static void ula_display_state_bottom_border(void) {
       }
 
       self.vsync_time = now;
+
+      self.frame_counter++;
+      if (self.frame_counter == self.display_frequency / 2) {
+        self.blink_state ^= 1;
+      } else if (self.frame_counter == self.display_frequency) {
+        self.blink_state ^= 1;
+        self.frame_counter = 0;
+      }
     }
   }
 }
@@ -331,30 +355,25 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
     return -1;
   }
 
-  self.pixel              = self.frame_buffer;
-  self.renderer           = renderer;
-  self.texture            = texture;
-  self.vsync_time         = SDL_GetPerformanceCounter();
-  self.display_ram        = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
-  self.attribute_ram      = &self.display_ram[192 * 32];
-  self.display_offset     = 0;
-  self.attribute_offset   = 0;
-  self.display_timing     = E_ULA_DISPLAY_TIMING_ZX_48K;
-  self.display_frequency  = E_ULA_DISPLAY_FREQUENCY_50HZ;
-  self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
-  self.display_spec       = &ula_display_spec[self.display_timing][self.display_frequency];
-  self.display_line       = 0;
-  self.display_column     = 0;
-  self.display_pixel_mask = 0;
-  self.border_colour      = 0;
-  self.speaker_state      = 0;
-  self.palette            = E_PALETTE_ULA_FIRST;
-  self.clip_x1            = 0;
-  self.clip_x2            = 255 * 2;
-  self.clip_y1            = 0;
-  self.clip_y2            = 191;
+  self.renderer          = renderer;
+  self.texture           = texture;
+  self.vsync_time        = SDL_GetPerformanceCounter();
+  self.display_ram       = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
+  self.attribute_ram     = &self.display_ram[192 * 32];
+  self.display_offset    = 0;
+  self.attribute_offset  = 0;
+  self.display_timing    = E_ULA_DISPLAY_TIMING_ZX_48K;
+  self.display_frequency = 50;
+  self.border_colour     = 0;
+  self.speaker_state     = 0;
+  self.palette           = E_PALETTE_ULA_FIRST;
+  self.clip_x1           = 0;
+  self.clip_x2           = 255 * 2;
+  self.clip_y1           = 0;
+  self.clip_y2           = 191;
 
   ula_fill_tables();
+  ula_reset_display_spec();
 
   return 0;
 }
@@ -380,16 +399,6 @@ ula_display_timing_t ula_display_timing_get(void) {
 }
 
 
-static void ula_reset_display_spec(void) {
-  self.display_spec       = &ula_display_spec[self.display_timing][self.display_frequency];
-  self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
-  self.display_line       = 0;
-  self.display_column     = 0;
-  self.display_pixel_mask = 0;
-  self.pixel              = self.frame_buffer;
-}
-
-
 void ula_display_timing_set(ula_display_timing_t timing) {
   const char* descriptions[] = {
     "internal use",
@@ -409,16 +418,15 @@ void ula_display_timing_set(ula_display_timing_t timing) {
 }
 
 
-void ula_display_frequency_set(ula_display_frequency_t frequency) {
-  const char* descriptions[] = {
-    "50",
-    "60"
-  };
+void ula_display_frequency_set(int is_60hz) {
+  const int display_frequency = is_60hz ? 60 : 50;
 
-  self.display_frequency = frequency;
-  log_dbg("ula: display frequency set to %s Hz\n", descriptions[frequency]);
+  if (display_frequency != self.display_frequency) {
+    self.display_frequency = display_frequency;
+    log_dbg("ula: display frequency set to %d Hz\n", self.display_frequency);
 
-  ula_reset_display_spec();
+    ula_reset_display_spec();
+  }
 }
 
 
