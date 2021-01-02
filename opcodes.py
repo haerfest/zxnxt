@@ -395,6 +395,12 @@ def jp(cond: Optional[str] = None) -> C:
 def jp_pss(ss: str) -> C:
     return f'PC = {ss};'
 
+def jpc() -> C:
+    return '''
+        PC = PC & 0xC000 + (io_read(BC) << 6);
+        T(5);
+    '''
+
 def ld_A_I() -> C:
     return '''
         T(1);
@@ -487,24 +493,42 @@ def ld_r_n(r: str) -> C:
 def ld_r_r(r1: str, r2: str) -> C:
     return f'{r1} = {r2};'
 
+def ldws() -> C:
+    return '''
+        TMP = memory_read(DE); T(3);
+        memory_write(HL, TMP); T(3);
+        L++; D++;
+        F = SZ53(D) | HF_ADD(D - 1, 1, D) | (D == 0x80) << VF_SHIFT | (F & CF_MASK);
+    '''
+
 def ldx(op: str) -> C:
     return f'''
-        Z = memory_read(HL{op}{op}); T(3);
-        memory_write(DE{op}{op}, Z); T(5);
+        TMP = memory_read(HL{op}{op}); T(3);
+        memory_write(DE{op}{op}, TMP); T(5);
         F &= ~(HF_MASK | VF_MASK | NF_MASK);
-        F |= (BC - 1 != 0) << VF_SHIFT;
+        F |= (--BC != 0) << VF_SHIFT;
     '''
 
 def ldxr(op: str) -> C:
     return f'''
-        Z  = memory_read(HL{op}{op}); T(3);
-        memory_write(DE{op}{op}, Z);  T(5);
-        if (--BC) {{
+        TMP  = memory_read(HL{op}{op}); T(3);
+        memory_write(DE{op}{op}, TMP);  T(5);
+        F &= ~(HF_MASK | VF_MASK | NF_MASK);
+        F |= (--BC != 0) << VF_SHIFT;
+        if (BC) {{
             PC -= 2; T(5);
-        }} else {{
-            F &= ~(HF_MASK | VF_MASK | NF_MASK);
-            F |= (BC - 1 != 0) << VF_SHIFT;
         }}
+    '''
+
+def ldxx(op: str) -> C:
+    return f'''
+        TMP = memory_read(HL{op}{op}); T(3);
+        if (TMP != A) {{
+            memory_write(DE, TMP);     T(5);
+        }}
+        DE{op}{op};
+        F &= ~(HF_MASK | VF_MASK | NF_MASK);
+        F |= (--BC != 0) << VF_SHIFT;
     '''
 
 def logical_n(op: str) -> C:
@@ -524,6 +548,20 @@ def logical_pss(op: str, xy: Optional[str] = None) -> C:
         WZ    = {wz(xy)};
         A {op}= memory_read(WZ); T(4);
         F     = SZ53P(A);        T(3);
+    '''
+
+def lxrx(op: str) -> C:
+    return f'''
+        TMP = memory_read(HL{op}{op}); T(3);
+        if (TMP != A) {{
+            memory_write(DE, TMP);     T(5);
+        }}
+        DE{op}{op};
+        F &= ~(HF_MASK | VF_MASK | NF_MASK);
+        F |= (--BC != 0) << VF_SHIFT;
+        if (BC) {{
+          PC -= 2; T(5);
+        }}
     '''
 
 def mirr() -> C:
@@ -565,6 +603,12 @@ def nreg_reg_value() -> C:
         T(8);
     '''
 
+def otib() -> C:
+    return '''
+        TMP = memory_read(HL++); T(4);
+        io_write(BC, TMP);       T(4);
+    '''
+    
 def otxr(op: str) -> C:
     return f'''
         T(1);
@@ -872,6 +916,9 @@ def set_b_pss(b: int, xy: Optional[str] = None) -> C:
 def set_b_r(b: int, r: str) -> C:
     return f'{r} |= 1 << {b};'
 
+def stae() -> C:
+    return f'A = (unsigned char) 0x80 >> (E & 7);'
+
 def sla_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
@@ -1020,79 +1067,90 @@ def cb_table(xy: Optional[str] = None) -> Table:
 # See https://wiki.specnext.dev/Extended_Z80_instruction_set.
 def ed_table() -> Table:
     return {
-        0x23: ('SWAP',       swap),
-        0x24: ('MIRR A',     mirr),
-        0x27: ('TEST n',     test),
-        0x28: ('BSLA DE,B',  bsla),
-        0x29: ('BSRA DE,B',  bsra),
-        0x2A: ('BSRL DE,B',  bsrl),
-        0x2B: ('BSRF DE,B',  bsrf),
-        0x2C: ('BRLC DE,B',  brlc),
-        0x30: ('MUL D,E',    mul),
-        0x31: ('ADD HL,A',   partial(add_dd_r, 'HL', 'A')),
-        0x34: ('ADD HL,nn',  partial(add_dd_nn, 'HL')),
-        0x35: ('ADD DE,nn',  partial(add_dd_nn, 'DE')),
-        0x40: ('IN B,(C)',   partial(in_r_C,  'B')),
-        0x41: ('OUT (C),B',  partial(out_C_r, 'B')),
-        0x42: ('SBC HL,BC',  partial(sbc_HL_ss, 'BC')),
-        0x43: ('LD (nn),BC', partial(ld_pnn_dd, 'BC')),
-        0x44: ('NEG',        neg),
-        0x45: ('RETN',       retn),
-        0x46: ('IM 0',       partial(im, 0)),
-        0x47: ('LD I,A',     ld_I_A),
-        0x48: ('IN C,(C)',   partial(in_r_C,  'C')),
-        0x49: ('OUT (C),C',  partial(out_C_r, 'C')),
-        0x4A: ('ADC HL,BC',  partial(adc_HL_ss, 'BC')),
-        0x4B: ('LD BC,(nn)', partial(ld_dd_pnn, 'BC')),
-        0x4D: ('RETI',       reti),
-        0x4F: ('LD R,A',     ld_R_A),
-        0x50: ('IN D,(C)',   partial(in_r_C, 'D')),
-        0x51: ('OUT (C),D',  partial(out_C_r, 'D')),
-        0x52: ('SBC HL,DE',  partial(sbc_HL_ss, 'DE')),
-        0x53: ('LD (nn),DE', partial(ld_pnn_dd, 'DE')),
-        0x56: ('IM 1',       partial(im, 1)),
-        0x57: ('LD A,I',     ld_A_I),
-        0x58: ('IN E,(C)',   partial(in_r_C,  'E')),
-        0x59: ('OUT (C),E',  partial(out_C_r, 'E')),
-        0x5A: ('ADC HL,DE',  partial(adc_HL_ss, 'DE')),
-        0x5B: ('LD DE,(nn)', partial(ld_dd_pnn, 'DE')),
-        0x5E: ('IM 2',       partial(im, 2)),
-        0x5F: ('LD A,R',     ld_A_R),
-        0x60: ('IN H,(C)',   partial(in_r_C,  'H')),
-        0x61: ('OUT (C),H',  partial(out_C_r, 'H')),
-        0x62: ('SBC HL,HL',  partial(sbc_HL_ss, 'HL')),
-        0x67: ('RRD',        rrd),
-        0x68: ('IN L,(C)',   partial(in_r_C, 'L')),
-        0x69: ('OUT (C),L',  partial(out_C_r, 'L')),
-        0x6A: ('ADC HL,HL',  partial(adc_HL_ss, 'HL')),
-        0x6F: ('RLD',        rld),
-        0x72: ('SBC HL,SP',  partial(sbc_HL_ss, 'SP')),
-        0x73: ('LD (nn),SP', partial(ld_pnn_dd, 'SP')),
-        0x78: ('IN A,(C)',   partial(in_r_C, 'A')),
-        0x79: ('OUT (C),A',  partial(out_C_r, 'A')),
-        0x7A: ('ADC HL,SP',  partial(adc_HL_ss, 'SP')),
-        0x7B: ('LD SP,(nn)', partial(ld_dd_pnn, 'SP')),
-        0x8A: ('PUSH mm',    push_im),
+        0x23: ('SWAP',           swap),
+        0x24: ('MIRR A',         mirr),
+        0x27: ('TEST n',         test),
+        0x28: ('BSLA DE,B',      bsla),
+        0x29: ('BSRA DE,B',      bsra),
+        0x2A: ('BSRL DE,B',      bsrl),
+        0x2B: ('BSRF DE,B',      bsrf),
+        0x2C: ('BRLC DE,B',      brlc),
+        0x30: ('MUL D,E',        mul),
+        0x31: ('ADD HL,A',       partial(add_dd_r, 'HL', 'A')),
+        0x32: ('ADD DE,A',       partial(add_dd_r, 'DE', 'A')),
+        0x33: ('ADD BC,A',       partial(add_dd_r, 'BC', 'A')),
+        0x34: ('ADD HL,nn',      partial(add_dd_nn, 'HL')),
+        0x35: ('ADD DE,nn',      partial(add_dd_nn, 'DE')),
+        0x36: ('ADD BC,nn',      partial(add_dd_nn, 'DE')),
+        0x40: ('IN B,(C)',       partial(in_r_C,  'B')),
+        0x41: ('OUT (C),B',      partial(out_C_r, 'B')),
+        0x42: ('SBC HL,BC',      partial(sbc_HL_ss, 'BC')),
+        0x43: ('LD (nn),BC',     partial(ld_pnn_dd, 'BC')),
+        0x44: ('NEG',            neg),
+        0x45: ('RETN',           retn),
+        0x46: ('IM 0',           partial(im, 0)),
+        0x47: ('LD I,A',         ld_I_A),
+        0x48: ('IN C,(C)',       partial(in_r_C,  'C')),
+        0x49: ('OUT (C),C',      partial(out_C_r, 'C')),
+        0x4A: ('ADC HL,BC',      partial(adc_HL_ss, 'BC')),
+        0x4B: ('LD BC,(nn)',     partial(ld_dd_pnn, 'BC')),
+        0x4D: ('RETI',           reti),
+        0x4F: ('LD R,A',         ld_R_A),
+        0x50: ('IN D,(C)',       partial(in_r_C, 'D')),
+        0x51: ('OUT (C),D',      partial(out_C_r, 'D')),
+        0x52: ('SBC HL,DE',      partial(sbc_HL_ss, 'DE')),
+        0x53: ('LD (nn),DE',     partial(ld_pnn_dd, 'DE')),
+        0x56: ('IM 1',           partial(im, 1)),
+        0x57: ('LD A,I',         ld_A_I),
+        0x58: ('IN E,(C)',       partial(in_r_C,  'E')),
+        0x59: ('OUT (C),E',      partial(out_C_r, 'E')),
+        0x5A: ('ADC HL,DE',      partial(adc_HL_ss, 'DE')),
+        0x5B: ('LD DE,(nn)',     partial(ld_dd_pnn, 'DE')),
+        0x5E: ('IM 2',           partial(im, 2)),
+        0x5F: ('LD A,R',         ld_A_R),
+        0x60: ('IN H,(C)',       partial(in_r_C,  'H')),
+        0x61: ('OUT (C),H',      partial(out_C_r, 'H')),
+        0x62: ('SBC HL,HL',      partial(sbc_HL_ss, 'HL')),
+        0x67: ('RRD',            rrd),
+        0x68: ('IN L,(C)',       partial(in_r_C, 'L')),
+        0x69: ('OUT (C),L',      partial(out_C_r, 'L')),
+        0x6A: ('ADC HL,HL',      partial(adc_HL_ss, 'HL')),
+        0x6F: ('RLD',            rld),
+        0x72: ('SBC HL,SP',      partial(sbc_HL_ss, 'SP')),
+        0x73: ('LD (nn),SP',     partial(ld_pnn_dd, 'SP')),
+        0x78: ('IN A,(C)',       partial(in_r_C, 'A')),
+        0x79: ('OUT (C),A',      partial(out_C_r, 'A')),
+        0x7A: ('ADC HL,SP',      partial(adc_HL_ss, 'SP')),
+        0x7B: ('LD SP,(nn)',     partial(ld_dd_pnn, 'SP')),
+        0x8A: ('PUSH mm',        push_im),
+        0x90: ('OTIB',           otib),
         0x91: ('NREG reg,value', nreg_reg_value),
         0x92: ('NREG reg,A',     nreg_reg_A),
         0x93: ('PXDN',           pxdn),
         0x94: ('PXAD',           pxad),
-        0xA0: ('LDI',  partial(ldx,  '+')),
-        0xA1: ('CPI',  partial(cpx,  '+')),
-        0xA2: ('INI',  partial(inx,  '+')),
-        0xA3: ('OUTI', partial(outx, '+')),
-        0xA8: ('LDD',  partial(ldx,  '-')),
-        0xA9: ('CPD',  partial(cpx,  '-')),
-        0xAA: ('IND',  partial(inx,  '-')),
-        0xAB: ('OUTD', partial(outx, '-')),
-        0xB0: ('LDIR', partial(ldxr, '+')),
-        0xB1: ('CPIR', partial(cpxr, '+')),
-        0xB2: ('INIR', partial(inxr, '+')),
-        0xB3: ('OTIR', partial(otxr, '+')),
-        0xB8: ('LDDR', partial(ldxr, '-')),
-        0xB9: ('CPDR', partial(cpxr, '-')),
-        0xBA: ('INDR', partial(inxr, '-')),
-        0xBB: ('OTDR', partial(otxr, '-')),
+        0x95: ('STAE',           stae),
+        0x98: ('JP (C)',         jpc),
+        0xA0: ('LDI',            partial(ldx,  '+')),
+        0xA1: ('CPI',            partial(cpx,  '+')),
+        0xA2: ('INI',            partial(inx,  '+')),
+        0xA3: ('OUTI',           partial(outx, '+')),
+        0xA4: ('LDIX',           partial(ldxx, '+')),
+        0xA5: ('LDWS',           ldws),
+        0xA8: ('LDD',            partial(ldx,  '-')),
+        0xA9: ('CPD',            partial(cpx,  '-')),
+        0xAA: ('IND',            partial(inx,  '-')),
+        0xAB: ('OUTD',           partial(outx, '-')),
+        0xAC: ('LDDX',           partial(ldxx, '-')),
+        0xB0: ('LDIR',           partial(ldxr, '+')),
+        0xB1: ('CPIR',           partial(cpxr, '+')),
+        0xB2: ('INIR',           partial(inxr, '+')),
+        0xB3: ('OTIR',           partial(otxr, '+')),
+        0xB4: ('LIRX',           partial(lxrx, '+')),
+        0xB8: ('LDDR',           partial(ldxr, '-')),
+        0xB9: ('CPDR',           partial(cpxr, '-')),
+        0xBA: ('INDR',           partial(inxr, '-')),
+        0xBB: ('OTDR',           partial(otxr, '-')),
+        0xBC: ('LDRX',           partial(lxrx, '-')),
     }
 
 
