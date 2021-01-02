@@ -222,6 +222,8 @@ static void main_eventloop(void) {
     if (cpu_run(250000) != 0) {
       break;
     }
+
+    keyboard_refresh();
   }
 }
 

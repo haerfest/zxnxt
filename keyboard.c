@@ -122,8 +122,6 @@ u8_t keyboard_read(u16_t address) {
   u8_t       mask;
   u8_t       pressed = 0x00;
 
-  keyboard_refresh();
-
   for (half_row = 0, mask = 0x80; mask != 0; half_row++, mask >>= 1) {
     if (half_rows & mask) {
       for (column = 0; column < N_COLS; column++) {
