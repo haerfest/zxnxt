@@ -145,7 +145,7 @@ def bsra() -> C:
     return 'DE = (u16_t) ((s16_t) DE >> (B & 0x1F));'
 
 def bsrf() -> C:
-    return 'DE = ~(~DE >> (B & 0x1F));'
+    return 'DE = ~(((u16_t) ~DE) >> (B & 0x1F));'
 
 def bsrl() -> C:
     return 'DE >>= B & 0x1F;'
@@ -1523,7 +1523,7 @@ def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode
             f.write('''
 log_dbg("     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
 log_dbg("     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
-log_dbg("     ROM %d  DIVMMC %02X  PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", rom_selected(), divmmc_control_read(0xE3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
+log_dbg("     ROM %d  DIVMMC %02X  PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", 0xFF, divmmc_control_read(0xE3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
 log_dbg("%04X ", PC);
 ''')
 
