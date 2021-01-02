@@ -262,7 +262,7 @@ static void ula_display_state_bottom_border(void) {
           .tv_nsec = desired_ns - elapsed_ns
         };
 
-        log_dbg("ula: sleeping %lld nanoseconds\n", t.tv_nsec);
+        log_dbg("ula: sleeping %ld nanoseconds\n", t.tv_nsec);
         while (nanosleep(&t, &t) != 0);
       }
 

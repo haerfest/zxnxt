@@ -5,6 +5,7 @@
 #include "ula.h"
 
 
+#if 0
 /**
  * https://wiki.specnext.dev/Refresh_Rates
  *
@@ -26,6 +27,7 @@ static const unsigned int frequency_28mhz[E_CLOCK_VIDEO_TIMING_HDMI - E_CLOCK_VI
   33000000,  /* E_CLOCK_VIDEO_TIMING_VGA_SETTING_6 */
   27000000   /* E_CLOCK_VIDEO_TIMING_HDMI          */
 };
+#endif
 
 
 typedef struct {
@@ -96,7 +98,6 @@ void clock_run(u32_t cpu_ticks) {
   };
   const u32_t ticks_28mhz = cpu_ticks * clock_divider[self.cpu_speed];
   u32_t       ticks_7mhz;
-  u64_t       ticks_elapsed;
 
   /* Update system clock. */
   self.ticks_28mhz += ticks_28mhz;
