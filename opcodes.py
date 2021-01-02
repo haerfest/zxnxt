@@ -232,7 +232,10 @@ def cpl() -> C:
 
 def daa() -> C:
     # TODO: implement DAA.
-    return 'log_wrn("cpu: DAA not implemented\\n");'
+    return '''
+        log_err("cpu: DAA not implemented\\n");
+        exit(1);
+    '''
 
 def dec_pdd(xy: Optional[str] = None) -> C:
     return f'''
@@ -1519,23 +1522,32 @@ default:
 
 
 def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str, C], tables: Dict[str, C]) -> C:
-    # First add functions for all opcode implementations, and build a look-up
-    # table to jump to them quickly.
-    table = dict((opcode, 'opcode_00') for opcode in range(256))
+    table = {}
 
     for opcode, entry in instructions.items():
         name = 'opcode_' + '_'.join(f'{op:02X}' for op in prefix + [opcode])
 
         if isinstance(entry, tuple):
-            mnemonic, implementation = entry
+            comment, implementation = entry
             body                     = implementation()
 
         elif isinstance(entry, dict):
-            mnemonic = 'prefix'
-            body     = generate_fast(entry, prefix + [opcode], functions, tables)
+            comment = 'prefix'
+            body    = generate_fast(entry, prefix + [opcode], functions, tables)
 
-        functions[name]          = (mnemonic, body)
-        table[opcode]            = name
+        functions[name] = (comment, body)
+        table[opcode]   = name
+
+    missing = set(range(256)) - set(table.keys())
+    for opcode in missing:
+        name = 'opcode_' + '_'.join(f'{op:02X}' for op in prefix + [opcode])
+        body = f'''
+            log_err("cpu: {name} not implemented\\n");
+            exit(1);
+        '''
+
+        functions[name] = (comment, body)
+        table[opcode]   = name
 
     # Write the lookup table.
     name         = 'lookup_' + '_'.join(f'{op:02X}' for op in prefix) if prefix else 'lookup'
