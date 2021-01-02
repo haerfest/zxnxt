@@ -5,6 +5,7 @@
 int  keyboard_init(void);
 void keyboard_finit();
 u8_t keyboard_read(u16_t address);
+void keyboard_refresh(void);
 
 
 #endif  /* __KEYBOARD_H */
