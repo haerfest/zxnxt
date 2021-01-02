@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <time.h>
 #include "cpu.h"
 #include "defs.h"
 #include "log.h"
@@ -229,15 +230,21 @@ static void ula_display_state_bottom_border(void) {
                        : E_ULA_DISPLAY_STATE_VSYNC;
 
     if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
-      const u64_t  now        = SDL_GetPerformanceCounter();
-      const int    elapsed_ms = (double) (now - self.vsync_time) / SDL_GetPerformanceFrequency();
-      const int    desired_ms = (self.display_frequency == E_ULA_DISPLAY_FREQUENCY_50HZ) ? 20 : 16;
+      const u64_t now        = SDL_GetPerformanceCounter();
+      const long  elapsed_ns = 1e9 * (now - self.vsync_time) / SDL_GetPerformanceFrequency();
+      const long  desired_ns = 1e6 * (self.display_frequency == E_ULA_DISPLAY_FREQUENCY_50HZ ? 20 : 16);
 
       cpu_irq();
       ula_blit();
 
-      if (elapsed_ms < desired_ms) {
-        SDL_Delay(desired_ms - elapsed_ms);
+      if (elapsed_ns < desired_ns) {
+        const struct timespec t = {
+          .tv_sec  = 0,
+          .tv_nsec = desired_ns - elapsed_ns
+        };
+
+        log_inf("ula: sleeping %lld nanoseconds\n", t.tv_nsec);
+        (void) nanosleep(&t, NULL);
       }
 
       self.vsync_time = now;
