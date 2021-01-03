@@ -316,6 +316,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
         return;
 
       default:
+        log_wrn("sdcard%d: received unimplemented CMD%d ($%02X $%02X $%02X $%02X $%02X $%02X)\n", n, self[n].command, self[n].command_buffer[0], self[n].command_buffer[1], self[n].command_buffer[2], self[n].command_buffer[3], self[n].command_buffer[4], self[n].command_buffer[5]);
         break;
     }
   }
