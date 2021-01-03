@@ -91,6 +91,8 @@ static void nextreg_reset_soft(void) {
 
   ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
+
+  clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
 }
 
 
@@ -162,6 +164,7 @@ static void nextreg_machine_type_write(u8_t value) {
   }
 
   if (config_is_active()) {
+#ifdef DEBUG
     const char* descriptions[8] = {
       "configuration mode",
       "ZX Spectrum 48K",
@@ -169,6 +172,7 @@ static void nextreg_machine_type_write(u8_t value) {
       "ZX Spectrum +2A/+2B/+3",
       "Pentagon"
     };
+#endif
     u8_t machine_type = value & 0x03;
 
     if (machine_type > E_MACHINE_TYPE_PENTAGON) {
@@ -192,6 +196,13 @@ static void nextreg_machine_type_write(u8_t value) {
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
   ula_display_frequency_set((value & 0x04) >> 2);
+}
+
+
+static u8_t nextreg_cpu_speed_read(void) {
+  const u8_t speed = clock_cpu_speed_get();
+
+  return speed << 4 | speed;
 }
 
 
@@ -453,6 +464,9 @@ u8_t nextreg_data_read(u16_t address) {
 
     case REGISTER_RESET:
       return nextreg_reset_read();
+
+    case REGISTER_CPU_SPEED:
+      return nextreg_cpu_speed_read();
 
     case REGISTER_CLIP_WINDOW_ULA:
       return nextreg_clip_window_ula_read();

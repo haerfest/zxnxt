@@ -400,6 +400,7 @@ ula_display_timing_t ula_display_timing_get(void) {
 
 
 void ula_display_timing_set(ula_display_timing_t timing) {
+#ifdef DEBUG
   const char* descriptions[] = {
     "internal use",
     "ZX Spectrum 48K",
@@ -410,6 +411,7 @@ void ula_display_timing_set(ula_display_timing_t timing) {
     "invalid (6)",
     "invalid (7)"
   };
+#endif
 
   self.display_timing = timing;
   log_dbg("ula: display timing set to %s\n", descriptions[timing]);

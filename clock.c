@@ -61,9 +61,11 @@ clock_cpu_speed_t clock_cpu_speed_get(void) {
 
 
 void clock_cpu_speed_set(clock_cpu_speed_t speed) {
+#ifdef DEBUG
   const char* speeds[] = {
     "3.5", "7", "14", "28"
   };
+#endif
 
   self.cpu_speed = speed;
   log_dbg("clock: CPU speed set to %s MHz\n", speeds[speed]);
@@ -76,6 +78,7 @@ clock_video_timing_t clock_video_timing_get(void) {
 
 
 void clock_video_timing_set(clock_video_timing_t timing) {
+#ifdef DEBUG
   const char* descriptions[] = {
     "base VGA",
     "VGA setting 1",
@@ -86,6 +89,7 @@ void clock_video_timing_set(clock_video_timing_t timing) {
     "VGA setting 6",
     "HDMI"
   };
+#endif
 
   self.video_timing = timing;
   log_dbg("clock: video timing set to %s\n", descriptions[timing]);
