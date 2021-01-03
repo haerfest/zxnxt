@@ -17,6 +17,11 @@
 #define MAX_BLOCK_LENGTH  1024
 #define SDCARD_IMAGE      "tbblue.mmc"
 
+#define TOKEN_BUSY        0x00
+#define TOKEN_NOT_BUSY    0xAA  /* Anything other than TOKEN_BUSY or TOKEN_NO_DATA. */
+#define TOKEN_START_DATA  0xFE
+#define TOKEN_NO_DATA     0xFF
+
 
 typedef enum {
   E_CMD_GO_IDLE_STATE       = 0,
@@ -27,6 +32,7 @@ typedef enum {
   E_CMD_SET_BLOCKLEN        = 16,
   E_CMD_READ_SINGLE_BLOCK   = 17,
   E_CMD_READ_MULTIPLE_BLOCK = 18,
+  E_CMD_WRITE_SINGLE_BLOCK  = 24,
   E_CMD_APP_SEND_OP_COND    = 41,  /* Prepended by E_CMD_APP_CMD */
   E_CMD_APP_CMD             = 55,
   E_CMD_READ_OCR            = 58
@@ -40,7 +46,8 @@ typedef enum {
 
 typedef enum {
   E_ERROR_NONE            = 0x00,
-  E_ERROR_ILLEGAL_COMMAND = 0x04
+  E_ERROR_ILLEGAL_COMMAND = 0x04,
+  E_ERROR_PARAMETER_ERROR = 0x40
 } error_t;
 
 typedef enum {
@@ -64,6 +71,8 @@ typedef struct {
   u8_t       response_buffer[1 + 1 + MAX_BLOCK_LENGTH + 2];  /* R1 + start data token + block + CRC. */
   int        response_length;
   int        response_index;
+  u8_t       data_buffer[MAX_BLOCK_LENGTH + 2];  /* block + CRC. */
+  int        data_index;
   u8_t       error;
   u32_t      block_length;
   u32_t      position;
@@ -94,9 +103,9 @@ int sdcard_init(void) {
     self[n].is_sdsc         = 1;
 
     if (n == 0) {
-      self[n].fp = fopen(SDCARD_IMAGE, "rb");
+      self[n].fp = fopen(SDCARD_IMAGE, "r+");
       if (self[n].fp == NULL) {
-        log_err("sdcard%d: could not open %s for reading\n", n, SDCARD_IMAGE);
+        log_err("sdcard%d: could not open %s for reading and writing\n", n, SDCARD_IMAGE);
         for (n--; n >= 0; n--) {
           fclose(self[n].fp);
         }
@@ -137,22 +146,16 @@ void sdcard_finit(void) {
 }
 
 
-static int sdcard_read_block(sdcard_nr_t n, u8_t* response_buffer) {
-  log_dbg("sdcard%d: reading %u bytes from position %u in %s\n", n, self[n].block_length, self[n].position, SDCARD_IMAGE);
-
-  if (fseek(self[n].fp, (long) self[n].position, SEEK_SET) != 0) {
-    log_err("sdcard%d: error seeking to position %u in %s\n", n, self[n].position, SDCARD_IMAGE);
-    response_buffer[0] = 0x09;  /* Data error token (out of range). */
-    return 1;
-  }
+static int sdcard_block_read(sdcard_nr_t n, u8_t* response_buffer) {
+  log_dbg("sdcard%d: reading %u bytes from %s\n", n, self[n].block_length, SDCARD_IMAGE);
 
   if (fread(&response_buffer[1], self[n].block_length, 1, self[n].fp) != 1) {
-    log_err("sdcard%d: error reading %u bytes from position %u in %s\n", n, self[n].block_length, self[n].position, SDCARD_IMAGE);
+    log_err("sdcard%d: error reading %u bytes from %s\n", n, self[n].block_length, SDCARD_IMAGE);
     response_buffer[0] = 0x03;  /* Data error token (card controller error) . */
     return 1;
   }
 
-  response_buffer[0]                            = 0xFE;  /* Start data token. */
+  response_buffer[0]                            = TOKEN_START_DATA;
   response_buffer[1 + self[n].block_length + 0] = 0x00;  /* CRC. */
   response_buffer[1 + self[n].block_length + 1] = 0x00;
 
@@ -161,11 +164,13 @@ static int sdcard_read_block(sdcard_nr_t n, u8_t* response_buffer) {
 
 
 u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
+  u8_t response;
+
   /* If there is no response left, should we request one on the fly? */
   if (self[n].response_index == self[n].response_length) {
     if (self[n].command == E_CMD_READ_MULTIPLE_BLOCK) {
       self[n].position += self[n].block_length;
-      self[n].response_length = sdcard_read_block(n, self[n].response_buffer);
+      self[n].response_length = sdcard_block_read(n, self[n].response_buffer);
       self[n].response_index  = 0;
     }
   }
@@ -176,7 +181,12 @@ u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
   }
   
   /* Standard R1 response. */
-  return self[n].error | (self[n].state == E_STATE_IDLE);
+  response = self[n].error | (self[n].state == E_STATE_IDLE);
+
+  /* Error bits are cleard by the host when read. */
+  self[n].error = E_ERROR_NONE;
+
+  return response;
 }
 
 
@@ -243,7 +253,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
 
       case E_CMD_SEND_CSD:
         self[n].response_buffer[0] = 0x00;   /* R1. */
-        self[n].response_buffer[1] = 0xFE;   /* Start data token. */
+        self[n].response_buffer[1] = TOKEN_START_DATA;
         
         sdcard_fill_csd(n, &self[n].response_buffer[2]);
 
@@ -255,7 +265,7 @@ static void sdcard_handle_command(sdcard_nr_t n) {
       case E_CMD_STOP_TRANSMISSION:
         self[n].state              = E_STATE_TRANSFER;
         self[n].response_buffer[0] = 0x01;
-        self[n].response_buffer[1] = 0xFF;  /* No longer busy. */
+        self[n].response_buffer[1] = TOKEN_NOT_BUSY;
         self[n].response_length    = 2;
         return;
 
@@ -286,16 +296,44 @@ static void sdcard_handle_command(sdcard_nr_t n) {
           self[n].position *= self[n].block_length;
         }
 
+        if (fseek(self[n].fp, (long) self[n].position, SEEK_SET) != 0) {
+          log_err("sdcard%d: error seeking to position %u in %s\n", n, self[n].position, SDCARD_IMAGE);
+          self[n].error = E_ERROR_PARAMETER_ERROR;
+          return;
+        }
+
         self[n].state              = E_STATE_SENDING_DATA;
         self[n].response_buffer[0] = 0x00;  /* R1. */
-        self[n].response_length    = 1 + sdcard_read_block(n, &self[n].response_buffer[1]);
+        self[n].response_length    = 1 + sdcard_block_read(n, &self[n].response_buffer[1]);
+        return;
+
+      case E_CMD_WRITE_SINGLE_BLOCK:
+        self[n].position = self[n].command_buffer[1] << 24
+                         | self[n].command_buffer[2] << 16
+                         | self[n].command_buffer[3] << 8
+                         | self[n].command_buffer[4];
+
+        /* SDHC/SDXC addresses are block numbers. */
+        if (!self[n].is_sdsc) {
+          self[n].position *= self[n].block_length;
+        }
+
+        if (fseek(self[n].fp, (long) self[n].position, SEEK_SET) != 0) {
+          log_err("sdcard%d: error seeking to position %u in %s\n", n, self[n].position, SDCARD_IMAGE);
+          self[n].error = E_ERROR_PARAMETER_ERROR;
+          return;
+        }
+
+        self[n].state              = E_STATE_RECEIVE_DATA;
+        self[n].response_buffer[0] = 0x00;  /* R1. */
+        self[n].response_length    = 1;
         return;
 
       case E_CMD_APP_SEND_OP_COND:
         if (self[n].in_app_cmd) {
           self[n].in_app_cmd         = 0;
           self[n].state              = E_STATE_READY;
-          self[n].response_buffer[0] = 0x00;  /* Need to indicate busy. */
+          self[n].response_buffer[0] = TOKEN_BUSY;
           self[n].response_length    = 1;
           return;
         }
@@ -328,7 +366,47 @@ static void sdcard_handle_command(sdcard_nr_t n) {
 }
 
 
-void sdcard_write(sdcard_nr_t n, u16_t address, u8_t value) {
+static void sdcard_block_write(sdcard_nr_t n) {
+  log_dbg("sdcard%d: writing %u bytes to %s\n", n, self[n].block_length, SDCARD_IMAGE);
+
+  /* Assume we reject the data. */
+  self[n].response_index     = 0;
+  self[n].response_length    = 1;
+  self[n].response_buffer[0] = 0x0D;  /* Data rejected. */
+
+  if (self[n].data_buffer[0] != TOKEN_START_DATA) {
+    log_wrn("sdcard%d: block of data to write did not start with start-of-data token\n", n);
+    return;
+  }
+
+  if (fwrite(&self[n].data_buffer[1], self[n].block_length, 1, self[n].fp) != 1) {
+    log_err("sdcard%d: error writing %u bytes to %s\n", n, self[n].block_length, SDCARD_IMAGE);
+    return;
+  }
+  
+  self[n].response_buffer[0] = 0x05;  /* Data accepted. */
+  self[n].response_buffer[1] = TOKEN_NOT_BUSY;
+  self[n].response_length    = 2;
+}
+
+
+static void sdcard_receive_data(sdcard_nr_t n, u8_t value) {
+  /* Preconditions:
+   * - self[n].block_length + 2 <= sizeof(self[n].data_buffer)
+   * - self[n].data_index       <  sizeof(self[n].data_buffer)
+   */
+  self[n].data_buffer[self[n].data_index++] = value;
+
+  if (self[n].data_index == 1 + self[n].block_length + 2) {
+    sdcard_block_write(n);
+
+    self[n].data_index = 0;
+    self[n].state      = E_STATE_TRANSFER;
+  }
+}
+
+
+static void sdcard_receive_command(sdcard_nr_t n, u8_t value) {
   if (self[n].command_length == sizeof(self[n].command_buffer)) {
     self[n].command_length = 0;
   }
@@ -352,5 +430,14 @@ void sdcard_write(sdcard_nr_t n, u16_t address, u8_t value) {
   if (self[n].command_length == sizeof(self[n].command_buffer)) {
     self[n].command = self[n].command_buffer[0] & 0x3F;
     sdcard_handle_command(n);
+  }
+}
+
+
+void sdcard_write(sdcard_nr_t n, u16_t address, u8_t value) {
+  if (self[n].state == E_STATE_RECEIVE_DATA) {
+    sdcard_receive_data(n, value);
+  } else {
+    sdcard_receive_command(n, value);
   }
 }
