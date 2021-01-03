@@ -29,6 +29,7 @@ typedef enum {
   E_CMD_SEND_IF_COND        = 8,
   E_CMD_SEND_CSD            = 9,
   E_CMD_STOP_TRANSMISSION   = 12,
+  E_CMD_SEND_STATUS         = 13,
   E_CMD_SET_BLOCKLEN        = 16,
   E_CMD_READ_SINGLE_BLOCK   = 17,
   E_CMD_READ_MULTIPLE_BLOCK = 18,
@@ -266,6 +267,12 @@ static void sdcard_handle_command(sdcard_nr_t n) {
         self[n].state              = E_STATE_TRANSFER;
         self[n].response_buffer[0] = 0x01;
         self[n].response_buffer[1] = TOKEN_NOT_BUSY;
+        self[n].response_length    = 2;
+        return;
+
+      case E_CMD_SEND_STATUS:
+        self[n].response_buffer[0] = self[n].error | (self[n].state == E_STATE_IDLE);
+        self[n].response_buffer[1] = (self[n].error != E_ERROR_NONE) << 2;
         self[n].response_length    = 2;
         return;
 
