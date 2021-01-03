@@ -10,12 +10,16 @@
  */
 
 
+#define CONMEM_ENABLED(value)  ((value) & 0x80)
+#define MAPRAM_ENABLED(value)  ((value) & 0x40)
+#define BANK_NUMBER(value)     ((value) & 0x0F)
+
+
 typedef struct {
   u8_t* sram;
   u8_t* rom;
   u8_t* ram;
-  int   conmem_enabled;
-  int   bank_number;
+  u8_t  value;
 } divmmc_t;
 
 
@@ -26,15 +30,14 @@ static void divmmc_refresh_ptr(void) {
   /* We subtract 0x2000 because RAM is paged in starting at 0x2000, so all
    * addresses are offset 0x2000. This saves us a subtraction on every
    * access. */
-  self.ram = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_RAM + self.bank_number * 8 * 1024 - 0x2000];
+  self.ram = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_RAM + BANK_NUMBER(self.value) * 8 * 1024 - 0x2000];
 }
 
 
 int divmmc_init(u8_t* sram) {
-  self.sram           = sram;
-  self.rom            = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
-  self.conmem_enabled = 0;
-  self.bank_number    = 0;
+  self.sram  = sram;
+  self.rom   = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
+  self.value = 0x00;
 
   divmmc_refresh_ptr();
 
@@ -47,7 +50,7 @@ void divmmc_finit(void) {
 
 
 int divmmc_is_active(void) {
-  return self.conmem_enabled;
+  return CONMEM_ENABLED(self.value);
 }
 
 
@@ -72,24 +75,23 @@ void divmmc_ram_write(u16_t address, u8_t value) {
 
 
 u8_t divmmc_control_read(u16_t address) {
-  return self.conmem_enabled << 7 | self.bank_number;
+  return self.value;
 }
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
-  if (value != (self.conmem_enabled << 7 | self.bank_number)) {
-    self.conmem_enabled = value >> 7;
-    self.bank_number    = value & 0x0F;
+  if (value != self.value)  {
+    self.value = value;
 
     divmmc_refresh_ptr();
 
-    if (self.conmem_enabled) {
-      log_dbg("divmmc: CONMEM enabled, bank %d paged in\n", self.bank_number);
+    if (CONMEM_ENABLED(value)) {
+      log_dbg("divmmc: CONMEM enabled, bank %d paged in\n", BANK_NUMBER(value));
     } else {
       log_dbg("divmmc: CONMEM disabled\n");
     }
 
-    if (value & 0x40) {
+    if (MAPRAM_ENABLED(value)) {
       log_wrn("divmmc: MAPRAM functionality not implemented\n");
     }
 
