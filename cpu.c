@@ -313,6 +313,8 @@ static void cpu_irq_pending(void) {
 }
 
 
+#ifdef TRACE
+
 static void cpu_sprintf_rom(char* buffer) {
   if (bootrom_is_active()) {
     *buffer = 'B';
@@ -335,20 +337,27 @@ static void cpu_sprintf_flags(char* buffer) {
 }
 
 
-int cpu_run(u32_t n_instructions) {
-#ifdef TRACE
+static void cpu_trace(void) {
   char rom;
   char flags[6 + 1];
-#endif
+  
+  cpu_sprintf_rom(&rom);
+  cpu_sprintf_flags(flags);
+  log_inf("%04X R%c %s AF=%04X'%04X BC=%04X'%04X DE=%04X'%04X HL=%04X'%04X IX=%04X IY=%04X SP=%04X DV=%02X MM=%02X %02X %02X %02X %02X %02X %02X %02X\n", PC, rom, flags, AF, AF_, BC, BC_, DE, DE_, HL, HL_, IX, IY, SP, divmmc_control_read(0x00E3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
+}
+
+#else   /* TRACE */
+
+#define cpu_trace()
+
+#endif  /* TRACE */
+
+
+int cpu_run(u32_t n_instructions) {
   u32_t i;
 
   for (i = 0; i < n_instructions; i++) {
-#ifdef TRACE
-    cpu_sprintf_rom(&rom);
-    cpu_sprintf_flags(flags);
-    log_inf("%04X R%c %s AF=%04X'%04X BC=%04X'%04X DE=%04X'%04X HL=%04X'%04X IX=%04X IY=%04X SP=%04X MM=%02X %02X %02X %02X %02X %02X %02X %02X\n", PC, rom, flags, AF, AF_, BC, BC_, DE, DE_, HL, HL_, IX, IY, SP, mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
-#endif
-
+    cpu_trace();
     cpu_step();
 
     if (self.irq_pending) {
