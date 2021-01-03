@@ -4,6 +4,7 @@
 #include "clock.h"
 #include "config.h"
 #include "cpu.h"
+#include "dac.h"
 #include "defs.h"
 #include "divmmc.h"
 #include "i2c.h"
@@ -103,8 +104,12 @@ static int main_init(void) {
     goto exit_nextreg;
   }
 
-  if (memory_init() != 0) {
+  if (dac_init() != 0) {
     goto exit_io;
+  }
+
+  if (memory_init() != 0) {
+    goto exit_dac;
   }
 
   sram = memory_sram();
@@ -185,6 +190,8 @@ exit_bootrom:
   bootrom_finit();
 exit_memory:
   memory_finit();
+exit_dac:
+  dac_finit();
 exit_io:
   io_finit();
 exit_nextreg:
@@ -242,6 +249,7 @@ static void main_finit(void) {
   config_finit();
   bootrom_finit();
   memory_finit();
+  dac_finit();
   io_finit();
   nextreg_finit();
   palette_finit();
