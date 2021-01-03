@@ -77,6 +77,11 @@ void rom_set_machine_type(machine_type_t machine_type) {
 }
 
 
+u8_t rom_selected(void) {
+  return self.selected;
+}
+
+
 void rom_select(u8_t rom) {
   if (rom != self.selected) {
     self.selected = rom;

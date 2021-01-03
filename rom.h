@@ -10,6 +10,7 @@ void rom_finit(void);
 u8_t rom_read(u16_t address);
 void rom_write(u16_t address, u8_t value);
 void rom_select(u8_t rom);
+u8_t rom_selected(void);
 void rom_set_machine_type(machine_type_t machine_type);
 void rom_set_lock(u8_t lock);
 
