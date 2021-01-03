@@ -390,6 +390,9 @@ static void sdcard_block_write(sdcard_nr_t n) {
     log_err("sdcard%d: error writing %u bytes to %s\n", n, self[n].block_length, SDCARD_IMAGE);
     return;
   }
+
+  /* Ensure everything is written. */
+  (void) fflush(self[n].fp);
   
   self[n].response_buffer[0] = 0x05;  /* Data accepted. */
   self[n].response_buffer[1] = TOKEN_NOT_BUSY;
