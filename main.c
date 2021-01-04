@@ -238,6 +238,8 @@ exit:
 
 
 static void main_eventloop(void) {
+  SDL_PauseAudioDevice(self.audio_device, 0);
+
   for (;;) {
     if (SDL_QuitRequested() == SDL_TRUE) {
       break;
@@ -249,6 +251,8 @@ static void main_eventloop(void) {
 
     keyboard_refresh();
   }
+
+  SDL_PauseAudioDevice(self.audio_device, 1);
 }
 
 
