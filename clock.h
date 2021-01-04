@@ -37,6 +37,7 @@ clock_video_timing_t clock_video_timing_get(void);
 void                 clock_video_timing_set(clock_video_timing_t timing);
 int                  clock_register_callback(clock_callback_t callback);
 void                 clock_run(u32_t cpu_ticks);
+u64_t                clock_ticks(void);
 
 
 #endif  /* __CLOCK_H */

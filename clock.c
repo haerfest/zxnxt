@@ -55,6 +55,11 @@ void clock_finit(void) {
 }
 
 
+u64_t clock_ticks(void) {
+  return self.ticks_28mhz;
+}
+
+
 clock_cpu_speed_t clock_cpu_speed_get(void) {
   return self.cpu_speed;
 }

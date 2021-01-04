@@ -353,10 +353,10 @@ static void cpu_trace(void) {
 #endif  /* TRACE */
 
 
-int cpu_run(u32_t n_instructions) {
-  u32_t i;
+int cpu_run(u32_t ticks_28mhz) {
+  const u64_t until = clock_ticks() + ticks_28mhz;
 
-  for (i = 0; i < n_instructions; i++) {
+  while (clock_ticks() < until) {
     cpu_trace();
     cpu_step();
 
