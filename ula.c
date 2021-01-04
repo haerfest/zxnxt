@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <time.h>
+#include "clock.h"
 #include "cpu.h"
 #include "defs.h"
 #include "keyboard.h"
@@ -93,6 +94,8 @@ typedef struct {
   int                       clip_y2;
   int                       frame_counter;
   int                       blink_state;
+  s8_t                      audio_buffer[AUDIO_BUFFER_LENGTH];
+  u64_t                     audio_buffer_emptied_ticks_28mhz;
 } self_t;
 
 
@@ -250,12 +253,22 @@ static void ula_display_state_bottom_border(void) {
                        : E_ULA_DISPLAY_STATE_VSYNC;
 
     if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
-      const u64_t now        = SDL_GetPerformanceCounter();
-      const long  elapsed_ns = 1e9 * (now - self.vsync_time) / SDL_GetPerformanceFrequency();
-      const long  desired_ns = 1e6 * 1000 / self.display_frequency;
+      long  elapsed_ns;
+      long  desired_ns;
 
-      cpu_irq(32);
+      self.frame_counter++;
+      if (self.frame_counter == self.display_frequency / 2) {
+        self.blink_state ^= 1;
+      } else if (self.frame_counter == self.display_frequency) {
+        self.blink_state ^= 1;
+        self.frame_counter = 0;
+      }
+
       ula_blit();
+      cpu_irq(32);
+
+      elapsed_ns = 1e9 * (SDL_GetPerformanceCounter() - self.vsync_time) / SDL_GetPerformanceFrequency();
+      desired_ns = 1e6 * 1000 / self.display_frequency;
 
       if (elapsed_ns < desired_ns) {
         struct timespec t = {
@@ -267,15 +280,7 @@ static void ula_display_state_bottom_border(void) {
         while (nanosleep(&t, &t) != 0);
       }
 
-      self.vsync_time = now;
-
-      self.frame_counter++;
-      if (self.frame_counter == self.display_frequency / 2) {
-        self.blink_state ^= 1;
-      } else if (self.frame_counter == self.display_frequency) {
-        self.blink_state ^= 1;
-        self.frame_counter = 0;
-      }
+      self.vsync_time = SDL_GetPerformanceCounter();
     }
   }
 }
@@ -377,6 +382,9 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID aud
   ula_fill_tables();
   ula_reset_display_spec();
 
+  self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
+  memset(self.audio_buffer, 0, sizeof(self.audio_buffer));
+
   return 0;
 }
 
@@ -391,8 +399,23 @@ u8_t ula_read(u16_t address) {
 
 
 void ula_write(u16_t address, u8_t value) {
+  const u8_t speaker_state = value & 0x10;
+  const s8_t sample        = speaker_state ? 127 : -128;
+  int        index;
+
+  SDL_LockAudioDevice(self.audio_device);
+
+  index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.audio_buffer_emptied_ticks_28mhz) / 28000000;
+  if (index < sizeof(self.audio_buffer)) {
+    self.audio_buffer[index] = sample;
+  }
+
+  /* TODO: Else shift data in audio buffer, to play back most recent data? */
+
+  SDL_UnlockAudioDevice(self.audio_device);
+
+  self.speaker_state = speaker_state;
   self.border_colour = value & 0x07;
-  self.speaker_state = value & 0x04;
 }
 
 
@@ -446,4 +469,11 @@ void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_y2 = y2;
 
   log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", self.clip_x1, self.clip_x2, self.clip_y1, self.clip_y2);
+}
+
+
+void ula_audio_callback(void* userdata, u8_t* stream, int length) {
+  self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
+  memcpy(stream, self.audio_buffer, sizeof(self.audio_buffer));
+  // memset(self.audio_buffer, 0, sizeof(self.audio_buffer));
 }

@@ -47,52 +47,53 @@ static int main_init(void) {
   SDL_AudioSpec have;
   u8_t*         sram;
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-    fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
+  if (log_init() != 0) {
     goto exit;
   }
 
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
+    log_err("SDL_Init: %s\n", SDL_GetError());
+    goto exit_log;
+  }
+
   memset(&want, 0, sizeof(want));
-  want.freq     = 44100;
-  want.format   = AUDIO_U8;
+  want.freq     = AUDIO_SAMPLE_RATE;
+  want.format   = AUDIO_S8;
   want.channels = 1;
-  want.samples  = 4096;
+  want.samples  = AUDIO_BUFFER_LENGTH;
+  want.callback = ula_audio_callback;
   
   self.audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
   if (self.audio_device == 0) {
-    fprintf(stderr, "main: SDL_OpenAudioDevice error: %s\n", SDL_GetError());
+    log_err("main: SDL_OpenAudioDevice error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
 
   self.window = SDL_CreateWindow("zxnxt", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
   if (self.window == NULL) {
-    fprintf(stderr, "main: SDL_CreateWindow error: %s\n", SDL_GetError());
+    log_err("main: SDL_CreateWindow error: %s\n", SDL_GetError());
     goto exit_audio;
   }
 
   self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED);
   if (self.renderer == NULL) {
-    fprintf(stderr, "main: SDL_CreateRenderer error: %s\n", SDL_GetError());
+    log_err("main: SDL_CreateRenderer error: %s\n", SDL_GetError());
     goto exit_audio;
   }
 
   if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
-    fprintf(stderr, "main: SDL_RenderSetScale error: %s\n", SDL_GetError());
+    log_err("main: SDL_RenderSetScale error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
   }
 
   self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGBA4444, SDL_TEXTUREACCESS_STREAMING, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
-    fprintf(stderr, "main: SDL_CreateTexture error: %s\n", SDL_GetError());
+    log_err("main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_window_and_renderer;
   }
 
-  if (log_init() != 0) {
-    goto exit_texture;
-  }
-
   if (utils_init() != 0) {
-    goto exit_log;
+    goto exit_texture;
   }
 
   if (i2c_init() != 0) {
@@ -221,8 +222,6 @@ exit_i2c:
   i2c_finit();
 exit_utils:
   utils_finit();
-exit_log:
-  log_finit();
 exit_texture:
   SDL_DestroyTexture(self.texture);
 exit_window_and_renderer:
@@ -232,6 +231,8 @@ exit_audio:
   SDL_CloseAudioDevice(self.audio_device);
 exit_sdl:
   SDL_Quit();
+exit_log:
+  log_finit();
 exit:
   return -1;
 }
@@ -278,13 +279,12 @@ static void main_finit(void) {
   sdcard_finit();
   i2c_finit();
   utils_finit();
-  log_finit();
-
   SDL_DestroyTexture(self.texture);
   SDL_DestroyRenderer(self.renderer);
   SDL_DestroyWindow(self.window);
   SDL_CloseAudioDevice(self.audio_device);
   SDL_Quit();
+  log_finit();
 }
 
 
