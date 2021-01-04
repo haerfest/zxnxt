@@ -96,6 +96,8 @@ typedef struct {
   int                       blink_state;
   s8_t                      audio_buffer[AUDIO_BUFFER_LENGTH];
   u64_t                     audio_buffer_emptied_ticks_28mhz;
+  s8_t                      audio_last_sample;
+  int                       audio_last_index;
 } self_t;
 
 
@@ -383,6 +385,8 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID aud
   ula_reset_display_spec();
 
   self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
+  self.audio_last_sample                = 0;
+  self.audio_last_index                 = sizeof(self.audio_buffer);
   memset(self.audio_buffer, 0, sizeof(self.audio_buffer));
 
   return 0;
@@ -398,17 +402,36 @@ u8_t ula_read(u16_t address) {
 }
 
 
+#define MAX(a, b)  ((a) > (b) ? (a) : (b))
+#define MIN(a, b)  ((a) < (b) ? (a) : (b))
+
+
 void ula_write(u16_t address, u8_t value) {
   const u8_t speaker_state = value & 0x10;
   const s8_t sample        = speaker_state ? 127 : -128;
   int        index;
+  int        i;
 
   SDL_LockAudioDevice(self.audio_device);
 
   index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.audio_buffer_emptied_ticks_28mhz) / 28000000;
+
+  /* Extend previous sample. */
+  for (i = MIN(self.audio_last_index, sizeof(self.audio_buffer)); i < MIN(index, sizeof(self.audio_buffer)); i++) {
+    self.audio_buffer[i] = self.audio_last_sample;
+  }
+
   if (index < sizeof(self.audio_buffer)) {
     self.audio_buffer[index] = sample;
+
+    /* Extend this sample. */
+    for (i = index + 1; i < sizeof(self.audio_buffer); i++) {
+      self.audio_buffer[i] = sample;
+    }
   }
+
+  self.audio_last_index  = index;
+  self.audio_last_sample = sample;
 
   /* TODO: Else shift data in audio buffer, to play back most recent data? */
 
@@ -473,7 +496,9 @@ void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
 
 
 void ula_audio_callback(void* userdata, u8_t* stream, int length) {
-  self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
   memcpy(stream, self.audio_buffer, sizeof(self.audio_buffer));
-  // memset(self.audio_buffer, 0, sizeof(self.audio_buffer));
+  memset(self.audio_buffer, self.audio_last_sample, sizeof(self.audio_buffer));
+
+  self.audio_last_index                 = 0;
+  self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
 }
