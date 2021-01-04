@@ -83,7 +83,7 @@ def add_A_r(r: str) -> C:
     return f'''
         const u16_t result = A + {r};
         const u8_t  carry  = A > 0xFF - {r};
-        F = SZ53(A) | HF_ADD(A, {r}, result) | VF_ADD(A, {r}, result) | carry;
+        F = SZ53(result & 0xFF) | HF_ADD(A, {r}, result) | VF_ADD(A, {r}, result) | carry;
         A += {r} & 0xFF;
     '''
 
