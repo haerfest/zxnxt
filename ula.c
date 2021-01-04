@@ -65,6 +65,7 @@ typedef enum {
 typedef struct {
   SDL_Renderer*             renderer;
   SDL_Texture*              texture;
+  SDL_AudioDeviceID         audio_device;
   u64_t                     vsync_time;
   const ula_display_spec_t* display_spec;
   u16_t                     display_offsets[192];
@@ -348,7 +349,7 @@ static void ula_fill_tables(void) {
 }
 
 
-int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
+int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID audio_device, u8_t* sram) {
   self.frame_buffer = malloc(FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
   if (self.frame_buffer == NULL) {
     log_err("ula: out of memory\n");
@@ -357,6 +358,7 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
 
   self.renderer          = renderer;
   self.texture           = texture;
+  self.audio_device      = audio_device;
   self.vsync_time        = SDL_GetPerformanceCounter();
   self.display_ram       = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
   self.attribute_ram     = &self.display_ram[192 * 32];

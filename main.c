@@ -32,9 +32,10 @@
 
 
 typedef struct {
-  SDL_Window*   window;
-  SDL_Renderer* renderer;
-  SDL_Texture*  texture;
+  SDL_Window*       window;
+  SDL_Renderer*     renderer;
+  SDL_Texture*      texture;
+  SDL_AudioDeviceID audio_device;
 } main_t;
 
 
@@ -42,23 +43,37 @@ static main_t self;
 
 
 static int main_init(void) {
-  u8_t* sram;
+  SDL_AudioSpec want;
+  SDL_AudioSpec have;
+  u8_t*         sram;
 
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
     goto exit;
+  }
+
+  memset(&want, 0, sizeof(want));
+  want.freq     = 44100;
+  want.format   = AUDIO_U8;
+  want.channels = 1;
+  want.samples  = 4096;
+  
+  self.audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+  if (self.audio_device == 0) {
+    fprintf(stderr, "main: SDL_OpenAudioDevice error: %s\n", SDL_GetError());
+    goto exit_sdl;
   }
 
   self.window = SDL_CreateWindow("zxnxt", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
   if (self.window == NULL) {
     fprintf(stderr, "main: SDL_CreateWindow error: %s\n", SDL_GetError());
-    goto exit_sdl;
+    goto exit_audio;
   }
 
   self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED);
   if (self.renderer == NULL) {
     fprintf(stderr, "main: SDL_CreateRenderer error: %s\n", SDL_GetError());
-    goto exit_sdl;
+    goto exit_audio;
   }
 
   if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
@@ -146,7 +161,7 @@ static int main_init(void) {
     goto exit_clock;
   }
 
-  if (ula_init(self.renderer, self.texture, sram) != 0) {
+  if (ula_init(self.renderer, self.texture, self.audio_device, sram) != 0) {
     goto exit_keyboard;
   }
 
@@ -213,6 +228,8 @@ exit_texture:
 exit_window_and_renderer:
   SDL_DestroyRenderer(self.renderer);
   SDL_DestroyWindow(self.window);
+exit_audio:
+  SDL_CloseAudioDevice(self.audio_device);
 exit_sdl:
   SDL_Quit();
 exit:
@@ -262,6 +279,7 @@ static void main_finit(void) {
   SDL_DestroyTexture(self.texture);
   SDL_DestroyRenderer(self.renderer);
   SDL_DestroyWindow(self.window);
+  SDL_CloseAudioDevice(self.audio_device);
   SDL_Quit();
 }
 
