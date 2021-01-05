@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include "altrom.h"
+#include "audio.h"
 #include "bootrom.h"
 #include "clock.h"
 #include "config.h"
@@ -58,12 +59,16 @@ static int main_init(void) {
     goto exit_log;
   }
 
+  self.renderer = NULL;
+  self.texture  = NULL;
+  self.window   = NULL;
+
   memset(&want, 0, sizeof(want));
   want.freq     = AUDIO_SAMPLE_RATE;
   want.format   = AUDIO_S8;
   want.channels = 1;
   want.samples  = AUDIO_BUFFER_LENGTH;
-  want.callback = ula_audio_callback;
+  want.callback = audio_callback;
   
   self.audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
   if (self.audio_device == 0) {
@@ -74,41 +79,45 @@ static int main_init(void) {
   self.window = SDL_CreateWindow("zxnxt", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
   if (self.window == NULL) {
     log_err("main: SDL_CreateWindow error: %s\n", SDL_GetError());
-    goto exit_audio;
+    goto exit_sdl;
   }
 
   self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED);
   if (self.renderer == NULL) {
     log_err("main: SDL_CreateRenderer error: %s\n", SDL_GetError());
-    goto exit_window;
+    goto exit_sdl;
   }
 
   if (SDL_RenderSetIntegerScale(self.renderer, 1) != 0) {
     log_err("main: SDL_RenderSetIntegerScale error: %s\n", SDL_GetError());
-    goto exit_renderer;
+    goto exit_sdl;
   }
 
   if (SDL_RenderSetLogicalSize(self.renderer, 352, 312) != 0) {
     log_err("main: SDL_RenderSetLogicalSize error: %s\n", SDL_GetError());
-    goto exit_renderer;
+    goto exit_sdl;
   }
 
   if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
     log_err("main: SDL_RenderSetScale error: %s\n", SDL_GetError());
-    goto exit_renderer;
+    goto exit_sdl;
   }
 
   self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGBA4444, SDL_TEXTUREACCESS_STREAMING, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
     log_err("main: SDL_CreateTexture error: %s\n", SDL_GetError());
-    goto exit_renderer;
+    goto exit_sdl;
   }
 
   self.keyboard_state = SDL_GetKeyboardState(NULL);
   self.is_windowed    = SDL_TRUE;
 
+  if (audio_init(self.audio_device) != 0) {
+    goto exit_sdl;
+  }
+
   if (utils_init() != 0) {
-    goto exit_texture;
+    goto exit_audio;
   }
 
   if (i2c_init() != 0) {
@@ -177,7 +186,7 @@ static int main_init(void) {
     goto exit_clock;
   }
 
-  if (ula_init(self.renderer, self.texture, self.audio_device, sram) != 0) {
+  if (ula_init(self.renderer, self.texture, sram) != 0) {
     goto exit_keyboard;
   }
 
@@ -237,15 +246,19 @@ exit_i2c:
   i2c_finit();
 exit_utils:
   utils_finit();
-exit_texture:
-  SDL_DestroyTexture(self.texture);
-exit_renderer:
-  SDL_DestroyRenderer(self.renderer);
-exit_window:
-  SDL_DestroyWindow(self.window);
 exit_audio:
-  SDL_CloseAudioDevice(self.audio_device);
+  audio_finit();
 exit_sdl:
+  if (self.texture != NULL) {
+    SDL_DestroyTexture(self.texture);
+  }
+  if (self.renderer != NULL) {
+    SDL_DestroyRenderer(self.renderer);
+  }
+  if (self.window != NULL) {
+    SDL_DestroyWindow(self.window);
+  }
+  SDL_CloseAudioDevice(self.audio_device);
   SDL_Quit();
 exit_log:
   log_finit();
@@ -273,7 +286,7 @@ static void main_reset(int hard) {
 
 
 static void main_eventloop(void) {
-  SDL_PauseAudioDevice(self.audio_device, 0);
+  audio_resume();
 
   while (!SDL_QuitRequested()) {
     const u64_t audio_filled = clock_ticks() + 28000000L * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
@@ -295,10 +308,10 @@ static void main_eventloop(void) {
     }
 
     keyboard_refresh();
-    ula_audio_sync();
+    audio_sync();
   }
 
-  SDL_PauseAudioDevice(self.audio_device, 1);
+  audio_pause();
 }
 
 
@@ -324,6 +337,7 @@ static void main_finit(void) {
   sdcard_finit();
   i2c_finit();
   utils_finit();
+  audio_finit();
   SDL_DestroyTexture(self.texture);
   SDL_DestroyRenderer(self.renderer);
   SDL_DestroyWindow(self.window);

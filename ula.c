@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <time.h>
+#include "audio.h"
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"
@@ -71,7 +72,6 @@ typedef enum {
 typedef struct {
   SDL_Renderer*             renderer;
   SDL_Texture*              texture;
-  SDL_AudioDeviceID         audio_device;
   const ula_display_spec_t* display_spec;
   u16_t                     display_offsets[192];
   u8_t*                     display_ram;
@@ -98,13 +98,8 @@ typedef struct {
   int                       clip_y2;
   int                       frame_counter;
   int                       blink_state;
-  s8_t                      audio_buffer[AUDIO_BUFFER_LENGTH];
-  u64_t                     audio_buffer_emptied_ticks_28mhz;
   s16_t                     audio_last_sample_lpf;
   s8_t                      audio_last_sample;
-  SDL_bool                  audio_is_empty;
-  SDL_cond*                 audio_emptied;
-  SDL_mutex*                audio_lock;
 } self_t;
 
 
@@ -345,7 +340,7 @@ static void ula_fill_tables(void) {
 }
 
 
-int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID audio_device, u8_t* sram) {
+int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.frame_buffer = malloc(FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
   if (self.frame_buffer == NULL) {
     log_err("ula: out of memory\n");
@@ -354,7 +349,6 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID aud
 
   self.renderer          = renderer;
   self.texture           = texture;
-  self.audio_device      = audio_device;
   self.display_ram       = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
   self.attribute_ram     = &self.display_ram[192 * 32];
   self.display_offset    = 0;
@@ -372,14 +366,8 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID aud
   ula_fill_tables();
   ula_reset_display_spec();
 
-  self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
   self.audio_last_sample_lpf            = 0;
   self.audio_last_sample                = 0;
-  self.audio_is_empty                   = SDL_FALSE;
-  self.audio_emptied                    = SDL_CreateCond();
-  self.audio_lock                       = SDL_CreateMutex();
-
-  memset(self.audio_buffer, self.audio_last_sample, sizeof(self.audio_buffer));
 
   return 0;
 }
@@ -397,27 +385,11 @@ u8_t ula_read(u16_t address) {
 void ula_write(u16_t address, u8_t value) {
   const u8_t speaker_state = value & 0x10;
   const s8_t sample        = speaker_state ? 127 : -128;
-  size_t     index;
-
-  /* Prevent a race condition between us and the audio callback. */
-  SDL_LockAudioDevice(self.audio_device);
 
   /* Apply a low-pass filter to mimick the physical properties of the real
    * speaker. */
   self.audio_last_sample_lpf = (((self.audio_last_sample_lpf << BETA) - self.audio_last_sample_lpf) + ((s16_t) sample << FIXPOINT)) >> BETA;
-  self.audio_last_sample     = self.audio_last_sample_lpf >> FIXPOINT;
-
-  /* Calculate where to place the new sample. */
-  index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.audio_buffer_emptied_ticks_28mhz) / 28000000;
-
-  if (index < sizeof(self.audio_buffer)) {
-    /* Place this sample and extend it to the end of the buffer, assuming
-     * for now that no further samples will arrive before the callback
-     * picks up our audio buffer. */
-    memset(&self.audio_buffer[index], self.audio_last_sample, sizeof(self.audio_buffer) - index);
-  }
-
-  SDL_UnlockAudioDevice(self.audio_device);
+  audio_add_sample(self.audio_last_sample_lpf >> FIXPOINT);
 
   self.speaker_state = speaker_state;
   self.border_colour = value & 0x07;
@@ -474,34 +446,4 @@ void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_y2 = y2;
 
   log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", self.clip_x1, self.clip_x2, self.clip_y1, self.clip_y2);
-}
-
-
-void ula_audio_sync(void) {
-  SDL_LockMutex(self.audio_lock);
-  while (!self.audio_is_empty) {
-    SDL_CondWait(self.audio_emptied, self.audio_lock);
-  }
-  self.audio_is_empty = SDL_FALSE;
-  SDL_UnlockMutex(self.audio_lock);
-}
-
-
-void ula_audio_callback(void* userdata, u8_t* stream, int length) {
-  /* Copy the audio buffer to SDL. */
-  memcpy(stream, self.audio_buffer, sizeof(self.audio_buffer));
-
-  /* Fill our buffer with silence according to the last sample,
-   * in case the ULA does not produce any more. */
-  memset(self.audio_buffer, self.audio_last_sample, sizeof(self.audio_buffer));
-
-  /* Record when we last emptied the buffer, so we can know where in the buffer
-   * to place freshly arriving audio samples. */
-  self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
-
-  /* Signal the main thread that we emptied the audio buffer. */
-  SDL_LockMutex(self.audio_lock);
-  self.audio_is_empty = SDL_TRUE;
-  SDL_CondSignal(self.audio_emptied);
-  SDL_UnlockMutex(self.audio_lock);
 }
