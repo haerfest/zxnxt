@@ -267,6 +267,8 @@ static void ula_display_state_bottom_border(void) {
 
       ula_blit();
       cpu_irq(32);
+
+      keyboard_refresh();
     }
   }
 }

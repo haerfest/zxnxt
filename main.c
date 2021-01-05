@@ -242,19 +242,13 @@ static void main_eventloop(void) {
   SDL_PauseAudioDevice(self.audio_device, 0);
 
   while (!SDL_QuitRequested()) {
-    const u64_t event_check = clock_ticks() + 28000000 / 20;
+    const u64_t audio_filled = clock_ticks() + 28000000L * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
 
-    while (clock_ticks() < event_check) {
-      const u64_t audio_filled = clock_ticks() + 28000000L * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
-
-      while (clock_ticks() < audio_filled) {
-        cpu_step();
-      }
-
-      ula_audio_sync();
+    while (clock_ticks() < audio_filled) {
+      cpu_step();
     }
 
-    keyboard_refresh();
+    ula_audio_sync();
   }
 
   SDL_PauseAudioDevice(self.audio_device, 1);
