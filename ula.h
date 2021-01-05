@@ -26,6 +26,7 @@ void                 ula_palette_set(int use_second);
 void                 ula_run(u32_t ticks);
 void                 ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2);
 void                 ula_audio_callback(void* userdata, u8_t* stream, int length);
+void                 ula_audio_sync(void);
 
 
 #endif  /* __ULA_H */

@@ -1672,7 +1672,7 @@ static void {name}(void) {{
 ''')
 
         f.write(f'''
-void cpu_step(void) {{
+void cpu_execute_next_opcode(void) {{
   {decoder}
 }}
 ''')

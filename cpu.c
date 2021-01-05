@@ -353,17 +353,11 @@ static void cpu_trace(void) {
 #endif  /* TRACE */
 
 
-int cpu_run(u32_t ticks_28mhz) {
-  const u64_t until = clock_ticks() + ticks_28mhz;
+void cpu_step(void) {
+  cpu_trace();
+  cpu_execute_next_opcode();
 
-  while (clock_ticks() < until) {
-    cpu_trace();
-    cpu_step();
-
-    if (self.irq_pending) {
-      cpu_irq_pending();
-    }
+  if (self.irq_pending) {
+    cpu_irq_pending();
   }
-
-  return 0;
 }

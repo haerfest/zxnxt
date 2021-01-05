@@ -241,13 +241,17 @@ exit:
 static void main_eventloop(void) {
   SDL_PauseAudioDevice(self.audio_device, 0);
 
-  for (;;) {
-    if (SDL_QuitRequested() == SDL_TRUE) {
-      break;
-    }
+  while (!SDL_QuitRequested()) {
+    const u64_t event_check = clock_ticks() + 28000000 / 20;
 
-    if (cpu_run(28000000 / 20) != 0) {
-      break;
+    while (clock_ticks() < event_check) {
+      const u64_t audio_filled = clock_ticks() + 28000000L * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
+
+      while (clock_ticks() < audio_filled) {
+        cpu_step();
+      }
+
+      ula_audio_sync();
     }
 
     keyboard_refresh();

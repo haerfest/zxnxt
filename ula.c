@@ -67,7 +67,6 @@ typedef struct {
   SDL_Renderer*             renderer;
   SDL_Texture*              texture;
   SDL_AudioDeviceID         audio_device;
-  u64_t                     vsync_time;
   const ula_display_spec_t* display_spec;
   u16_t                     display_offsets[192];
   u8_t*                     display_ram;
@@ -98,6 +97,9 @@ typedef struct {
   u64_t                     audio_buffer_emptied_ticks_28mhz;
   s8_t                      audio_last_sample;
   int                       audio_last_index;
+  SDL_bool                  audio_is_empty;
+  SDL_cond*                 audio_emptied;
+  SDL_mutex*                audio_lock;
 } self_t;
 
 
@@ -255,9 +257,6 @@ static void ula_display_state_bottom_border(void) {
                        : E_ULA_DISPLAY_STATE_VSYNC;
 
     if (self.display_state == E_ULA_DISPLAY_STATE_VSYNC) {
-      long  elapsed_ns;
-      long  desired_ns;
-
       self.frame_counter++;
       if (self.frame_counter == self.display_frequency / 2) {
         self.blink_state ^= 1;
@@ -268,21 +267,6 @@ static void ula_display_state_bottom_border(void) {
 
       ula_blit();
       cpu_irq(32);
-
-      elapsed_ns = 1e9 * (SDL_GetPerformanceCounter() - self.vsync_time) / SDL_GetPerformanceFrequency();
-      desired_ns = 1e6 * 1000 / self.display_frequency;
-
-      if (elapsed_ns < desired_ns) {
-        struct timespec t = {
-          .tv_sec  = 0,
-          .tv_nsec = desired_ns - elapsed_ns
-        };
-
-        log_dbg("ula: sleeping %ld nanoseconds\n", t.tv_nsec);
-        while (nanosleep(&t, &t) != 0);
-      }
-
-      self.vsync_time = SDL_GetPerformanceCounter();
     }
   }
 }
@@ -366,7 +350,6 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID aud
   self.renderer          = renderer;
   self.texture           = texture;
   self.audio_device      = audio_device;
-  self.vsync_time        = SDL_GetPerformanceCounter();
   self.display_ram       = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
   self.attribute_ram     = &self.display_ram[192 * 32];
   self.display_offset    = 0;
@@ -387,6 +370,10 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID aud
   self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
   self.audio_last_sample                = 0;
   self.audio_last_index                 = sizeof(self.audio_buffer);
+  self.audio_is_empty                   = SDL_FALSE;
+  self.audio_emptied                    = SDL_CreateCond();
+  self.audio_lock                       = SDL_CreateMutex();
+
   memset(self.audio_buffer, 0, sizeof(self.audio_buffer));
 
   return 0;
@@ -495,10 +482,25 @@ void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
 }
 
 
+void ula_audio_sync(void) {
+  SDL_LockMutex(self.audio_lock);
+  while (!self.audio_is_empty) {
+    SDL_CondWait(self.audio_emptied, self.audio_lock);
+  }
+  self.audio_is_empty = SDL_FALSE;
+  SDL_UnlockMutex(self.audio_lock);
+}
+
+
 void ula_audio_callback(void* userdata, u8_t* stream, int length) {
   memcpy(stream, self.audio_buffer, sizeof(self.audio_buffer));
   memset(self.audio_buffer, self.audio_last_sample, sizeof(self.audio_buffer));
 
   self.audio_last_index                 = 0;
   self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
+
+  SDL_LockMutex(self.audio_lock);
+  self.audio_is_empty = SDL_TRUE;
+  SDL_CondSignal(self.audio_emptied);
+  SDL_UnlockMutex(self.audio_lock);
 }
