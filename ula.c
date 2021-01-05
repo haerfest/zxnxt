@@ -10,6 +10,11 @@
 #include "ula.h"
 
 
+/* For fixed-point low-pass audio filter. */
+#define FIXPOINT  4
+#define BETA      4
+
+
 #define PALETTE_OFFSET_INK      0
 #define PALETTE_OFFSET_PAPER   16
 #define PALETTE_OFFSET_BORDER  16
@@ -95,8 +100,8 @@ typedef struct {
   int                       blink_state;
   s8_t                      audio_buffer[AUDIO_BUFFER_LENGTH];
   u64_t                     audio_buffer_emptied_ticks_28mhz;
+  s16_t                     audio_last_sample_lpf;
   s8_t                      audio_last_sample;
-  int                       audio_last_index;
   SDL_bool                  audio_is_empty;
   SDL_cond*                 audio_emptied;
   SDL_mutex*                audio_lock;
@@ -368,13 +373,13 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, SDL_AudioDeviceID aud
   ula_reset_display_spec();
 
   self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
+  self.audio_last_sample_lpf            = 0;
   self.audio_last_sample                = 0;
-  self.audio_last_index                 = sizeof(self.audio_buffer);
   self.audio_is_empty                   = SDL_FALSE;
   self.audio_emptied                    = SDL_CreateCond();
   self.audio_lock                       = SDL_CreateMutex();
 
-  memset(self.audio_buffer, 0, sizeof(self.audio_buffer));
+  memset(self.audio_buffer, self.audio_last_sample, sizeof(self.audio_buffer));
 
   return 0;
 }
@@ -389,38 +394,28 @@ u8_t ula_read(u16_t address) {
 }
 
 
-#define MAX(a, b)  ((a) > (b) ? (a) : (b))
-#define MIN(a, b)  ((a) < (b) ? (a) : (b))
-
-
 void ula_write(u16_t address, u8_t value) {
   const u8_t speaker_state = value & 0x10;
   const s8_t sample        = speaker_state ? 127 : -128;
-  int        index;
-  int        i;
+  size_t     index;
 
+  /* Prevent a race condition between us and the audio callback. */
   SDL_LockAudioDevice(self.audio_device);
 
+  /* Apply a low-pass filter to mimick the physical properties of the real
+   * speaker. */
+  self.audio_last_sample_lpf = (((self.audio_last_sample_lpf << BETA) - self.audio_last_sample_lpf) + ((s16_t) sample << FIXPOINT)) >> BETA;
+  self.audio_last_sample     = self.audio_last_sample_lpf >> FIXPOINT;
+
+  /* Calculate where to place the new sample. */
   index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.audio_buffer_emptied_ticks_28mhz) / 28000000;
 
-  /* Extend previous sample. */
-  for (i = MIN(self.audio_last_index, sizeof(self.audio_buffer)); i < MIN(index, sizeof(self.audio_buffer)); i++) {
-    self.audio_buffer[i] = self.audio_last_sample;
-  }
-
   if (index < sizeof(self.audio_buffer)) {
-    self.audio_buffer[index] = sample;
-
-    /* Extend this sample. */
-    for (i = index + 1; i < sizeof(self.audio_buffer); i++) {
-      self.audio_buffer[i] = sample;
-    }
+    /* Place this sample and extend it to the end of the buffer, assuming
+     * for now that no further samples will arrive before the callback
+     * picks up our audio buffer. */
+    memset(&self.audio_buffer[index], self.audio_last_sample, sizeof(self.audio_buffer) - index);
   }
-
-  self.audio_last_index  = index;
-  self.audio_last_sample = sample;
-
-  /* TODO: Else shift data in audio buffer, to play back most recent data? */
 
   SDL_UnlockAudioDevice(self.audio_device);
 
@@ -493,12 +488,18 @@ void ula_audio_sync(void) {
 
 
 void ula_audio_callback(void* userdata, u8_t* stream, int length) {
+  /* Copy the audio buffer to SDL. */
   memcpy(stream, self.audio_buffer, sizeof(self.audio_buffer));
+
+  /* Fill our buffer with silence according to the last sample,
+   * in case the ULA does not produce any more. */
   memset(self.audio_buffer, self.audio_last_sample, sizeof(self.audio_buffer));
 
-  self.audio_last_index                 = 0;
+  /* Record when we last emptied the buffer, so we can know where in the buffer
+   * to place freshly arriving audio samples. */
   self.audio_buffer_emptied_ticks_28mhz = clock_ticks();
 
+  /* Signal the main thread that we emptied the audio buffer. */
   SDL_LockMutex(self.audio_lock);
   self.audio_is_empty = SDL_TRUE;
   SDL_CondSignal(self.audio_emptied);
