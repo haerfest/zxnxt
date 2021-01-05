@@ -36,6 +36,8 @@ typedef struct {
   SDL_Renderer*     renderer;
   SDL_Texture*      texture;
   SDL_AudioDeviceID audio_device;
+  const u8_t*       keyboard_state;
+  SDL_bool          is_windowed;
 } main_t;
 
 
@@ -78,19 +80,32 @@ static int main_init(void) {
   self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED);
   if (self.renderer == NULL) {
     log_err("main: SDL_CreateRenderer error: %s\n", SDL_GetError());
-    goto exit_audio;
+    goto exit_window;
+  }
+
+  if (SDL_RenderSetIntegerScale(self.renderer, 1) != 0) {
+    log_err("main: SDL_RenderSetIntegerScale error: %s\n", SDL_GetError());
+    goto exit_renderer;
+  }
+
+  if (SDL_RenderSetLogicalSize(self.renderer, 352, 312) != 0) {
+    log_err("main: SDL_RenderSetLogicalSize error: %s\n", SDL_GetError());
+    goto exit_renderer;
   }
 
   if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
     log_err("main: SDL_RenderSetScale error: %s\n", SDL_GetError());
-    goto exit_window_and_renderer;
+    goto exit_renderer;
   }
 
   self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGBA4444, SDL_TEXTUREACCESS_STREAMING, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
     log_err("main: SDL_CreateTexture error: %s\n", SDL_GetError());
-    goto exit_window_and_renderer;
+    goto exit_renderer;
   }
+
+  self.keyboard_state = SDL_GetKeyboardState(NULL);
+  self.is_windowed    = SDL_TRUE;
 
   if (utils_init() != 0) {
     goto exit_texture;
@@ -224,8 +239,9 @@ exit_utils:
   utils_finit();
 exit_texture:
   SDL_DestroyTexture(self.texture);
-exit_window_and_renderer:
+exit_renderer:
   SDL_DestroyRenderer(self.renderer);
+exit_window:
   SDL_DestroyWindow(self.window);
 exit_audio:
   SDL_CloseAudioDevice(self.audio_device);
@@ -238,6 +254,18 @@ exit:
 }
 
 
+static void main_toggle_fullscreen(void) {
+  const u32_t flags = self.is_windowed ? SDL_WINDOW_FULLSCREEN_DESKTOP: 0;
+  
+  if (SDL_SetWindowFullscreen(self.window, flags) != 0) {
+    log_err("main: SDL_SetWindowFullscreen error: %s\n", SDL_GetError());
+    return;
+  }
+
+  self.is_windowed = !self.is_windowed;
+}
+
+
 static void main_eventloop(void) {
   SDL_PauseAudioDevice(self.audio_device, 0);
 
@@ -246,6 +274,10 @@ static void main_eventloop(void) {
 
     while (clock_ticks() < audio_filled) {
       cpu_step();
+    }
+
+    if (self.keyboard_state[SDL_SCANCODE_F12]) {
+      main_toggle_fullscreen();
     }
 
     ula_audio_sync();
