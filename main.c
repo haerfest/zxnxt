@@ -266,6 +266,12 @@ static void main_toggle_fullscreen(void) {
 }
 
 
+static void main_reset(int hard) {
+  nextreg_select_write(0x243B, E_NEXTREG_REGISTER_RESET);
+  nextreg_data_write(0x253B, hard ? 0x02 : 0x01);
+}
+
+
 static void main_eventloop(void) {
   SDL_PauseAudioDevice(self.audio_device, 0);
 
@@ -276,10 +282,19 @@ static void main_eventloop(void) {
       cpu_step();
     }
 
+    if (self.keyboard_state[SDL_SCANCODE_F1]) {
+      main_reset(1);
+    }
+
+    if (self.keyboard_state[SDL_SCANCODE_F4]) {
+      main_reset(0);
+    }
+
     if (self.keyboard_state[SDL_SCANCODE_F12]) {
       main_toggle_fullscreen();
     }
 
+    keyboard_refresh();
     ula_audio_sync();
   }
 
