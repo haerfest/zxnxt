@@ -12,8 +12,8 @@
 
 
 /* For fixed-point low-pass audio filter. */
-#define FIXPOINT  4
-#define BETA      4
+#define SHIFT  1
+#define BETA   1
 
 
 #define PALETTE_OFFSET_INK      0
@@ -388,8 +388,8 @@ void ula_write(u16_t address, u8_t value) {
 
   /* Apply a low-pass filter to mimick the physical properties of the real
    * speaker. */
-  self.audio_last_sample_lpf = (((self.audio_last_sample_lpf << BETA) - self.audio_last_sample_lpf) + ((s16_t) sample << FIXPOINT)) >> BETA;
-  audio_add_sample(self.audio_last_sample_lpf >> FIXPOINT);
+  self.audio_last_sample_lpf = (((self.audio_last_sample_lpf << BETA) - self.audio_last_sample_lpf) + ((s16_t) sample << SHIFT)) >> BETA;
+  audio_add_sample(self.audio_last_sample_lpf >> SHIFT);
 
   self.speaker_state = speaker_state;
   self.border_colour = value & 0x07;
