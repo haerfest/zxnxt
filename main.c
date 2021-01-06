@@ -41,7 +41,8 @@ typedef struct {
   SDL_Texture*      texture;
   SDL_AudioDeviceID audio_device;
   const u8_t*       keyboard_state;
-  SDL_bool          is_windowed;
+  int               is_windowed;
+  int               is_function_key_down;
 } main_t;
 
 
@@ -112,8 +113,9 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  self.keyboard_state = SDL_GetKeyboardState(NULL);
-  self.is_windowed    = SDL_TRUE;
+  self.keyboard_state       = SDL_GetKeyboardState(NULL);
+  self.is_function_key_down = 0;
+  self.is_windowed          = 1;
 
   if (audio_init(self.audio_device) != 0) {
     goto exit_sdl;
@@ -299,6 +301,28 @@ static void main_change_cpu_speed(void) {
 }
 
 
+static void main_handle_function_keys(void) {
+  const int f1  = self.keyboard_state[SDL_SCANCODE_F1];
+  const int f4  = self.keyboard_state[SDL_SCANCODE_F4];
+  const int f8  = self.keyboard_state[SDL_SCANCODE_F8];
+  const int f12 = self.keyboard_state[SDL_SCANCODE_F12];
+
+  if (f1 || f4 || f8 || f12) {
+    if (!self.is_function_key_down) {
+      if (f1)  main_reset(RESET_HARD);
+      if (f4)  main_reset(RESET_SOFT);
+      if (f8)  main_change_cpu_speed();
+      if (f12) main_toggle_fullscreen();
+
+      /* Prevent auto-repeat from continuous triggering. */
+      self.is_function_key_down = 1;
+    }
+  } else if (self.is_function_key_down) {
+    self.is_function_key_down = 0;
+  }
+}
+
+
 static void main_eventloop(void) {
   audio_resume();
 
@@ -309,23 +333,9 @@ static void main_eventloop(void) {
       cpu_step();
     }
 
-    if (self.keyboard_state[SDL_SCANCODE_F1]) {
-      main_reset(RESET_HARD);
-    }
-
-    if (self.keyboard_state[SDL_SCANCODE_F4]) {
-      main_reset(RESET_SOFT);
-    }
-
-    if (self.keyboard_state[SDL_SCANCODE_F8]) {
-      main_change_cpu_speed();
-    }
-
-    if (self.keyboard_state[SDL_SCANCODE_F12]) {
-      main_toggle_fullscreen();
-    }
-
     keyboard_refresh();
+    main_handle_function_keys();
+
     audio_sync();
   }
 
