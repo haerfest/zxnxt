@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include "altrom.h"
 #include "audio.h"
+#include "ay.h"
 #include "bootrom.h"
 #include "clock.h"
 #include "config.h"
@@ -122,8 +123,12 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  if (utils_init() != 0) {
+  if (ay_init() != 0) {
     goto exit_audio;
+  }
+
+  if (utils_init() != 0) {
+    goto exit_ay;
   }
 
   if (i2c_init() != 0) {
@@ -258,6 +263,8 @@ exit_i2c:
   i2c_finit();
 exit_utils:
   utils_finit();
+exit_ay:
+  ay_finit();
 exit_audio:
   audio_finit();
 exit_sdl:
@@ -373,6 +380,7 @@ static void main_finit(void) {
   sdcard_finit();
   i2c_finit();
   utils_finit();
+  ay_finit();
   audio_finit();
   SDL_DestroyTexture(self.texture);
   SDL_DestroyRenderer(self.renderer);

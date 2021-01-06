@@ -1,3 +1,4 @@
+#include "ay.h"
 #include "divmmc.h"
 #include "nextreg.h"
 #include "dac.h"
@@ -23,6 +24,18 @@ void io_finit(void) {
 u8_t io_read(u16_t address) {
   if ((address & 0x0001) == 0x0000) {
     return ula_read(address);
+  }
+
+  /* TODO: Bit 14 of address must be set on Plus 3? */
+  if ((address & 0x8003) == 0x0001) {
+    /* Typically 0x7FFD. */
+    return paging_spectrum_128k_paging_read();
+  }
+
+  /* TODO: 0xBFFD is readable on +3. */
+  if ((address & 0xC007) == 0xC005) {
+    /* 0xFFFD */
+    return ay_register_read();
   }
 
   switch (address & 0x00FF) {
@@ -99,6 +112,19 @@ void io_write(u16_t address, u8_t value) {
     /* Typically 0x7FFD. */
     paging_spectrum_128k_paging_write(value);
     return;
+  }
+
+  switch (address & 0xC007) {
+    case 0xC005:  /* 0xFFFD */
+      ay_register_select(value);
+      return;
+
+    case 0x8005:  /* 0xBFFD */
+      ay_register_write(value);
+      return;
+
+    default:
+      break;
   }
 
   switch (address & 0x00FF) {
