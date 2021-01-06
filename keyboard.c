@@ -27,23 +27,16 @@ const static SDL_Scancode scancodes[N_KEYS] = {
 };
 
 
-/* The column order is d0 - d4 in the response byte. */
-const static keyboard_key_t matrix[N_ROWS][N_COLS] = {
-  /* 7F */ { E_KEY_SPACE,      E_KEY_SYMBOL_SHIFT, E_KEY_M, E_KEY_N, E_KEY_B },
-  /* BF */ { E_KEY_ENTER,      E_KEY_L,            E_KEY_K, E_KEY_J, E_KEY_H },
-  /* DF */ { E_KEY_P,          E_KEY_O,            E_KEY_I, E_KEY_U, E_KEY_Y },
-  /* EF */ { E_KEY_0,          E_KEY_9,            E_KEY_8, E_KEY_7, E_KEY_6 },
-  /* F7 */ { E_KEY_1,          E_KEY_2,            E_KEY_3, E_KEY_4, E_KEY_5 },
-  /* FB */ { E_KEY_Q,          E_KEY_W,            E_KEY_E, E_KEY_R, E_KEY_T },
-  /* FD */ { E_KEY_A,          E_KEY_S,            E_KEY_D, E_KEY_F, E_KEY_G },
-  /* FE */ { E_KEY_CAPS_SHIFT, E_KEY_Z,            E_KEY_X, E_KEY_C, E_KEY_V }
-};
-
-
 typedef struct {
   const u8_t* state;
-  int         pressed[N_KEYS];
-  int         capslock_on;
+  u8_t        half_row_FE;
+  u8_t        half_row_FD;
+  u8_t        half_row_FB;
+  u8_t        half_row_F7;
+  u8_t        half_row_EF;
+  u8_t        half_row_DF;
+  u8_t        half_row_BF;
+  u8_t        half_row_7F;
 } self_t;
 
 
@@ -52,7 +45,14 @@ static self_t self;
 
 int keyboard_init(void) {
   self.state       = SDL_GetKeyboardState(NULL);
-  self.capslock_on = self.state[SDL_SCANCODE_CAPSLOCK];
+  self.half_row_FE = 0;
+  self.half_row_FD = 0;
+  self.half_row_FB = 0;
+  self.half_row_F7 = 0;
+  self.half_row_EF = 0;
+  self.half_row_DF = 0;
+  self.half_row_BF = 0;
+  self.half_row_7F = 0;
 
   return 0;
 }
@@ -64,72 +64,80 @@ void keyboard_finit(void) {
 
 /* TODO: Use Caps Lock to trigger Caps Shift + 2. */
 void keyboard_refresh(void) {
+  int p[N_KEYS];  /* 'p' = pressed */
   int i;
 
   /* First capture the state of the physical keys on a ZX Spectrum 48K. */
   for (i = 0; i < N_KEYS; i++) {
-    self.pressed[i] = self.state[scancodes[i]];
+    p[i] = self.state[scancodes[i]];
   }
 
   /* Also allow for the right modifier keys. */
-  self.pressed[E_KEY_CAPS_SHIFT]   |= self.state[SDL_SCANCODE_RSHIFT];
-  self.pressed[E_KEY_SYMBOL_SHIFT] |= self.state[SDL_SCANCODE_RALT];
+  p[E_KEY_CAPS_SHIFT]   |= self.state[SDL_SCANCODE_RSHIFT];
+  p[E_KEY_SYMBOL_SHIFT] |= self.state[SDL_SCANCODE_RALT];
 
   /* Then implement some of the additional keys on later models. */
   if (self.state[SDL_SCANCODE_BACKSPACE]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_0] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_0] = 1;
   }
   if (self.state[SDL_SCANCODE_GRAVE]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_1] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_1] = 1;
   }
   if (self.state[SDL_SCANCODE_LEFT]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_5] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_5] = 1;
   }
   if (self.state[SDL_SCANCODE_DOWN]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_6] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_6] = 1;
   }
   if (self.state[SDL_SCANCODE_UP]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_7] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_7] = 1;
   }
   if (self.state[SDL_SCANCODE_RIGHT]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_8] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_8] = 1;
   }
   if (self.state[SDL_SCANCODE_ESCAPE]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_SPACE] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_SPACE] = 1;
   }
   if (self.state[SDL_SCANCODE_SEMICOLON]) {
-    self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_O] = 1;
+    p[E_KEY_SYMBOL_SHIFT] = p[E_KEY_O] = 1;
   }
     if (self.state[SDL_SCANCODE_APOSTROPHE]) {
-    self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_P] = 1;
+    p[E_KEY_SYMBOL_SHIFT] = p[E_KEY_P] = 1;
   }
   if (self.state[SDL_SCANCODE_COMMA]) {
-    self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_N] = 1;
+    p[E_KEY_SYMBOL_SHIFT] = p[E_KEY_N] = 1;
   }
   if (self.state[SDL_SCANCODE_PERIOD]) {
-    self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_M] = 1;
+    p[E_KEY_SYMBOL_SHIFT] = p[E_KEY_M] = 1;
   }
   if (self.state[SDL_SCANCODE_TAB]) {
-    self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_SYMBOL_SHIFT] = 1;
+    p[E_KEY_CAPS_SHIFT] = p[E_KEY_SYMBOL_SHIFT] = 1;
   }
+
+  self.half_row_FE = (p[E_KEY_CAPS_SHIFT] << 0) | (p[E_KEY_Z] << 1) | (p[E_KEY_X] << 2) | (p[E_KEY_C]            << 3) | (p[E_KEY_V]     << 4);
+  self.half_row_FD = (p[E_KEY_A]          << 0) | (p[E_KEY_S] << 1) | (p[E_KEY_D] << 2) | (p[E_KEY_F]            << 3) | (p[E_KEY_G]     << 4);
+  self.half_row_FB = (p[E_KEY_Q]          << 0) | (p[E_KEY_W] << 1) | (p[E_KEY_E] << 2) | (p[E_KEY_R]            << 3) | (p[E_KEY_T]     << 4);
+  self.half_row_F7 = (p[E_KEY_1]          << 0) | (p[E_KEY_2] << 1) | (p[E_KEY_3] << 2) | (p[E_KEY_4]            << 3) | (p[E_KEY_5]     << 4);
+  self.half_row_EF = (p[E_KEY_6]          << 4) | (p[E_KEY_7] << 3) | (p[E_KEY_8] << 2) | (p[E_KEY_9]            << 1) | (p[E_KEY_0]     << 0);
+  self.half_row_DF = (p[E_KEY_Y]          << 4) | (p[E_KEY_U] << 3) | (p[E_KEY_I] << 2) | (p[E_KEY_O]            << 1) | (p[E_KEY_P]     << 0);
+  self.half_row_BF = (p[E_KEY_H]          << 4) | (p[E_KEY_J] << 3) | (p[E_KEY_K] << 2) | (p[E_KEY_L]            << 1) | (p[E_KEY_ENTER] << 0);
+  self.half_row_7F = (p[E_KEY_B]          << 4) | (p[E_KEY_N] << 3) | (p[E_KEY_M] << 2) | (p[E_KEY_SYMBOL_SHIFT] << 1) | (p[E_KEY_SPACE] << 0);
 }
 
 
 u8_t keyboard_read(u16_t address) {
-  const u8_t half_rows = ~(address >> 8);
-  int        half_row;
-  int        column;
-  u8_t       mask;
-  u8_t       pressed = 0x00;
+  const u8_t half_row = ~(address >> 8);
+  u8_t       pressed  = ~0x1F;  /* No key pressed. */
 
-  for (half_row = 0, mask = 0x80; mask != 0; half_row++, mask >>= 1) {
-    if (half_rows & mask) {
-      for (column = 0; column < N_COLS; column++) {
-        const keyboard_key_t key = matrix[half_row][column];
-        pressed |= self.pressed[key] << column;
-      }
-    }
-  }
+  if (half_row & ~0xFE) pressed |= self.half_row_FE;  /* ~11111110 */
+  if (half_row & ~0xFD) pressed |= self.half_row_FD;  /* ~11111101 */
+  if (half_row & ~0xFB) pressed |= self.half_row_FB;  /* ~11111011 */
+  if (half_row & ~0xF7) pressed |= self.half_row_F7;  /* ~11110111 */
+  if (half_row & ~0xEF) pressed |= self.half_row_EF;  /* ~11101111 */
+  if (half_row & ~0xDF) pressed |= self.half_row_DF;  /* ~11011111 */
+  if (half_row & ~0xBF) pressed |= self.half_row_BF;  /* ~10111111 */
+  if (half_row & ~0x7F) pressed |= self.half_row_7F;  /* ~01111111 */
+
+  return ~pressed;
   
-  return ~pressed & 0x1F;
 }
