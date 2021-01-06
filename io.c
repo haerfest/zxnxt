@@ -94,6 +94,13 @@ void io_write(u16_t address, u8_t value) {
     return;
   }
 
+  /* TODO: Bit 14 of address must be set on Plus 3? */
+  if ((address & 0x8003) == 0x0001) {
+    /* Typically 0x7FFD. */
+    paging_spectrum_128k_paging_write(value);
+    return;
+  }
+
   switch (address & 0x00FF) {
     case 0x00E3:
       divmmc_control_write(address, value);
@@ -142,9 +149,11 @@ void io_write(u16_t address, u8_t value) {
       layer2_write(address, value);
       return;
 
+#if 0
     case 0x1FFD:
       paging_spectrum_plus_3_paging_write(value);
       return;
+#endif
 
     case 0x243B:
       nextreg_select_write(address, value);
@@ -154,13 +163,11 @@ void io_write(u16_t address, u8_t value) {
       nextreg_data_write(address, value);
       return;
 
-    case 0x7FFD:
-      paging_spectrum_128k_paging_write(value);
-      return;
-
+#if 0
     case 0xDFFD:
       paging_spectrum_next_bank_extension_write(value);
       return;
+#endif
 
     default:
       break;

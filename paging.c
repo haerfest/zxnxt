@@ -65,11 +65,13 @@ u8_t paging_spectrum_128k_paging_read(void) {
 
 
 void paging_spectrum_128k_paging_write(u8_t value) {
+  log_dbg("paging: Spectrum 128K paging write of $%02X\n", value);
+
   if (self.is_spectrum_128k_paging_locked) {
-    log_dbg("paging: cannot write $%02X to locked Spectrum 128K paging port\n");
+    log_dbg("paging: cannot write $%02X to locked Spectrum 128K paging port\n", value);
     return;
   }
-  
+
   /* TODO: Implement 16K RAM bank paging Pentagon 512K mode. */
 
   rom_select((rom_selected() & ~0x01) | (value & 0x10) >> 4);
@@ -82,7 +84,8 @@ void paging_spectrum_128k_paging_write(u8_t value) {
     self.is_spectrum_128k_paging_locked = 1;
   }
 
-  mmu_bank_set(1, MMU_ROM_BANK);
+  mmu_page_set(0, MMU_ROM_PAGE);
+  mmu_page_set(1, MMU_ROM_PAGE);
 }
 
 

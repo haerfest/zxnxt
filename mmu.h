@@ -6,7 +6,6 @@
 
 
 #define MMU_ROM_PAGE  0xFF
-#define MMU_ROM_BANK  MMU_ROM_PAGE
 
 
 int   mmu_init(u8_t* sram);
