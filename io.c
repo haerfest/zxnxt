@@ -3,6 +3,7 @@
 #include "nextreg.h"
 #include "dac.h"
 #include "defs.h"
+#include "io.h"
 #include "layer2.h"
 #include "log.h"
 #include "i2c.h"
@@ -12,8 +13,22 @@
 #include "ula.h"
 
 
+typedef struct {
+  int port_7FFD_enabled;
+} self_t;
+
+
+static self_t self;
+
+
 int io_init(void) {
+  io_reset();
   return 0;
+}
+
+
+void io_reset(void) {
+  self.port_7FFD_enabled = 1;
 }
 
 
@@ -22,6 +37,8 @@ void io_finit(void) {
 
 
 u8_t io_read(u16_t address) {
+  log_dbg("io: read from $%04X\n", address);
+
   if ((address & 0x0001) == 0x0000) {
     return ula_read(address);
   }
@@ -102,6 +119,8 @@ u8_t io_read(u16_t address) {
 
 
 void io_write(u16_t address, u8_t value) {
+  log_dbg("io: write of $%02X to $%04X\n", value, address);
+
   if ((address & 0x0001) == 0x0000) {
     ula_write(address, value);
     return;
@@ -110,7 +129,9 @@ void io_write(u16_t address, u8_t value) {
   /* TODO: Bit 14 of address must be set on Plus 3? */
   if ((address & 0x8003) == 0x0001) {
     /* Typically 0x7FFD. */
-    paging_spectrum_128k_paging_write(value);
+    if (self.port_7FFD_enabled) {
+      paging_spectrum_128k_paging_write(value);
+    }
     return;
   }
 
@@ -201,3 +222,17 @@ void io_write(u16_t address, u8_t value) {
 
   log_wrn("io: unimplemented write of $%02X to $%04X\n", value, address);
 }
+
+
+void io_port_enable(u16_t address, int enable) {
+  switch (address) {
+    case 0x7FFD:
+      self.port_7FFD_enabled = enable;
+      break;
+
+    default:
+      log_wrn("io: port $%04X en/disabling not implemented\n", address);
+      break;
+  }
+}
+    

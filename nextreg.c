@@ -4,6 +4,7 @@
 #include "config.h"
 #include "cpu.h"
 #include "defs.h"
+#include "io.h"
 #include "log.h"
 #include "memory.h"
 #include "mmu.h"
@@ -59,6 +60,9 @@ static void nextreg_reset_soft(void) {
 
   ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
+
+  io_reset();
+  paging_reset();
 
   clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
 }
@@ -351,7 +355,14 @@ static void nextreg_palette_value_9bits_write(u8_t value) {
 }
 
 
+static void nextreg_internal_port_decoding_0_write(u8_t value) {
+  io_port_enable(0x7FFD, value & 0x02);
+}
+
+
 void nextreg_data_write(u16_t address, u8_t value) {
+  log_dbg("nextreg: write of $%02X to $%04X\n", value, address);
+
   switch (self.selected_register) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
       nextreg_config_mapping_write(value);
@@ -420,6 +431,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
       mmu_page_set(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL, value);
       break;
 
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
+      nextreg_internal_port_decoding_0_write(value);
+      break;
+
     case E_NEXTREG_REGISTER_ALTERNATE_ROM:
       nextreg_alternate_rom_write(value);
       break;
@@ -436,6 +451,8 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
 
 u8_t nextreg_data_read(u16_t address) {
+  log_dbg("nextreg: read from $%04X\n", address);
+
   switch (self.selected_register) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
       return MACHINE_ID;
