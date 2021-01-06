@@ -9,6 +9,7 @@
 #include "mmu.h"
 #include "nextreg.h"
 #include "palette.h"
+#include "paging.h"
 #include "rom.h"
 #include "ula.h"
 
@@ -166,6 +167,18 @@ static void nextreg_peripheral_1_setting_write(u8_t value) {
 }
 
 
+static u8_t nextreg_peripheral_3_setting_read(void) {
+  return !paging_spectrum_128k_paging_is_locked() << 7;
+}
+
+
+static void nextreg_peripheral_3_setting_write(u8_t value) {
+  if (value & 0x80) {
+    paging_spectrum_128k_paging_unlock();
+  }
+}
+
+
 static u8_t nextreg_cpu_speed_read(void) {
   const u8_t speed = clock_cpu_speed_get();
 
@@ -198,7 +211,7 @@ static void nextreg_spectrum_memory_mapping_write(u8_t value) {
   const int paging_mode = value & 0x04;
   
   if (change_bank) {
-    mmu_bank_set(4, value >> 4);
+    paging_spectrum_128k_ram_bank_slot_4_set(value >> 4);
   }
 
   if (paging_mode == 0) {
@@ -356,6 +369,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
       nextreg_peripheral_1_setting_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
+      nextreg_peripheral_3_setting_write(value);
+      break;
+
     case E_NEXTREG_REGISTER_CPU_SPEED:
       nextreg_cpu_speed_write(value);
       break;
@@ -431,6 +448,9 @@ u8_t nextreg_data_read(u16_t address) {
 
     case E_NEXTREG_REGISTER_RESET:
       return nextreg_reset_read();
+
+    case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
+      return nextreg_peripheral_3_setting_read();
 
     case E_NEXTREG_REGISTER_CPU_SPEED:
       return nextreg_cpu_speed_read();

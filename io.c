@@ -144,7 +144,7 @@ void io_write(u16_t address, u8_t value) {
 
     case 0x1FFD:
       paging_spectrum_plus_3_paging_write(value);
-      break;
+      return;
 
     case 0x243B:
       nextreg_select_write(address, value);
@@ -156,11 +156,11 @@ void io_write(u16_t address, u8_t value) {
 
     case 0x7FFD:
       paging_spectrum_128k_paging_write(value);
-      break;
+      return;
 
     case 0xDFFD:
       paging_spectrum_next_bank_extension_write(value);
-      break;
+      return;
 
     default:
       break;

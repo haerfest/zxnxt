@@ -8,7 +8,7 @@
 
 typedef struct {
   int  is_spectrum_128k_paging_locked;
-  u8_t bank_at_C000;
+  u8_t bank_slot_4;
 } self_t;
 
 
@@ -27,11 +27,22 @@ void paging_finit(void) {
 
 void paging_reset(void) {
   self.is_spectrum_128k_paging_locked = 0;
-  self.bank_at_C000                   = 0;
+  self.bank_slot_4                    = 0;
 }
 
 
-void paging_unlock_spectrum_128k_paging(void) {
+void paging_spectrum_128k_ram_bank_slot_4_set(u8_t bank) {
+  self.bank_slot_4 = bank;
+  mmu_bank_set(4, self.bank_slot_4);
+}
+
+
+int paging_spectrum_128k_paging_is_locked(void) {
+  return self.is_spectrum_128k_paging_locked;
+}
+
+
+void paging_spectrum_128k_paging_unlock(void) {
   self.is_spectrum_128k_paging_locked = 0;
 }
 
@@ -40,8 +51,17 @@ u8_t paging_spectrum_128k_paging_read(void) {
   return self.is_spectrum_128k_paging_locked            << 5 |
          (rom_selected() & 0x01)                        << 4 |
          (ula_screen_bank_get() == E_ULA_SCREEN_BANK_7) << 3 |
-         (self.bank_at_C000 & 0x03);
+         (self.bank_slot_4 & 0x03);
 }
+
+
+/**
+ * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/ports.txt
+ *
+ * "A write to any of the ports 0x7FFD, 0xDFFD, 0x1FFD, 0xEFF7 sets mmu0=0xff
+ * and mmu1=0xff to reveal the selected rom in the bottom 16K.  mmu6 and mmu7
+ * are set to reflect the selected 16K memory bank."
+ */
 
 
 void paging_spectrum_128k_paging_write(u8_t value) {
@@ -55,12 +75,14 @@ void paging_spectrum_128k_paging_write(u8_t value) {
   rom_select((rom_selected() & ~0x01) | (value & 0x10) >> 4);
   ula_screen_bank_set((value & 0x08) ? E_ULA_SCREEN_BANK_7 : E_ULA_SCREEN_BANK_5);
 
-  self.bank_at_C000 = (self.bank_at_C000 & ~0x03) | (value & 0x03);
-  mmu_bank_set(4, self.bank_at_C000);
+  self.bank_slot_4 = (self.bank_slot_4 & ~0x03) | (value & 0x03);
+  mmu_bank_set(4, self.bank_slot_4);
 
   if (value & 0x20) {
     self.is_spectrum_128k_paging_locked = 1;
   }
+
+  mmu_bank_set(1, MMU_ROM_BANK);
 }
 
 
