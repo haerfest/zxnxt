@@ -5,6 +5,10 @@
 #include "defs.h"
 
 
+#define NEXTREG_SELECT  0x243B
+#define NEXTREG_DATA    0x253B
+
+
 /* See https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt */
 typedef enum {
   E_NEXTREG_REGISTER_MACHINE_ID              = 0x00,

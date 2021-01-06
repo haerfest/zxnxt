@@ -31,6 +31,9 @@
 #define WINDOW_WIDTH  (FRAME_BUFFER_WIDTH  * RENDER_SCALE_X)
 #define WINDOW_HEIGHT (FRAME_BUFFER_HEIGHT * RENDER_SCALE_Y)
 
+#define RESET_HARD  1
+#define RESET_SOFT  0
+
 
 typedef struct {
   SDL_Window*       window;
@@ -280,8 +283,19 @@ static void main_toggle_fullscreen(void) {
 
 
 static void main_reset(int hard) {
-  nextreg_select_write(0x243B, E_NEXTREG_REGISTER_RESET);
-  nextreg_data_write(0x253B, hard ? 0x02 : 0x01);
+  nextreg_select_write(NEXTREG_SELECT, E_NEXTREG_REGISTER_RESET);
+  nextreg_data_write(NEXTREG_DATA, hard ? 0x02 : 0x01);
+}
+
+
+static void main_change_cpu_speed(void) {
+  u8_t speed;
+
+  /* TODO: Only allow this when enabled in peripheral 2 setting. */
+  nextreg_select_write(NEXTREG_SELECT, E_NEXTREG_REGISTER_CPU_SPEED);
+  speed = nextreg_data_read(NEXTREG_DATA) & 0x03;
+  speed = speed + 1;
+  nextreg_data_write(NEXTREG_DATA, speed & 0x03);
 }
 
 
@@ -296,11 +310,15 @@ static void main_eventloop(void) {
     }
 
     if (self.keyboard_state[SDL_SCANCODE_F1]) {
-      main_reset(1);
+      main_reset(RESET_HARD);
     }
 
     if (self.keyboard_state[SDL_SCANCODE_F4]) {
-      main_reset(0);
+      main_reset(RESET_SOFT);
+    }
+
+    if (self.keyboard_state[SDL_SCANCODE_F8]) {
+      main_change_cpu_speed();
     }
 
     if (self.keyboard_state[SDL_SCANCODE_F12]) {
