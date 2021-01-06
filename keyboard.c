@@ -118,14 +118,22 @@ void keyboard_refresh(void) {
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_SYMBOL_SHIFT] = 1;
   }
 
-  self.half_row_FE = HALF_ROW_L(E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C, E_KEY_V);
-  self.half_row_FD = HALF_ROW_L(E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F, E_KEY_G);
-  self.half_row_FB = HALF_ROW_L(E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R, E_KEY_T);
-  self.half_row_F7 = HALF_ROW_L(E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4, E_KEY_5);
-  self.half_row_EF = HALF_ROW_R(E_KEY_6,          E_KEY_7, E_KEY_8, E_KEY_9, E_KEY_0);
-  self.half_row_DF = HALF_ROW_R(E_KEY_Y,          E_KEY_U, E_KEY_I, E_KEY_O, E_KEY_P);  
-  self.half_row_BF = HALF_ROW_R(E_KEY_H,          E_KEY_J, E_KEY_K, E_KEY_L, E_KEY_ENTER);
-  self.half_row_7F = HALF_ROW_R(E_KEY_B,          E_KEY_N, E_KEY_M, E_KEY_S, E_KEY_SPACE);
+  /**
+   *      Left half row    Right half row
+   * ------------------    ------------------------
+   *          1 2 3 4 5    6 7 8 9            0
+   *          Q W E R T    Y U I O            P
+   *          A S D F G    H J K L            ENTER
+   * CAPS_SHIFT Z X C V    B N M SYMBOL_SHIFT SPACE
+   */
+  self.half_row_F7 = HALF_ROW_L(E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4,            E_KEY_5);
+  self.half_row_EF = HALF_ROW_R(E_KEY_6,          E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0);
+  self.half_row_FB = HALF_ROW_L(E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R,            E_KEY_T);
+  self.half_row_DF = HALF_ROW_R(E_KEY_Y,          E_KEY_U, E_KEY_I, E_KEY_O,            E_KEY_P);  
+  self.half_row_FD = HALF_ROW_L(E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F,            E_KEY_G);
+  self.half_row_BF = HALF_ROW_R(E_KEY_H,          E_KEY_J, E_KEY_K, E_KEY_L,            E_KEY_ENTER);
+  self.half_row_FE = HALF_ROW_L(E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C,            E_KEY_V);
+  self.half_row_7F = HALF_ROW_R(E_KEY_B,          E_KEY_N, E_KEY_M, E_KEY_SYMBOL_SHIFT, E_KEY_SPACE);
 }
 
 
