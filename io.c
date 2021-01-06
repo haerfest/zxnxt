@@ -5,6 +5,7 @@
 #include "layer2.h"
 #include "log.h"
 #include "i2c.h"
+#include "paging.h"
 #include "spi.h"
 #include "timex.h"
 #include "ula.h"
@@ -61,11 +62,21 @@ u8_t io_read(u16_t address) {
     case 0x123B:
       return layer2_read(address);
 
+    case 0x1FFD:
+      return paging_spectrum_plus_3_paging_read();
+
     case 0x243B:
       return nextreg_select_read(address);
 
     case 0x253B:
       return nextreg_data_read(address);
+
+    case 0x7FFD:
+      return paging_spectrum_128k_paging_read();
+
+    case 0xDFFD:
+      paging_spectrum_plus_3_paging_read();
+      break;
 
     default:
       break;
@@ -131,6 +142,10 @@ void io_write(u16_t address, u8_t value) {
       layer2_write(address, value);
       return;
 
+    case 0x1FFD:
+      paging_spectrum_plus_3_paging_write(value);
+      break;
+
     case 0x243B:
       nextreg_select_write(address, value);
       return;
@@ -138,6 +153,14 @@ void io_write(u16_t address, u8_t value) {
     case 0x253B:
       nextreg_data_write(address, value);
       return;
+
+    case 0x7FFD:
+      paging_spectrum_128k_paging_write(value);
+      break;
+
+    case 0xDFFD:
+      paging_spectrum_next_bank_extension_write(value);
+      break;
 
     default:
       break;

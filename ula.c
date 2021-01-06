@@ -72,6 +72,7 @@ typedef enum {
 typedef struct {
   SDL_Renderer*             renderer;
   SDL_Texture*              texture;
+  u8_t*                     sram;
   const ula_display_spec_t* display_spec;
   u16_t                     display_offsets[192];
   u8_t*                     display_ram;
@@ -100,6 +101,7 @@ typedef struct {
   int                       blink_state;
   s16_t                     audio_last_sample_lpf;
   s8_t                      audio_last_sample;
+  ula_screen_bank_t         screen_bank;
 } self_t;
 
 
@@ -349,7 +351,9 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
 
   self.renderer          = renderer;
   self.texture           = texture;
-  self.display_ram       = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];  /* Always bank 5. */
+  self.sram              = sram;
+  self.screen_bank       = E_ULA_SCREEN_BANK_5;
+  self.display_ram       = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
   self.attribute_ram     = &self.display_ram[192 * 32];
   self.display_offset    = 0;
   self.attribute_offset  = 0;
@@ -446,4 +450,15 @@ void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_y2 = y2;
 
   log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", self.clip_x1, self.clip_x2, self.clip_y1, self.clip_y2);
+}
+
+
+void ula_screen_bank_set(ula_screen_bank_t bank) {
+  self.screen_bank = bank;
+  self.display_ram = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+}
+
+
+ula_screen_bank_t ula_screen_bank_get(void) {
+  return self.screen_bank;
 }

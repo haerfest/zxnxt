@@ -16,6 +16,7 @@
 #include "memory.h"
 #include "mmu.h"
 #include "nextreg.h"
+#include "paging.h"
 #include "palette.h"
 #include "rom.h"
 #include "sdcard.h"
@@ -179,8 +180,12 @@ static int main_init(void) {
     goto exit_rom;
   }
 
-  if (divmmc_init(sram) != 0) {
+  if (paging_init() != 0) {
     goto exit_mmu;
+  }
+
+  if (divmmc_init(sram) != 0) {
+    goto exit_paging;
   }
 
   if (clock_init() != 0) {
@@ -223,6 +228,8 @@ exit_clock:
   clock_finit();
 exit_divmmc:
   divmmc_finit();
+exit_paging:
+  paging_finit();
 exit_mmu:
   mmu_finit();
 exit_rom:
@@ -351,6 +358,7 @@ static void main_finit(void) {
   keyboard_finit();
   clock_finit();
   divmmc_finit();
+  paging_finit();
   mmu_finit();
   rom_finit();
   altrom_finit();
