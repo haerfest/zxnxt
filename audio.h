@@ -7,7 +7,7 @@
 
 
 #define AUDIO_SAMPLE_RATE    44100
-#define AUDIO_BUFFER_LENGTH   2048
+#define AUDIO_BUFFER_LENGTH    512
 
 
 int  audio_init(SDL_AudioDeviceID device);
