@@ -88,7 +88,7 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  if (SDL_RenderSetIntegerScale(self.renderer, 1) != 0) {
+  if (SDL_RenderSetIntegerScale(self.renderer, 0) != 0) {
     log_err("main: SDL_RenderSetIntegerScale error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
