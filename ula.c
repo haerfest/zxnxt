@@ -58,6 +58,14 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
 };
 
 
+static const SDL_Rect ula_source_rect = {
+  .x = 0,
+  .y = 17,
+  .w = WINDOW_WIDTH,
+  .h = WINDOW_HEIGHT / 2
+};
+
+
 typedef enum {
   E_ULA_DISPLAY_STATE_TOP_BORDER = 0,
   E_ULA_DISPLAY_STATE_LEFT_BORDER,
@@ -91,8 +99,7 @@ typedef struct {
   u8_t                      border_colour;
   u8_t                      speaker_state;
   palette_t                 palette;
-  u8_t*                     frame_buffer;
-  u8_t*                     pixel;
+  u16_t*                    frame_buffer;
   int                       clip_x1;
   int                       clip_x2;
   int                       clip_y1;
@@ -105,12 +112,15 @@ typedef struct {
 } self_t;
 
 
-#define PLOT(colour) \
-  *self.pixel++ = colour.blue << 4 | 0; \
-  *self.pixel++ = colour.red  << 4 | colour.green;
-
-
 static self_t self;
+
+
+static void ula_plot_pixel(palette_entry_t colour) {
+  const u16_t RGBA = colour.red << 12 | colour.green << 8 | colour.blue << 4;
+
+  self.frame_buffer[self.display_line * FRAME_BUFFER_WIDTH + (self.display_column * 2) + 0] = RGBA;
+  self.frame_buffer[self.display_line * FRAME_BUFFER_WIDTH + (self.display_column * 2) + 1] = RGBA;
+}
 
 
 static void ula_reset_display_spec(void) {
@@ -119,7 +129,6 @@ static void ula_reset_display_spec(void) {
   self.display_line       = 0;
   self.display_column     = 0;
   self.display_pixel_mask = 0;
-  self.pixel              = self.frame_buffer;
   self.frame_counter      = 0;
   self.blink_state        = 0;
 }
@@ -137,7 +146,7 @@ static void ula_blit(void) {
   memcpy(pixels, self.frame_buffer, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
   SDL_UnlockTexture(self.texture);
 
-  if (SDL_RenderCopy(self.renderer, self.texture, NULL, NULL) != 0) {
+  if (SDL_RenderCopy(self.renderer, self.texture, &ula_source_rect, NULL) != 0) {
     log_err("ula: SDL_RenderCopy error: %s\n", SDL_GetError());
     return;
   }
@@ -149,7 +158,7 @@ static void ula_blit(void) {
 static void ula_display_state_top_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
-  PLOT(colour);
+  ula_plot_pixel(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
     self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
@@ -160,7 +169,7 @@ static void ula_display_state_top_border(void) {
 static void ula_display_state_left_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
-  PLOT(colour);
+  ula_plot_pixel(colour);
 
   if (++self.display_column == 32) {
     const u16_t line = self.display_line - self.display_spec->top_border_lines;
@@ -204,7 +213,7 @@ static void ula_display_state_frame_buffer(void) {
   }
 
   colour = palette_read_rgb(self.palette, index);
-  PLOT(colour);
+  ula_plot_pixel(colour);
 
   self.display_pixel_mask >>= 1;
   if (++self.display_column == 32 + 256) {
@@ -227,7 +236,7 @@ static void ula_display_state_hsync(void) {
 static void ula_display_state_right_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
-  PLOT(colour);
+  ula_plot_pixel(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
     self.display_state = E_ULA_DISPLAY_STATE_HSYNC;
@@ -251,7 +260,7 @@ static void ula_display_state_right_border(void) {
 static void ula_display_state_bottom_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
-  PLOT(colour);
+  ula_plot_pixel(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
     self.display_state = (self.display_line < self.display_spec->total_lines)
@@ -284,7 +293,6 @@ static void ula_display_state_vsync(void) {
       self.display_offset     = 0;
       self.attribute_offset   = 0;
       self.display_state      = E_ULA_DISPLAY_STATE_TOP_BORDER;
-      self.pixel              = self.frame_buffer;
     }
   }
 }

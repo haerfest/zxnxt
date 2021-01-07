@@ -27,12 +27,6 @@
 #include "utils.h"
 
 
-#define RENDER_SCALE_X 2
-#define RENDER_SCALE_Y 2
-
-#define WINDOW_WIDTH  (FRAME_BUFFER_WIDTH  * RENDER_SCALE_X)
-#define WINDOW_HEIGHT (FRAME_BUFFER_HEIGHT * RENDER_SCALE_Y)
-
 #define RESET_HARD  1
 #define RESET_SOFT  0
 
@@ -99,12 +93,12 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  if (SDL_RenderSetLogicalSize(self.renderer, 352, 312) != 0) {
+  if (SDL_RenderSetLogicalSize(self.renderer, WINDOW_WIDTH, WINDOW_HEIGHT) != 0) {
     log_err("main: SDL_RenderSetLogicalSize error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
 
-  if (SDL_RenderSetScale(self.renderer, RENDER_SCALE_X, RENDER_SCALE_Y) != 0) {
+  if (SDL_RenderSetScale(self.renderer, 1, 1) != 0) {
     log_err("main: SDL_RenderSetScale error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
