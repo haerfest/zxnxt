@@ -100,6 +100,7 @@ typedef struct {
   u8_t                      speaker_state;
   palette_t                 palette;
   u16_t*                    frame_buffer;
+  u16_t*                    pixel;
   int                       clip_x1;
   int                       clip_x2;
   int                       clip_y1;
@@ -118,8 +119,9 @@ static self_t self;
 static void ula_plot_pixel(palette_entry_t colour) {
   const u16_t RGBA = colour.red << 12 | colour.green << 8 | colour.blue << 4;
 
-  self.frame_buffer[self.display_line * FRAME_BUFFER_WIDTH + (self.display_column * 2) + 0] = RGBA;
-  self.frame_buffer[self.display_line * FRAME_BUFFER_WIDTH + (self.display_column * 2) + 1] = RGBA;
+  /* For standard ULA we draw 2x1 pixels for every Spectrum pixel. */
+  *self.pixel++ = RGBA;
+  *self.pixel++ = RGBA;
 }
 
 
@@ -131,6 +133,7 @@ static void ula_reset_display_spec(void) {
   self.display_pixel_mask = 0;
   self.frame_counter      = 0;
   self.blink_state        = 0;
+  self.pixel              = self.frame_buffer;
 }
 
 
@@ -275,6 +278,9 @@ static void ula_display_state_bottom_border(void) {
         self.blink_state ^= 1;
         self.frame_counter = 0;
       }
+
+      /* Start drawing at the top again. */
+      self.pixel = self.frame_buffer;
 
       ula_blit();
       cpu_irq(32);
