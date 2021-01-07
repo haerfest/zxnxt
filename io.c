@@ -9,7 +9,6 @@
 #include "i2c.h"
 #include "paging.h"
 #include "spi.h"
-#include "timex.h"
 #include "ula.h"
 
 
@@ -66,7 +65,7 @@ u8_t io_read(u16_t address) {
       return spi_data_read(address);
 
     case 0xFF:
-      return timex_read(address);
+      return ula_timex_read(address);
 
     case 0x0F:
     case 0x1F:
@@ -162,7 +161,7 @@ void io_write(u16_t address, u8_t value) {
       return;
 
     case 0xFF:
-      timex_write(address, value);
+      ula_timex_write(address, value);
       return;
 
     case 0x0F:

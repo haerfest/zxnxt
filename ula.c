@@ -21,6 +21,14 @@
 #define PALETTE_OFFSET_BORDER  16
 
 
+typedef enum {
+  E_ULA_DISPLAY_MODE_SCREEN_0  = 0x00,
+  E_ULA_DISPLAY_MODE_SCREEN_1  = 0x01,
+  E_ULA_DISPLAY_MODE_HI_COLOUR = 0x02,
+  E_ULA_DISPLAY_MODE_HI_RES    = 0x06
+} ula_display_mode_t;
+
+
 /** See: https://wiki.specnext.dev/Reference_machines. */
 typedef struct {
   unsigned int total_lines;
@@ -85,6 +93,7 @@ typedef struct {
   const ula_display_spec_t*  display_spec;
   u16_t                      display_offsets[192];
   u8_t*                      display_ram;
+  u8_t*                      display_ram_odd;
   u16_t                      display_offset;
   u8_t                       display_byte;
   u8_t                       display_pixel_mask;
@@ -111,12 +120,13 @@ typedef struct {
   s16_t                      audio_last_sample_lpf;
   s8_t                       audio_last_sample;
   ula_screen_bank_t          screen_bank;
+  int                        timex_disable_ula_interrupt;
+  ula_display_mode_t         display_mode;
+  u8_t                       hi_res_ink_colour;
 } self_t;
 
 
 static self_t self;
-
-
 
 
 static void ula_plot_pixel(palette_entry_t colour) {
@@ -274,7 +284,10 @@ static void ula_display_state_bottom_border(void) {
       self.pixel = self.frame_buffer;
 
       ula_blit();
-      cpu_irq(32);
+
+      if (!self.timex_disable_ula_interrupt) {
+        cpu_irq(32);
+      }
     }
   }
 }
@@ -331,6 +344,36 @@ static void ula_fill_tables(void) {
 }
 
 
+static void ula_set_display_mode(ula_display_mode_t mode) {
+  self.display_mode = mode;
+  
+  switch (self.display_mode) {
+    case E_ULA_DISPLAY_MODE_SCREEN_0:
+      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      self.attribute_ram = &self.display_ram[192 * 32];
+      break;
+      
+    case E_ULA_DISPLAY_MODE_SCREEN_1:
+      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024 + 0x2000];
+      self.attribute_ram = &self.display_ram[192 * 32];
+      break;
+      
+    case E_ULA_DISPLAY_MODE_HI_COLOUR:
+      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      self.attribute_ram = &self.display_ram[0x2000];
+      break;
+      
+    case E_ULA_DISPLAY_MODE_HI_RES:
+      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      break;
+
+    default:
+      log_wrn("ula: invalid display mode %d\n", mode);
+      break;
+  }
+}
+
+
 int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.frame_buffer = malloc(FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
   if (self.frame_buffer == NULL) {
@@ -338,29 +381,30 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
     return -1;
   }
 
-  self.renderer          = renderer;
-  self.texture           = texture;
-  self.sram              = sram;
-  self.screen_bank       = E_ULA_SCREEN_BANK_5;
-  self.display_ram       = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
-  self.attribute_ram     = &self.display_ram[192 * 32];
-  self.display_offset    = 0;
-  self.attribute_offset  = 0;
-  self.display_timing    = E_ULA_DISPLAY_TIMING_ZX_48K;
-  self.display_frequency = 50;
-  self.border_colour     = 0;
-  self.speaker_state     = 0;
-  self.palette           = E_PALETTE_ULA_FIRST;
-  self.clip_x1           = 0;
-  self.clip_x2           = 255 * 2;
-  self.clip_y1           = 0;
-  self.clip_y2           = 191;
+  self.renderer                    = renderer;
+  self.texture                     = texture;
+  self.sram                        = sram;
+  self.screen_bank                 = E_ULA_SCREEN_BANK_5;
+  self.display_ram_odd             = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024 + 0x2000];
+  self.display_offset              = 0;
+  self.attribute_offset            = 0;
+  self.display_timing              = E_ULA_DISPLAY_TIMING_ZX_48K;
+  self.display_frequency           = 50;
+  self.border_colour               = 0;
+  self.speaker_state               = 0;
+  self.palette                     = E_PALETTE_ULA_FIRST;
+  self.clip_x1                     = 0;
+  self.clip_x2                     = 255 * 2;
+  self.clip_y1                     = 0;
+  self.clip_y2                     = 191;
+  self.audio_last_sample_lpf       = 0;
+  self.audio_last_sample           = 0;
+  self.timex_disable_ula_interrupt = 0;
+  self.hi_res_ink_colour           = 0;
 
   ula_fill_tables();
+  ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
   ula_reset_display_spec();
-
-  self.audio_last_sample_lpf            = 0;
-  self.audio_last_sample                = 0;
 
   return 0;
 }
@@ -386,6 +430,21 @@ void ula_write(u16_t address, u8_t value) {
 
   self.speaker_state = speaker_state;
   self.border_colour = value & 0x07;
+}
+
+
+u8_t ula_timex_read(u16_t address) {
+  return self.timex_disable_ula_interrupt << 6 |
+         self.hi_res_ink_colour           << 3 |
+         self.display_mode;
+}
+
+
+void ula_timex_write(u16_t address, u8_t value) {
+  self.timex_disable_ula_interrupt = (value & 0x40) >> 6;
+  self.hi_res_ink_colour           = (value & 0x38) >> 3;
+
+  ula_set_display_mode(value & 0x07);
 }
 
 

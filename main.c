@@ -22,7 +22,6 @@
 #include "rom.h"
 #include "sdcard.h"
 #include "spi.h"
-#include "timex.h"
 #include "ula.h"
 #include "utils.h"
 
@@ -199,12 +198,8 @@ static int main_init(void) {
     goto exit_keyboard;
   }
 
-  if (timex_init() != 0) {
-    goto exit_ula;
-  }
-
   if (layer2_init() != 0) {
-    goto exit_timex;
+    goto exit_ula;
   }
 
   if (cpu_init() != 0) {
@@ -217,8 +212,6 @@ static int main_init(void) {
 
 exit_layer2:
   layer2_finit();
-exit_timex:
-  timex_finit();
 exit_ula:
   ula_finit();
 exit_keyboard:
@@ -354,7 +347,6 @@ static void main_eventloop(void) {
 static void main_finit(void) {
   cpu_finit();
   layer2_finit();
-  timex_finit();
   ula_finit();
   keyboard_finit();
   clock_finit();
