@@ -108,7 +108,6 @@ typedef struct {
   int                        clip_y2;
   int                        frame_counter;
   int                        blink_state;
-  s16_t                      audio_last_sample_lpf;
   s8_t                       audio_last_sample;
   ula_screen_bank_t          screen_bank;
   int                        timex_disable_ula_interrupt;
@@ -252,7 +251,6 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.clip_x2                     = 255 * 2;
   self.clip_y1                     = 0;
   self.clip_y2                     = 191;
-  self.audio_last_sample_lpf       = 0;
   self.audio_last_sample           = 0;
   self.timex_disable_ula_interrupt = 0;
   self.hi_res_ink_colour           = 0;
@@ -278,10 +276,7 @@ void ula_write(u16_t address, u8_t value) {
   const u8_t speaker_state = value & 0x10;
   const s8_t sample        = speaker_state ? 127 : -128;
 
-  /* Apply a low-pass filter to mimick the physical properties of the real
-   * speaker. */
-  self.audio_last_sample_lpf = (((self.audio_last_sample_lpf << BETA) - self.audio_last_sample_lpf) + ((s16_t) sample << SHIFT)) >> BETA;
-  audio_add_sample(self.audio_last_sample_lpf >> SHIFT);
+  audio_add_sample(sample);
 
   self.speaker_state = speaker_state;
   self.border_colour = value & 0x07;
