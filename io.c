@@ -13,7 +13,9 @@
 
 
 typedef struct {
-  int port_7FFD_enabled;
+  int is_port_7FFD_enabled;
+  int is_port_BFFD_enabled;
+  int is_port_FFFD_enabled;
 } self_t;
 
 
@@ -27,7 +29,9 @@ int io_init(void) {
 
 
 void io_reset(void) {
-  self.port_7FFD_enabled = 1;
+  self.is_port_7FFD_enabled = 1;
+  self.is_port_BFFD_enabled = 1;
+  self.is_port_FFFD_enabled = 1;
 }
 
 
@@ -51,7 +55,7 @@ u8_t io_read(u16_t address) {
   /* TODO: 0xBFFD is readable on +3. */
   if ((address & 0xC007) == 0xC005) {
     /* 0xFFFD */
-    return ay_register_read();
+    return self.is_port_FFFD_enabled ? ay_register_read() : 0xFF;
   }
 
   switch (address & 0x00FF) {
@@ -128,7 +132,7 @@ void io_write(u16_t address, u8_t value) {
   /* TODO: Bit 14 of address must be set on Plus 3? */
   if ((address & 0x8003) == 0x0001) {
     /* Typically 0x7FFD. */
-    if (self.port_7FFD_enabled) {
+    if (self.is_port_7FFD_enabled) {
       paging_spectrum_128k_paging_write(value);
     }
     return;
@@ -136,11 +140,15 @@ void io_write(u16_t address, u8_t value) {
 
   switch (address & 0xC007) {
     case 0xC005:  /* 0xFFFD */
-      ay_register_select(value);
+      if (self.is_port_FFFD_enabled) {
+        ay_register_select(value);
+      }
       return;
 
     case 0x8005:  /* 0xBFFD */
-      ay_register_write(value);
+      if (self.is_port_BFFD_enabled) {
+        ay_register_write(value);
+      }
       return;
 
     default:
@@ -226,9 +234,17 @@ void io_write(u16_t address, u8_t value) {
 void io_port_enable(u16_t address, int enable) {
   switch (address) {
     case 0x7FFD:
-      self.port_7FFD_enabled = enable;
+      self.is_port_7FFD_enabled = enable;
       break;
 
+    case 0xBFFD:
+      self.is_port_BFFD_enabled = enable;
+      break;
+
+    case 0xFFFD:
+      self.is_port_FFFD_enabled = enable;
+      break;
+      
     default:
       log_wrn("io: port $%04X en/disabling not implemented\n", address);
       break;

@@ -360,6 +360,12 @@ static void nextreg_internal_port_decoding_0_write(u8_t value) {
 }
 
 
+static void nextreg_internal_port_decoding_2_write(u8_t value) {
+  io_port_enable(0xBFFD, value & 0x01);
+  io_port_enable(0xFFFD, value & 0x01);
+}
+
+
 void nextreg_data_write(u16_t address, u8_t value) {
   log_dbg("nextreg: write of $%02X to $%04X\n", value, address);
 
@@ -433,6 +439,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
       nextreg_internal_port_decoding_0_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
+      nextreg_internal_port_decoding_2_write(value);
       break;
 
     case E_NEXTREG_REGISTER_ALTERNATE_ROM:

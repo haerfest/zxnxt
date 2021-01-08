@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "ay.h"
 #include "clock.h"
 #include "defs.h"
 #include "log.h"
@@ -35,6 +36,7 @@ typedef struct {
   clock_cpu_speed_t    cpu_speed;
   u64_t                ticks_28mhz;   /* At max dot clock overflows in 20k years. */
   u64_t                sync_14mhz;    /* Last 28 MHz tick where we synced the 14 MHz ULA clock. */
+  u64_t                sync_2mhz;     /* Last 28 MHz tick where we synced the 1.75 MHz AY-3-8912 clock. */
 } self_t;
 
 
@@ -42,10 +44,11 @@ static self_t self;
 
 
 int clock_init(void) {
-  self.video_timing   = E_CLOCK_VIDEO_TIMING_VGA_BASE;
-  self.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
-  self.ticks_28mhz    = 0;
-  self.sync_14mhz     = self.ticks_28mhz;
+  self.video_timing = E_CLOCK_VIDEO_TIMING_VGA_BASE;
+  self.cpu_speed    = E_CLOCK_CPU_SPEED_3MHZ;
+  self.ticks_28mhz  = 0;
+  self.sync_14mhz   = self.ticks_28mhz;
+  self.sync_2mhz    = self.ticks_28mhz;
 
   return 0;
 }
@@ -107,6 +110,7 @@ void clock_run(u32_t cpu_ticks) {
   };
   const u32_t ticks_28mhz = cpu_ticks * clock_divider[self.cpu_speed];
   u32_t       ticks_14mhz;
+  u32_t       ticks_2mhz;
 
   /* Update system clock. */
   self.ticks_28mhz += ticks_28mhz;
@@ -116,5 +120,12 @@ void clock_run(u32_t cpu_ticks) {
   if (ticks_14mhz > 0) {
     ula_run(ticks_14mhz);
     self.sync_14mhz += ticks_14mhz * 2;
+  }
+
+  /* Update 2 MHz clock. */
+  ticks_2mhz = (self.ticks_28mhz - self.sync_2mhz) / 16;
+  if (ticks_2mhz > 0) {
+    ay_run(ticks_2mhz);
+    self.sync_2mhz += ticks_2mhz * 16;
   }
 }
