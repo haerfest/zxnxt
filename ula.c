@@ -11,11 +11,6 @@
 #include "ula.h"
 
 
-/* For fixed-point low-pass audio filter. */
-#define SHIFT  1
-#define BETA   1
-
-
 #define PALETTE_OFFSET_INK      0
 #define PALETTE_OFFSET_PAPER   16
 #define PALETTE_OFFSET_BORDER  16
