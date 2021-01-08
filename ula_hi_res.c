@@ -18,7 +18,7 @@ static void ula_display_mode_hi_res_top_border(void) {
 
   ula_display_mode_hi_res_plot(colour);
 
-  if (++self.display_column == 32 + 256 + 64) {
+  if (++self.display_column == (32 + 256 + 64) * 2) {
     self.display_mode_handler = ula_display_mode_hi_res_hsync;
   }
 }
@@ -29,7 +29,7 @@ static void ula_display_mode_hi_res_left_border(void) {
 
   ula_display_mode_hi_res_plot(colour);
 
-  if (++self.display_column == 32) {
+  if (++self.display_column == 32 * 2) {
     const u16_t line = self.display_line - self.display_spec->top_border_lines;
     self.display_offset       = self.display_offsets[line];
     self.display_mode_handler = ula_display_mode_hi_res_content;
@@ -42,18 +42,20 @@ static void ula_display_mode_hi_res_content(void) {
   u8_t            index;
   
   if (self.display_pixel_mask == 0x00) {
+    const int   is_odd_column = self.display_column & 0x08;
+    const u8_t* display_ram   = is_odd_column ? self.display_ram_odd : self.display_ram;
     self.display_pixel_mask = 0x80;
-    self.display_byte       = (self.display_offset & 0x01)
-      ? self.display_ram_odd[self.display_offset]
-      : self.display_ram[self.display_offset];
-    self.display_offset++;
+    self.display_byte       = display_ram[self.display_offset];
+
+    if (is_odd_column) {
+      self.display_offset++;
+    }
   }
 
   if (self.display_line   >= self.display_spec->top_border_lines + self.clip_y1 &&
       self.display_line   <= self.display_spec->top_border_lines + self.clip_y2 &&
-      self.display_column >= 32 + self.clip_x1 &&
-      self.display_column <= 32 + self.clip_x2) {
-
+      self.display_column >= (32 + self.clip_x1) * 2 &&
+      self.display_column <= (32 + self.clip_x2) * 2) {
     if (self.display_byte & self.display_pixel_mask) {
       index = PALETTE_OFFSET_INK   + self.hi_res_ink_colour;
     } else {
@@ -67,17 +69,17 @@ static void ula_display_mode_hi_res_content(void) {
   ula_display_mode_hi_res_plot(colour);
 
   self.display_pixel_mask >>= 1;
-  if (++self.display_column == 32 + 256) {
+  if (++self.display_column == (32 + 256) * 2) {
     self.display_mode_handler = ula_display_mode_hi_res_right_border;
   }
 }
 
 
 static void ula_display_mode_hi_res_hsync(void) {
-  if (++self.display_column == 32 + 256 + 64 + 96) {
+  if (++self.display_column == (32 + 256 + 64 + 96) * 2) {
     self.display_column = 0;
     self.display_line++;
-    self.display_mode_handler = (self.display_line < self.display_spec->top_border_lines)                                    ? ula_display_mode_hi_res_top_border
+    self.display_mode_handler = (self.display_line < self.display_spec->top_border_lines)                                     ? ula_display_mode_hi_res_top_border
                                : (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) ? ula_display_mode_hi_res_left_border
                                : ula_display_mode_hi_res_bottom_border;
   }
@@ -89,7 +91,7 @@ static void ula_display_mode_hi_res_right_border(void) {
 
   ula_display_mode_hi_res_plot(colour);
 
-  if (++self.display_column == 32 + 256 + 64) {
+  if (++self.display_column == (32 + 256 + 64) * 2) {
     self.display_mode_handler = ula_display_mode_hi_res_hsync;
   }
 }
@@ -113,7 +115,7 @@ static void ula_display_mode_hi_res_bottom_border(void) {
 
   ula_display_mode_hi_res_plot(colour);
 
-  if (++self.display_column == 32 + 256 + 64) {
+  if (++self.display_column == (32 + 256 + 64) * 2) {
     self.display_mode_handler = (self.display_line < self.display_spec->total_lines)
                                ? ula_display_mode_hi_res_hsync
                                : ula_display_mode_hi_res_vsync;
@@ -141,7 +143,7 @@ static void ula_display_mode_hi_res_bottom_border(void) {
 
 
 static void ula_display_mode_hi_res_vsync(void) {
-  if (++self.display_column == 32 + 256 + 64 + 96) {
+  if (++self.display_column == (32 + 256 + 64 + 96) * 2) {
     self.display_column = 0;
     self.display_line++;
 

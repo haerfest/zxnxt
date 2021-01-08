@@ -171,10 +171,12 @@ static void ula_display_restart(void) {
 }
 
 
-void ula_run(u32_t ticks) {
-  u32_t tick;
+/* Runs the ULA for 'ticks_14mhz', i.e. ticks of the ULA's 14 MHz clock. */
+void ula_run(u32_t ticks_14mhz) {
+  const u32_t divider = (self.display_mode == E_ULA_DISPLAY_MODE_HI_RES ? 1 : 2);
+  u32_t       tick;
 
-  for (tick = 0; tick < ticks; tick++) {
+  for (tick = 0; tick < ticks_14mhz; tick += divider) {
     self.display_mode_handler();
   }
 }
@@ -215,7 +217,8 @@ static void ula_set_display_mode(ula_display_mode_t mode) {
       break;
       
     case E_ULA_DISPLAY_MODE_HI_RES:
-      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      self.display_ram     = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      self.display_ram_odd = &self.display_ram[0x2000];
       break;
 
     default:
@@ -238,7 +241,6 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.texture                     = texture;
   self.sram                        = sram;
   self.screen_bank                 = E_ULA_SCREEN_BANK_5;
-  self.display_ram_odd             = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024 + 0x2000];
   self.display_offset              = 0;
   self.attribute_offset            = 0;
   self.display_timing              = E_ULA_DISPLAY_TIMING_ZX_48K;
