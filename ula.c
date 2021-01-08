@@ -74,16 +74,16 @@ static const SDL_Rect ula_source_rect = {
 };
 
 
-typedef void (*ula_display_state_handler)(void);
+typedef void (*ula_display_mode_handler)(void);
 
 
-static void ula_display_state_top_border(void);
-static void ula_display_state_left_border(void);
-static void ula_display_state_content(void);
-static void ula_display_state_right_border(void);
-static void ula_display_state_hsync(void);
-static void ula_display_state_bottom_border(void);
-static void ula_display_state_vsync(void);
+static void ula_display_mode_screen_x_top_border(void);
+static void ula_display_mode_screen_x_bottom_border(void);
+static void ula_display_mode_screen_x_left_border(void);
+static void ula_display_mode_screen_x_right_border(void);
+static void ula_display_mode_screen_x_content(void);
+static void ula_display_mode_screen_x_hsync(void);
+static void ula_display_mode_screen_x_vsync(void);
 
 
 typedef struct {
@@ -99,7 +99,7 @@ typedef struct {
   u8_t                       display_pixel_mask;
   ula_display_timing_t       display_timing;
   int                        display_frequency;
-  ula_display_state_handler  display_state_handler;
+  ula_display_mode_handler   display_mode_handler;
   unsigned int               display_line;
   unsigned int               display_column;  
   u16_t                      attribute_offsets[192];
@@ -159,18 +159,18 @@ static void ula_blit(void) {
 }
 
 
-static void ula_display_state_top_border(void) {
+static void ula_display_mode_screen_x_top_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
   ula_plot_pixel(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
-    self.display_state_handler = ula_display_state_hsync;
+    self.display_mode_handler = ula_display_mode_screen_x_hsync;
   }
 }
 
 
-static void ula_display_state_left_border(void) {
+static void ula_display_mode_screen_x_left_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
   ula_plot_pixel(colour);
@@ -179,12 +179,12 @@ static void ula_display_state_left_border(void) {
     const u16_t line = self.display_line - self.display_spec->top_border_lines;
     self.display_offset        = self.display_offsets[line];
     self.attribute_offset      = self.attribute_offsets[line];
-    self.display_state_handler = ula_display_state_content;
+    self.display_mode_handler = ula_display_mode_screen_x_content;
   }
 }
 
 
-static void ula_display_state_content(void) {
+static void ula_display_mode_screen_x_content(void) {
   palette_entry_t colour;
   u8_t            index;
   
@@ -221,29 +221,29 @@ static void ula_display_state_content(void) {
 
   self.display_pixel_mask >>= 1;
   if (++self.display_column == 32 + 256) {
-    self.display_state_handler = ula_display_state_right_border;
+    self.display_mode_handler = ula_display_mode_screen_x_right_border;
   }
 }
 
 
-static void ula_display_state_hsync(void) {
+static void ula_display_mode_screen_x_hsync(void) {
   if (++self.display_column == 32 + 256 + 64 + 96) {
     self.display_column = 0;
     self.display_line++;
-    self.display_state_handler = (self.display_line < self.display_spec->top_border_lines)                                    ? ula_display_state_top_border
-                               : (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) ? ula_display_state_left_border
-                               : ula_display_state_bottom_border;
+    self.display_mode_handler = (self.display_line < self.display_spec->top_border_lines)                                    ? ula_display_mode_screen_x_top_border
+                               : (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) ? ula_display_mode_screen_x_left_border
+                               : ula_display_mode_screen_x_bottom_border;
   }
 }
 
 
-static void ula_display_state_right_border(void) {
+static void ula_display_mode_screen_x_right_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
   ula_plot_pixel(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
-    self.display_state_handler = ula_display_state_hsync;
+    self.display_mode_handler = ula_display_mode_screen_x_hsync;
   }
 }
 
@@ -261,17 +261,17 @@ static void ula_display_state_right_border(void) {
  * start of the top border (close to the 14 lines it would be on VGA output).
  * At 60Hz, it happens 24 lines into blanking, leaving only 9 lines."
  */
-static void ula_display_state_bottom_border(void) {
+static void ula_display_mode_screen_x_bottom_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
   ula_plot_pixel(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
-    self.display_state_handler = (self.display_line < self.display_spec->total_lines)
-                               ? ula_display_state_hsync
-                               : ula_display_state_vsync;
+    self.display_mode_handler = (self.display_line < self.display_spec->total_lines)
+                               ? ula_display_mode_screen_x_hsync
+                               : ula_display_mode_screen_x_vsync;
 
-    if (self.display_state_handler == ula_display_state_vsync) {
+    if (self.display_mode_handler == ula_display_mode_screen_x_vsync) {
       self.frame_counter++;
       if (self.frame_counter == self.display_frequency / 2) {
         self.blink_state ^= 1;
@@ -293,7 +293,7 @@ static void ula_display_state_bottom_border(void) {
 }
 
 
-static void ula_display_state_vsync(void) {
+static void ula_display_mode_screen_x_vsync(void) {
   if (++self.display_column == 32 + 256 + 64 + 96) {
     self.display_column = 0;
     self.display_line++;
@@ -302,21 +302,21 @@ static void ula_display_state_vsync(void) {
       self.display_line          = 0;
       self.display_offset        = 0;
       self.attribute_offset      = 0;
-      self.display_state_handler = ula_display_state_top_border;
+      self.display_mode_handler = ula_display_mode_screen_x_top_border;
     }
   }
 }
 
 
-static void ula_reset_display_spec(void) {
-  self.display_spec          = &ula_display_spec[self.display_timing][self.display_frequency == 60];
-  self.display_state_handler = ula_display_state_top_border;
-  self.display_line          = 0;
-  self.display_column        = 0;
-  self.display_pixel_mask    = 0;
-  self.frame_counter         = 0;
-  self.blink_state           = 0;
-  self.pixel                 = self.frame_buffer;
+static void ula_display_restart(void) {
+  self.display_spec         = &ula_display_spec[self.display_timing][self.display_frequency == 60];
+  self.display_mode_handler = ula_display_mode_screen_x_top_border;
+  self.display_line         = 0;
+  self.display_column       = 0;
+  self.display_pixel_mask   = 0;
+  self.frame_counter        = 0;
+  self.blink_state          = 0;
+  self.pixel                = self.frame_buffer;
 }
 
 
@@ -324,7 +324,7 @@ void ula_run(u32_t ticks) {
   u32_t tick;
 
   for (tick = 0; tick < ticks; tick++) {
-    self.display_state_handler();
+    self.display_mode_handler();
   }
 }
 
@@ -369,8 +369,10 @@ static void ula_set_display_mode(ula_display_mode_t mode) {
 
     default:
       log_wrn("ula: invalid display mode %d\n", mode);
-      break;
+      return;
   }
+
+  ula_display_restart();
 }
 
 
@@ -404,7 +406,7 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
 
   ula_fill_tables();
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
-  ula_reset_display_spec();
+  ula_display_restart();
 
   return 0;
 }
@@ -470,7 +472,7 @@ void ula_display_timing_set(ula_display_timing_t timing) {
   self.display_timing = timing;
   log_dbg("ula: display timing set to %s\n", descriptions[timing]);
 
-  ula_reset_display_spec();
+  ula_display_restart();
 }
 
 
@@ -481,7 +483,7 @@ void ula_display_frequency_set(int is_60hz) {
     self.display_frequency = display_frequency;
     log_dbg("ula: display frequency set to %d Hz\n", self.display_frequency);
 
-    ula_reset_display_spec();
+    ula_display_restart();
   }
 }
 
