@@ -57,9 +57,9 @@ static void ula_display_mode_hi_res_content(void) {
       self.display_column >= (32 + self.clip_x1) * 2 &&
       self.display_column <= (32 + self.clip_x2) * 2) {
     if (self.display_byte & self.display_pixel_mask) {
-      index = PALETTE_OFFSET_INK   + self.hi_res_ink_colour;
+      index = PALETTE_OFFSET_INK   + 8 + self.hi_res_ink_colour;
     } else {
-      index = PALETTE_OFFSET_PAPER + ~self.hi_res_ink_colour & 0x07;
+      index = PALETTE_OFFSET_PAPER + 8 + (~self.hi_res_ink_colour & 0x07);
     }
   } else {
     index = PALETTE_OFFSET_BORDER + self.border_colour;
