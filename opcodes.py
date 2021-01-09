@@ -172,7 +172,7 @@ def call(cond: Optional[str] = None) -> C:
 def ccf() -> C:
     return '''
         const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
-        F &= ~(HF_MASK | CF_MASK);
+        F &= ~(HF_MASK | NF_MASK | CF_MASK);
         F |= carry << HF_SHIFT | (1 - carry) << CF_SHIFT;
     '''
 
