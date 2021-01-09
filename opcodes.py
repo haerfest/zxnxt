@@ -950,7 +950,7 @@ def sll_pss(xy: Optional[str] = None) -> C:
         WZ    = {wz(xy)};
         TMP   = memory_read(WZ);
         carry = TMP >> 7;
-        TMP <<= 1;
+        TMP   = TMP << 1 | 1;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
         T(4);
         memory_write(WZ, TMP);
@@ -960,7 +960,7 @@ def sll_pss(xy: Optional[str] = None) -> C:
 def sll_r(r: str) -> C:
     return f'''
         const u8_t carry = {r} >> 7;
-        {r} <<= 1;
+        {r} = {r} << 1 | 1;
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
