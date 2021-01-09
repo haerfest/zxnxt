@@ -744,7 +744,7 @@ def rl_r(r: str) -> C:
 
 def rla() -> C:
     return '''
-        const u8_t carry = F & CF_MASK;
+        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
         F &= ~(HF_MASK | NF_MASK | CF_MASK);
         F |= (A & 0x80) >> 7 << CF_SHIFT;
         A <<= 1;
@@ -774,8 +774,8 @@ def rlc_r(r: str) -> C:
 def rlca() -> C:
     return '''
         const u8_t carry = A >> 7;
-        F &= ~(NF_MASK | CF_MASK);
-        F |= HF_MASK | carry << CF_SHIFT;
+        F &= ~(HF_MASK | NF_MASK | CF_MASK);
+        F |= carry << CF_SHIFT;
         A <<= 1;
         A |= carry;
     '''
@@ -1606,6 +1606,7 @@ def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str
         name = 'opcode_' + '_'.join(f'{op:02X}' for op in prefix + [opcode])
         body = f'''
             log_err("cpu: {name} not implemented around PC $%04X\\n", PC);
+            getchar();
             exit(1);
         '''
 
