@@ -117,7 +117,10 @@ static void ay_channel_step(int n) {
   s8_t          sample;
 
   if (channel->tone_divider == 0) {
-    channel->tone_divider               = MAX(1, self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE + n] << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE + n]);
+    channel->tone_divider = self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE + n] << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE + n];
+    if (channel->tone_divider == 0) {
+      channel->tone_divider = 1;
+    }
     channel->tone_divider_halfway_point = channel->tone_divider / 2;
     channel->phase                      = 1;
   } else if (channel->tone_divider == channel->tone_divider_halfway_point) {
@@ -128,7 +131,10 @@ static void ay_channel_step(int n) {
     sample = 0;
   } else {
     /* TODO Assuming fixed amplitude for now. */
-    sample = channel->phase * (self.registers[E_AY_REGISTER_CHANNEL_A_AMPLITUDE + n] & 0x0F);
+    sample = self.registers[E_AY_REGISTER_CHANNEL_A_AMPLITUDE + n] & 0x0F;
+    if (channel->phase < 0) {
+      sample = -sample;
+    }
   }
 
   if (sample != channel->sample_last) {
