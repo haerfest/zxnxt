@@ -431,7 +431,7 @@ def ld_A_R() -> C:
     return '''
         T(1);
         A = R;
-        F = SZ53(A) | (IFF2 << VF_SHIFT) | (F & CF_MASK) >> CF_SHIFT;
+        F = SZ53(A) | (IFF2 << VF_SHIFT) | (F & CF_MASK);
     '''
 
 def ld_dd_nn(dd: str) -> C:
@@ -1694,6 +1694,7 @@ static void {name}(void) {{
 
         f.write(f'''
 void cpu_execute_next_opcode(void) {{
+  R = (R & 0x80) | (++R & 0x7F);
   {decoder}
 }}
 ''')
