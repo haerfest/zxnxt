@@ -248,13 +248,13 @@ def dec_pdd(xy: Optional[str] = None) -> C:
         WZ  = {wz(xy)};
         TMP = memory_read(WZ) - 1; T(4);
         memory_write(WZ, TMP);     T(3);
-        F = SZ53(TMP) | HF_SUB(TMP + 1, 1, TMP) | (TMP == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
+        F = SZ53(TMP) | HF_SUB(TMP + 1, 1, TMP) | (TMP == 0x7F) << VF_SHIFT | NF_MASK | (F & CF_MASK);
     '''
 
 def dec_r(r: str) -> C:
     return f'''
         {r}--;
-        F = SZ53({r}) | HF_SUB({r} + 1, 1, {r}) | ({r} == 0x79) << VF_SHIFT | NF_MASK | (F & CF_MASK);
+        F = SZ53({r}) | HF_SUB({r} + 1, 1, {r}) | ({r} == 0x7F) << VF_SHIFT | NF_MASK | (F & CF_MASK);
     '''
 
 def dec_ss(ss: str) -> C:
