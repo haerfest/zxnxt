@@ -1605,7 +1605,7 @@ def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str
     for opcode in missing:
         name = 'opcode_' + '_'.join(f'{op:02X}' for op in prefix + [opcode])
         body = f'''
-            log_err("cpu: {name} not implemented\\n");
+            log_err("cpu: {name} not implemented around PC $%04X\\n", PC);
             exit(1);
         '''
 
