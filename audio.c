@@ -36,7 +36,7 @@ void audio_finit(void) {
 }
 
 
-void audio_add_sample(s8_t sample) {
+void audio_add_sample(audio_source_t source, s8_t sample) {
   size_t index;
 
   /* Prevent a race condition between us and the audio callback. */

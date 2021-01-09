@@ -271,7 +271,7 @@ void ula_write(u16_t address, u8_t value) {
   const u8_t speaker_state = value & 0x10;
   const s8_t sample        = speaker_state ? 127 : -128;
 
-  audio_add_sample(sample);
+  audio_add_sample(E_AUDIO_SOURCE_BEEPER, sample);
 
   self.speaker_state = speaker_state;
   self.border_colour = value & 0x07;
