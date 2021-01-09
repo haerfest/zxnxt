@@ -36,7 +36,7 @@ def adc_A_n() -> C:
         const u8_t  n      = memory_read(PC++); T(3);
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
         const u16_t result = A + n + carry;
-        F = SZ53(result & 0xFF) | HF_ADD(A, n + carry, result) | VF_ADD(A, n + carry, result) | (result & 0x100) >> 8 << CF_SHIFT;
+        F = SZ53(result & 0xFF) | HF_ADD(A, n + carry, result) | VF_ADD(A, n + carry, result) | (result > 0xFF) << CF_SHIFT;
         A = result & 0xFF;
     '''
 
@@ -74,8 +74,7 @@ def add_A_n() -> C:
     return '''
         const u8_t n       = memory_read(PC++); T(3);
         const u16_t result = A + n;
-        const u8_t  carry  = A > 255 - n;
-        F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | carry;
+        F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | (result > 0xFF) << CF_SHIFT;
         A = result & 0xFF;
     '''
 
@@ -180,10 +179,9 @@ def ccf() -> C:
 def cp_n() -> C:
     return '''
         u16_t result;
-        Z      = memory_read(PC++); T(3);
-        result = A - Z;
-        F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | A < Z;
-        T(3);
+        TMP    = memory_read(PC++); T(3);
+        result = A - TMP;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (A < TMP) << CF_SHIFT;
     '''
 
 def cp_r(r: str) -> C:
@@ -542,20 +540,20 @@ def ldxx(op: str) -> C:
 def logical_n(op: str) -> C:
     return f'''
         A {op}= memory_read(PC++); T(3);
-        F = SZ53P(A) | HF_MASK;
+        F = SZ53P(A) | {"HF_MASK" if op == '&' else 0};
     '''
 
 def logical_r(op: str, r: str) -> C:
     return f'''
        A {op}= {r};
-       F = SZ53P(A);
+       F = SZ53P(A) | {"HF_MASK" if op == '&' else 0};
     '''
 
 def logical_pss(op: str, xy: Optional[str] = None) -> C:
     return f'''
         WZ    = {wz(xy)};
-        A {op}= memory_read(WZ); T(4);
-        F     = SZ53P(A);        T(3);
+        A {op}= memory_read(WZ);                            T(4);
+        F     = SZ53P(A) | {"HF_MASK" if op == '&' else 0}; T(3);
     '''
 
 def lxrx(op: str) -> C:
@@ -871,10 +869,10 @@ def sbc_A_n() -> C:
         const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
         const u8_t a     = A;
         s16_t      result;
-        Z      = memory_read(PC++) + carry; T(3);
-        result = A - Z;
+        TMP    = memory_read(PC++) + carry; T(3);
+        result = A - TMP;
         A      = result & 0xFF;
-        F  = SZ53(A) | HF_SUB(a, Z, A) | VF_SUB(a, Z, A) | NF_MASK | (result < 0) << CF_SHIFT;
+        F  = SZ53(A) | HF_SUB(a, TMP, A) | VF_SUB(a, TMP, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sbc_A_pss(xy: Optional[str] = None) -> C:
