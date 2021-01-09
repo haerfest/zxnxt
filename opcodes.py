@@ -229,18 +229,24 @@ def cpl() -> C:
     '''
 
 def daa() -> C:
-    # Credits to https://www.msx.org/forum/semi-msx-talk/emulation/z80-daa.
+    # Credits to:#
+    # - The Undocumented Z80 Documented, Sean Young
+    # - https://www.msx.org/forum/semi-msx-talk/emulation/z80-daa
     return '''
-        u8_t a = A;
+        const u8_t a          = A;
+        u8_t       correction = 0;
+
+        if ((F & HF_MASK) || ((A & 0x0F) > 9)) correction += 0x06;
+        if ((F & CF_MASK) || (A > 0x99))       correction += 0x60;
+
         if (F & NF_MASK) {
-            if ((F & HF_MASK) || (A & 0x0F) > 9) A -= 6;
-            if ((F & CF_MASK) || A > 0x99)       A -= 0x60;
+            A -= correction;
         } else {
-            if ((F & HF_MASK) || (A & 0x0F) > 9) A += 6;
-            if ((F & CF_MASK) || A > 0x99)       A += 0x60;
+            A += correction;
         }
-        
-        F = SZ53P(A) | ((a ^ A) & 0x10) >> 4 << HF_SHIFT | (F & (NF_MASK | CF_MASK)) | (a > 0x99) << CF_SHIFT;
+
+        F &= NF_MASK | CF_MASK;
+        F |= SZ53P(A) | (a > 0x99) << CF_SHIFT | ((a ^ A) & 0x10) >> 4 << HF_SHIFT;
     '''
 
 def dec_pdd(xy: Optional[str] = None) -> C:
