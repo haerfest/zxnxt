@@ -944,6 +944,26 @@ def sla_r(r: str) -> C:
         F = SZ53P({r}) | carry << CF_SHIFT;
     '''
 
+def sll_pss(xy: Optional[str] = None) -> C:
+    return f'''
+        u8_t carry;
+        WZ    = {wz(xy)};
+        TMP   = memory_read(WZ);
+        carry = TMP >> 7;
+        TMP <<= 1;
+        F     = SZ53P(TMP) | carry << CF_SHIFT;
+        T(4);
+        memory_write(WZ, TMP);
+        T(3);
+    '''
+
+def sll_r(r: str) -> C:
+    return f'''
+        const u8_t carry = {r} >> 7;
+        {r} <<= 1;
+        F = SZ53P({r}) | carry << CF_SHIFT;
+    '''
+
 def sra_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
@@ -1048,9 +1068,10 @@ def cb_table(xy: Optional[str] = None) -> Table:
             ('RR',  rr_r,  rr_pss),
             ('SLA', sla_r, sla_pss),
             ('SRA', sra_r, sra_pss),
+            ('SLL', sll_r, sll_pss),
             ('SRL', srl_r, srl_pss)
         ]
-        deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38]
+        deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38]
 
         for top_opcode, r in zip(range(B_opcode, B_opcode + 6), 'BCDEHL'):
             for delta, (mnemonic, act_r, act_pss) in zip(deltas, actions):
