@@ -1050,9 +1050,9 @@ def cb_table(xy: Optional[str] = None) -> Table:
             ('SRA', sra_r, sra_pss),
             ('SRL', srl_r, srl_pss)
         ]
+        deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38]
 
         for top_opcode, r in zip(range(B_opcode, B_opcode + 6), 'BCDEHL'):
-            deltas = [0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38]
             for delta, (mnemonic, act_r, act_pss) in zip(deltas, actions):
                 t[top_opcode + delta] = (f'{mnemonic} {r}', partial(act_r, r))
 
