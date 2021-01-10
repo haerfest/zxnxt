@@ -66,7 +66,7 @@ typedef struct {
 typedef struct {
   channel_latched_t latched;
   u16_t             tone_counter;
-  u16_t             tone_counter_halfway;
+  u16_t             tone_period_half;
   int               tone_value;
   s8_t              sample_last;
   u8_t              amplitude;
@@ -91,8 +91,14 @@ typedef struct {
   u32_t             noise_seed;
   int               noise_value;
   u8_t              noise_counter;
-  u8_t              noise_counter_halfway;
+  u8_t              noise_period_half;
   int               ticks_div_16;
+  int               ticks_div_256;
+  u16_t             envelope_counter;
+  u16_t             envelope_period_sixteenth;
+  u8_t              envelope_counter_sixteenth;
+  u8_t              envelope_amplitude;
+  s8_t              envelope_delta;
 } self_t;
 
 
@@ -185,9 +191,59 @@ void ay_register_write(u8_t value) {
       self.channels[C].latched.is_amplitude_fixed = !(value & 0x010);
       break;
 
+    case E_AY_REGISTER_ENVELOPE_PERIOD_FINE:
+    case E_AY_REGISTER_ENVELOPE_PERIOD_COARSE:
+      self.latched.envelope_period = self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_FINE];
+      log_inf("ay: envelope period=%04X\n", self.latched.envelope_period);
+      break;
+
+    case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
+      self.latched.do_envelope_hold      = value & 0x01;
+      self.latched.do_envelope_alternate = value & 0x02;
+      self.latched.do_envelope_attack    = value & 0x04;
+      self.latched.do_envelope_continue  = value & 0x08;
+      log_inf("ay: envelope hold=%d alternate=%d attack=%d continue=%d\n",
+              self.latched.do_envelope_hold      != 0,
+              self.latched.do_envelope_alternate != 0,
+              self.latched.do_envelope_attack    != 0,
+              self.latched.do_envelope_continue  != 0);
+      break;
+
     default:
       break;
   }
+}
+
+
+static void ay_envelope_step(void) {
+  if (self.envelope_counter == 0) {
+    /* One cycle complete. */
+    self.envelope_counter           = MAX(self.latched.envelope_period, 1);
+    self.envelope_period_sixteenth  = self.envelope_counter / 16;
+    self.envelope_counter_sixteenth = 16;
+
+    if (!self.latched.do_envelope_continue) {
+      self.envelope_amplitude = 0;
+      self.envelope_delta     = 0;
+    } else if (self.latched.do_envelope_hold && self.latched.do_envelope_alternate) {
+      self.envelope_delta     = 0;
+      self.envelope_amplitude = self.latched.do_envelope_attack ? 0 : 15;
+    } else if (self.latched.do_envelope_hold) {
+      self.envelope_delta = 0;
+    } else if (self.latched.do_envelope_alternate) {
+      self.envelope_delta = -self.envelope_delta;
+    } else if (self.latched.do_envelope_attack) {
+      self.envelope_amplitude = 0;
+    } else {
+      self.envelope_amplitude = 15;
+    }
+  } else if (self.envelope_counter_sixteenth == 0) {
+    self.envelope_counter_sixteenth = 16;
+    self.envelope_amplitude += self.envelope_delta;
+  }
+
+  self.envelope_counter_sixteenth--;
+  self.envelope_counter--;
 }
 
 
@@ -195,11 +251,11 @@ static void ay_noise_step(void) {
   int advance = 0;
 
   if (self.noise_counter == 0) {
-    self.noise_counter         = MAX(self.latched.noise_period, 1);
-    self.noise_counter_halfway = self.noise_counter / 2;
-    advance                    = 1;
-  } else if (self.noise_counter == self.noise_counter_halfway) {
-    advance                    = 1;
+    self.noise_counter     = MAX(self.latched.noise_period, 1);
+    self.noise_period_half = self.noise_counter / 2;
+    advance                = 1;
+  } else if (self.noise_counter == self.noise_period_half) {
+    advance                = 1;
   }
 
   if (advance) {
@@ -216,11 +272,11 @@ static void ay_channel_step(int n) {
   ay_channel_t* channel = &self.channels[n];
 
   if (channel->tone_counter == 0) {
-    channel->tone_counter         = MAX(channel->latched.tone_period, 1);
-    channel->tone_counter_halfway = channel->tone_counter / 2;
-    channel->tone_value           = 1;
-  } else if (channel->tone_counter == channel->tone_counter_halfway) {
-    channel->tone_value           = 0;
+    channel->tone_counter     = MAX(channel->latched.tone_period, 1);
+    channel->tone_period_half = channel->tone_counter / 2;
+    channel->tone_value       = 1;
+  } else if (channel->tone_counter == channel->tone_period_half) {
+    channel->tone_value       = 0;
   }
 
   channel->tone_counter--;
@@ -232,10 +288,11 @@ static void ay_mix(int n) {
   ay_channel_t* channel = &self.channels[n];
   s8_t          sample  = 0;
 
-  /* Toine or noise enabled on this channel? */
+  /* Tone or noise enabled on this channel? */
   if ((channel->latched.is_tone_enabled  && channel->tone_value) ||
       (channel->latched.is_noise_enabled && self.noise_value)) {
-    sample = ay_volume[channel->latched.amplitude];
+    const u8_t amplitude = channel->latched.is_amplitude_fixed ? channel->latched.amplitude : self.envelope_amplitude;
+    sample = ay_volume[amplitude];
   }
 
   if (sample != channel->sample_last) {
@@ -249,6 +306,12 @@ void ay_run(u32_t ticks) {
   u32_t tick;
 
   for (tick = 0; tick < ticks; tick++) {
+    if (++self.ticks_div_256 == 256) {
+      self.ticks_div_256 = 0;
+
+      ay_envelope_step();
+    }
+
     if (++self.ticks_div_16 == 16) {
       self.ticks_div_16 = 0;
 
