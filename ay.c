@@ -90,6 +90,7 @@ typedef struct {
   u32_t             noise_seed;
   int               noise_value;
   u8_t              noise_divider;
+  u8_t              noise_divider_halfway_point;
   int               ticks_div_16;
 } self_t;
 
@@ -101,10 +102,10 @@ int ay_init(void) {
   int i;
 
   for (i = A; i <= C; i++) {
-    self.channels[i].tone_value   = 1;
-    self.channels[i].sample_last  = 0;
-    self.channels[i].amplitude    = 0;
-    self.channels[i].tone_divider = 0;
+    self.channels[i].latched.is_tone_enabled  = 0;
+    self.channels[i].latched.is_noise_enabled = 0;
+    self.channels[i].sample_last              = 0;
+    self.channels[i].amplitude                = 0;
   }
 
   /* All AY channels are off by default. */
@@ -208,9 +209,17 @@ void ay_register_write(u8_t value) {
 
 
 static void ay_noise_step(void) {
-  if (self.noise_divider == 0) {
-    self.noise_divider = self.latched.noise_period;
+  int advance_noise = 0;
 
+  if (self.noise_divider == 0) {
+    self.noise_divider               = self.latched.noise_period;
+    self.noise_divider_halfway_point = self.noise_divider / 2;
+    advance_noise                    = 1;
+  } else if (self.noise_divider == self.noise_divider_halfway_point) {
+    advance_noise                    = 1;
+  }
+
+  if (advance_noise) {
     /* GenNoise (c) Hacker KAY & Sergey Bulba */
     self.noise_seed  = (self.noise_seed * 2 + 1) ^ (((self.noise_seed >> 16) ^ (self.noise_seed >> 13)) & 1);
     self.noise_value = (self.noise_seed >> 16) & 1;
