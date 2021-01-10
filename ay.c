@@ -23,8 +23,6 @@ typedef enum {
   E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE,
   E_AY_REGISTER_NOISE_PERIOD,
   E_AY_REGISTER_ENABLE,
-  E_AY_REGISTER_NOT_USED_8,
-  E_AY_REGISTER_NOT_USED_9,
   E_AY_REGISTER_CHANNEL_A_AMPLITUDE,
   E_AY_REGISTER_CHANNEL_B_AMPLITUDE,
   E_AY_REGISTER_CHANNEL_C_AMPLITUDE,
@@ -59,10 +57,20 @@ const s8_t ay_volume[N_AMPLITUDES] = {
 typedef struct {
   int   is_noise_enabled;
   int   is_tone_enabled;
-  u16_t tone_period_counter;
+  u16_t tone_period;
   int   is_amplitude_fixed;
   u8_t  amplitude;
 } channel_latched_t;
+
+
+typedef struct {
+  channel_latched_t latched;
+  u16_t             tone_counter;
+  u16_t             tone_counter_halfway;
+  int               tone_value;
+  s8_t              sample_last;
+  u8_t              amplitude;
+} ay_channel_t;
 
 
 typedef struct {
@@ -76,24 +84,14 @@ typedef struct {
 
 
 typedef struct {
-  channel_latched_t latched;
-  u16_t             tone_divider;
-  u16_t             tone_divider_halfway_point;
-  int               tone_value;
-  s8_t              sample_last;
-  u8_t              amplitude;
-} ay_channel_t;
-
-
-typedef struct {
   u8_t              registers[N_REGISTERS];
   ay_register_t     selected_register;
   ay_channel_t      channels[N_CHANNELS];
   general_latched_t latched;
   u32_t             noise_seed;
   int               noise_value;
-  u8_t              noise_divider;
-  u8_t              noise_divider_halfway_point;
+  u8_t              noise_counter;
+  u8_t              noise_counter_halfway;
   int               ticks_div_16;
 } self_t;
 
@@ -112,21 +110,11 @@ void ay_finit(void) {
 
 
 void ay_reset(void) {
-  int i;
-
-  for (i = A; i <= C; i++) {
-    self.channels[i].latched.is_tone_enabled  = 0;
-    self.channels[i].latched.is_noise_enabled = 0;
-    self.channels[i].sample_last              = 0;
-    self.channels[i].amplitude                = 0;
-  }
+  memset(&self, 0, sizeof(self));
 
   /* All AY channels are off by default. */
   self.registers[E_AY_REGISTER_ENABLE] = 0xFF;
-
-  self.selected_register = E_AY_REGISTER_ENABLE;
-  self.ticks_div_16      = 0;
-  self.noise_seed        = 0xFFFF;
+  self.noise_seed                      = 0xFFFF;
 }
 
 
@@ -156,33 +144,21 @@ void ay_register_write(u8_t value) {
   switch (self.selected_register) {
     case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE:
-      self.channels[A].latched.tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
-      if (self.channels[A].latched.tone_period_counter == 0) {
-        self.channels[A].latched.tone_period_counter = 1;
-      }
+      self.channels[A].latched.tone_period = (self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] & 0x0F) << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
       break;
 
     case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE:
-      self.channels[B].latched.tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
-      if (self.channels[B].latched.tone_period_counter == 0) {
-        self.channels[B].latched.tone_period_counter = 1;
-      }
+      self.channels[B].latched.tone_period = (self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] & 0x0F) << 8 | self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
       break;
 
     case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE:
-      self.channels[C].latched.tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
-      if (self.channels[C].latched.tone_period_counter == 0) {
-        self.channels[C].latched.tone_period_counter = 1;
-      }
+      self.channels[C].latched.tone_period = (self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] & 0x0F) << 8 | self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
       break;
 
     case E_AY_REGISTER_NOISE_PERIOD:
       self.latched.noise_period = value & 0x1F;
-      if (self.latched.noise_period == 0) {
-        self.latched.noise_period = 1;
-      }
       break;
 
     case E_AY_REGISTER_ENABLE:
@@ -216,38 +192,38 @@ void ay_register_write(u8_t value) {
 
 
 static void ay_noise_step(void) {
-  int advance_noise = 0;
+  int advance = 0;
 
-  if (self.noise_divider == 0) {
-    self.noise_divider               = self.latched.noise_period;
-    self.noise_divider_halfway_point = self.noise_divider / 2;
-    advance_noise                    = 1;
-  } else if (self.noise_divider == self.noise_divider_halfway_point) {
-    advance_noise                    = 1;
+  if (self.noise_counter == 0) {
+    self.noise_counter         = MAX(self.latched.noise_period, 1);
+    self.noise_counter_halfway = self.noise_counter / 2;
+    advance                    = 1;
+  } else if (self.noise_counter == self.noise_counter_halfway) {
+    advance                    = 1;
   }
 
-  if (advance_noise) {
+  if (advance) {
     /* GenNoise (c) Hacker KAY & Sergey Bulba */
     self.noise_seed  = (self.noise_seed * 2 + 1) ^ (((self.noise_seed >> 16) ^ (self.noise_seed >> 13)) & 1);
     self.noise_value = (self.noise_seed >> 16) & 1;
   }
 
-  self.noise_divider--;
+  self.noise_counter--;
 }
 
 
 static void ay_channel_step(int n) {
   ay_channel_t* channel = &self.channels[n];
 
-  if (channel->tone_divider == 0) {
-    channel->tone_divider               = channel->latched.tone_period_counter;
-    channel->tone_divider_halfway_point = channel->tone_divider / 2;
-    channel->tone_value                 = 1;
-  } else if (channel->tone_divider == channel->tone_divider_halfway_point) {
-    channel->tone_value                 = 0;
+  if (channel->tone_counter == 0) {
+    channel->tone_counter         = MAX(channel->latched.tone_period, 1);
+    channel->tone_counter_halfway = channel->tone_counter / 2;
+    channel->tone_value           = 1;
+  } else if (channel->tone_counter == channel->tone_counter_halfway) {
+    channel->tone_value           = 0;
   }
 
-  channel->tone_divider--;
+  channel->tone_counter--;
 }
 
 
