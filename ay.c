@@ -2,6 +2,16 @@
 #include "defs.h"
 #include "log.h"
 
+#define LEVEL(voltage)  ((s8_t) (AUDIO_MAX_VOLUME * voltage))
+#define MAX(a, b)       ((a) > (b) ? (a) : (b))
+
+#define N_AMPLITUDES    16
+#define N_REGISTERS     (E_AY_REGISTER_ENVELOPE_IO_PORT_B_DATA_STORE - E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE + 1)
+#define A               0
+#define B               1
+#define C               2
+#define N_CHANNELS      3
+
 
 typedef enum {
   E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE = 0,
@@ -23,13 +33,24 @@ typedef enum {
 } ay_register_t;
 
 
-#define MAX(a, b)    ((a) > (b) ? (a) : (b))
-
-#define N_REGISTERS  (E_AY_REGISTER_ENVELOPE_IO_PORT_B_DATA_STORE - E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE + 1)
-#define A            0
-#define B            1
-#define C            2
-#define N_CHANNELS   3
+const s8_t ay_volume[N_AMPLITUDES] = {
+  LEVEL(0.00000),  /*  0 */
+  LEVEL(0.00782),  /*  1 */
+  LEVEL(0.00859),  /*  2 */
+  LEVEL(0.01563),  /*  3 */
+  LEVEL(0.01717),  /*  4 */
+  LEVEL(0.03125),  /*  5 */
+  LEVEL(0.03535),  /*  6 */
+  LEVEL(0.06250),  /*  7 */
+  LEVEL(0.07070),  /*  8 */
+  LEVEL(0.12500),  /*  9 */
+  LEVEL(0.15150),  /* 10 */
+  LEVEL(0.25000),  /* 11 */
+  LEVEL(0.30303),  /* 12 */
+  LEVEL(0.50000),  /* 13 */
+  LEVEL(0.70707),  /* 14 */
+  LEVEL(1.00000)   /* 15 */
+};
 
 
 typedef struct {
@@ -151,7 +172,7 @@ static void ay_channel_step(int n) {
     sample = 0;
   } else {
     /* TODO Assuming fixed amplitude for now. */
-    sample = (self.registers[E_AY_REGISTER_CHANNEL_A_AMPLITUDE + n] & 0x0F) * 8;
+    sample = ay_volume[self.registers[E_AY_REGISTER_CHANNEL_A_AMPLITUDE + n] & 0x0F];
     if (channel->phase < 0) {
       sample = -sample;
     }
