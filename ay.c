@@ -76,6 +76,9 @@ int ay_init(void) {
     self.channels[i].tone_divider = 0;
   }
 
+  /* All AY channels are off by default. */
+  self.registers[E_AY_REGISTER_ENABLE] = 0xFF;
+
   self.selected_register = E_AY_REGISTER_ENABLE;
   self.ticks_div_16      = 0;
   
@@ -131,7 +134,7 @@ static void ay_channel_step(int n) {
     sample = 0;
   } else {
     /* TODO Assuming fixed amplitude for now. */
-    sample = self.registers[E_AY_REGISTER_CHANNEL_A_AMPLITUDE + n] & 0x0F;
+    sample = (self.registers[E_AY_REGISTER_CHANNEL_A_AMPLITUDE + n] & 0x0F) * 8;
     if (channel->phase < 0) {
       sample = -sample;
     }

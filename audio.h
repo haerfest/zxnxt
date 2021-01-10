@@ -10,13 +10,7 @@ typedef enum {
   E_AUDIO_SOURCE_BEEPER,
   E_AUDIO_SOURCE_AY_1_CHANNEL_A,
   E_AUDIO_SOURCE_AY_1_CHANNEL_B,
-  E_AUDIO_SOURCE_AY_1_CHANNEL_C,
-  E_AUDIO_SOURCE_AY_2_CHANNEL_A,
-  E_AUDIO_SOURCE_AY_2_CHANNEL_B,
-  E_AUDIO_SOURCE_AY_2_CHANNEL_C,
-  E_AUDIO_SOURCE_AY_3_CHANNEL_A,
-  E_AUDIO_SOURCE_AY_3_CHANNEL_B,
-  E_AUDIO_SOURCE_AY_3_CHANNEL_C
+  E_AUDIO_SOURCE_AY_1_CHANNEL_C
 } audio_source_t;
 
 
@@ -31,5 +25,6 @@ void audio_resume(void);
 void audio_add_sample(audio_source_t source, s8_t sample);
 void audio_sync(void);
 void audio_callback(void* userdata, u8_t* stream, int length);
+
 
 #endif  /* __AUDIO_H */
