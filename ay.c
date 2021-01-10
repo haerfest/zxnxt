@@ -54,33 +54,43 @@ const s8_t ay_volume[N_AMPLITUDES] = {
 
 
 typedef struct {
-  /* Latched state. */
+  int   is_noise_enabled;
   int   is_tone_enabled;
   u16_t tone_period_counter;
-  int   is_noise_enabled;
   int   is_amplitude_fixed;
-  u8_t  fixed_amplitude;
-
-  /* Working state. */
-  u16_t tone_divider;
-  u16_t tone_divider_halfway_point;
   u8_t  amplitude;
-  int   phase;
-  s8_t  sample_last;
+} channel_latched_t;
+
+
+typedef struct {
+  u8_t  noise_period;
+  u16_t envelope_period;
+  int   do_envelope_hold;
+  int   do_envelope_alternate;
+  int   do_envelope_attack;
+  int   do_envelope_continue;
+} general_latched_t;
+
+
+typedef struct {
+  channel_latched_t latched;
+  u16_t             tone_divider;
+  u16_t             tone_divider_halfway_point;
+  int               tone_value;
+  s8_t              sample_last;
+  u8_t              amplitude;
 } ay_channel_t;
 
 
 typedef struct {
-  u8_t          registers[N_REGISTERS];
-  ay_register_t selected_register;
-  ay_channel_t  channels[N_CHANNELS];
-  u8_t          noise_period;
-  u16_t         envelope_period;
-  int           do_envelope_hold;
-  int           do_envelope_alternate;
-  int           do_envelope_attack;
-  int           do_envelope_continue;
-  int           ticks_div_16;
+  u8_t              registers[N_REGISTERS];
+  ay_register_t     selected_register;
+  ay_channel_t      channels[N_CHANNELS];
+  general_latched_t latched;
+  u32_t             noise_seed;
+  int               noise_value;
+  u8_t              noise_divider;
+  int               ticks_div_16;
 } self_t;
 
 
@@ -91,9 +101,9 @@ int ay_init(void) {
   int i;
 
   for (i = A; i <= C; i++) {
-    self.channels[i].amplitude    = 0;
-    self.channels[i].phase        = 1;
+    self.channels[i].tone_value   = 1;
     self.channels[i].sample_last  = 0;
+    self.channels[i].amplitude    = 0;
     self.channels[i].tone_divider = 0;
   }
 
@@ -102,6 +112,7 @@ int ay_init(void) {
 
   self.selected_register = E_AY_REGISTER_ENABLE;
   self.ticks_div_16      = 0;
+  self.noise_seed        = 0xFFFF;
   
   return 0;
 }
@@ -135,16 +146,59 @@ void ay_register_write(u8_t value) {
   self.registers[self.selected_register] = value;
 
   switch (self.selected_register) {
+    case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE:
-      self.channels[A].tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
+      self.channels[A].latched.tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
+      if (self.channels[A].latched.tone_period_counter == 0) {
+        self.channels[A].latched.tone_period_counter = 1;
+      }
       break;
 
+    case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE:
-      self.channels[B].tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
+      self.channels[B].latched.tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
+      if (self.channels[B].latched.tone_period_counter == 0) {
+        self.channels[B].latched.tone_period_counter = 1;
+      }
       break;
 
+    case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE:
-      self.channels[C].tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
+      self.channels[C].latched.tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
+      if (self.channels[C].latched.tone_period_counter == 0) {
+        self.channels[C].latched.tone_period_counter = 1;
+      }
+      break;
+
+    case E_AY_REGISTER_NOISE_PERIOD:
+      self.latched.noise_period = value & 0x1F;
+      if (self.latched.noise_period == 0) {
+        self.latched.noise_period = 1;
+      }
+      break;
+
+    case E_AY_REGISTER_ENABLE:
+      self.channels[A].latched.is_tone_enabled  = !(value & 0x01);
+      self.channels[B].latched.is_tone_enabled  = !(value & 0x02);
+      self.channels[C].latched.is_tone_enabled  = !(value & 0x04);
+      self.channels[A].latched.is_noise_enabled = !(value & 0x08);
+      self.channels[B].latched.is_noise_enabled = !(value & 0x10);
+      self.channels[C].latched.is_noise_enabled = !(value & 0x20);
+      break;
+
+    case E_AY_REGISTER_CHANNEL_A_AMPLITUDE:
+      self.channels[A].latched.amplitude          = value & 0x0F;
+      self.channels[A].latched.is_amplitude_fixed = !(value & 0x010);
+      break;
+
+    case E_AY_REGISTER_CHANNEL_B_AMPLITUDE:
+      self.channels[B].latched.amplitude          = value & 0x0F;
+      self.channels[B].latched.is_amplitude_fixed = !(value & 0x010);
+      break;
+
+    case E_AY_REGISTER_CHANNEL_C_AMPLITUDE:
+      self.channels[C].latched.amplitude          = value & 0x0F;
+      self.channels[C].latched.is_amplitude_fixed = !(value & 0x010);
       break;
 
     default:
@@ -153,37 +207,49 @@ void ay_register_write(u8_t value) {
 }
 
 
+static void ay_noise_step(void) {
+  if (self.noise_divider == 0) {
+    self.noise_divider = self.latched.noise_period;
+
+    /* GenNoise (c) Hacker KAY & Sergey Bulba */
+    self.noise_seed  = (self.noise_seed * 2 + 1) ^ (((self.noise_seed >> 16) ^ (self.noise_seed >> 13)) & 1);
+    self.noise_value = (self.noise_seed >> 16) & 1;
+  }
+
+  self.noise_divider--;
+}
+
+
 static void ay_channel_step(int n) {
   ay_channel_t* channel = &self.channels[n];
-  s8_t          sample;
 
   if (channel->tone_divider == 0) {
-    channel->tone_divider = channel->tone_period_counter;
-    if (channel->tone_divider == 0) {
-      channel->tone_divider = 1;
-    }
+    channel->tone_divider               = channel->latched.tone_period_counter;
     channel->tone_divider_halfway_point = channel->tone_divider / 2;
-    channel->phase                      = 1;
+    channel->tone_value                 = 1;
   } else if (channel->tone_divider == channel->tone_divider_halfway_point) {
-    channel->phase                      = -1;
-  }
-
-  if (self.registers[E_AY_REGISTER_ENABLE] & (1 << n)) {
-    sample = 0;
-  } else {
-    /* TODO Assuming fixed amplitude for now. */
-    sample = ay_volume[self.registers[E_AY_REGISTER_CHANNEL_A_AMPLITUDE + n] & 0x0F];
-    if (channel->phase < 0) {
-      sample = -sample;
-    }
-  }
-
-  if (sample != channel->sample_last) {
-    audio_add_sample(E_AUDIO_SOURCE_AY_1_CHANNEL_A + n, sample);
-    channel->sample_last = sample;
+    channel->tone_value                 = 0;
   }
 
   channel->tone_divider--;
+}
+
+
+/* TODO Assuming fixed amplitude for now. */
+static void ay_mix(int n) {
+  ay_channel_t* channel = &self.channels[n];
+  s8_t          sample  = 0;
+
+  /* Toine or noise enabled on this channel? */
+  if ((channel->latched.is_tone_enabled  && channel->tone_value) ||
+      (channel->latched.is_noise_enabled && self.noise_value)) {
+    sample = ay_volume[channel->latched.amplitude];
+  }
+
+  if (sample != channel->sample_last) {
+    channel->sample_last = sample;
+    audio_add_sample(E_AUDIO_SOURCE_AY_1_CHANNEL_A + n, sample);
+  }
 }
 
 
@@ -194,9 +260,15 @@ void ay_run(u32_t ticks) {
     if (++self.ticks_div_16 == 16) {
       self.ticks_div_16 = 0;
 
+      ay_noise_step();
+
       ay_channel_step(A);
       ay_channel_step(B);
       ay_channel_step(C);
+
+      ay_mix(A);
+      ay_mix(B);
+      ay_mix(C);
     }
   }
 }
