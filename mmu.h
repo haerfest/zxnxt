@@ -10,6 +10,7 @@
 
 int   mmu_init(u8_t* sram);
 void  mmu_finit(void);
+void  mmu_reset(void);
 u8_t  mmu_page_get(u8_t slot);
 void  mmu_page_set(u8_t slot, u8_t page);
 void  mmu_bank_set(u8_t slot, u8_t bank);

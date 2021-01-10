@@ -62,6 +62,7 @@ static void nextreg_reset_soft(void) {
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
 
   io_reset();
+  mmu_reset();
   paging_reset();
 
   clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
