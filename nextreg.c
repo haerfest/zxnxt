@@ -1,4 +1,5 @@
 #include "altrom.h"
+#include "ay.h"
 #include "bootrom.h"
 #include "clock.h"
 #include "config.h"
@@ -65,14 +66,15 @@ static void nextreg_reset_soft(void) {
   ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
 
+  ay_reset();
   io_reset();
   mmu_reset();
   paging_reset();
 
-  clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
-
   rom_set_lock(self.altrom_soft_reset_lock);
   altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
+
+  clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
 }
 
 

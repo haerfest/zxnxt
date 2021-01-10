@@ -1,4 +1,5 @@
 #include "audio.h"
+#include "ay.h"
 #include "defs.h"
 #include "log.h"
 
@@ -99,6 +100,16 @@ static self_t self;
 
 
 int ay_init(void) {
+  ay_reset();
+  return 0;
+}
+
+
+void ay_finit(void) {
+}
+
+
+void ay_reset(void) {
   int i;
 
   for (i = A; i <= C; i++) {
@@ -114,12 +125,6 @@ int ay_init(void) {
   self.selected_register = E_AY_REGISTER_ENABLE;
   self.ticks_div_16      = 0;
   self.noise_seed        = 0xFFFF;
-  
-  return 0;
-}
-
-
-void ay_finit(void) {
 }
 
 
