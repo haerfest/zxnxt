@@ -62,9 +62,9 @@ void audio_add_sample(audio_source_t source, s8_t sample) {
      * for now that no further samples will arrive before the callback
      * picks up our audio buffer. */
     memset(&self.mixed[index], self.mixed_last_sample, sizeof(self.mixed) - index);
-  }
 
-  self.last_sample[source] = sample;
+    self.last_sample[source] = sample;
+  }
 
   SDL_UnlockAudioDevice(self.device);
 }
