@@ -36,6 +36,10 @@ typedef struct {
   int       ula_next_mode;
   u8_t      ula_clip_index;
   u8_t      ula_clip[4];  /* Elements: x1, x2, y1, y2. */
+  int       altrom_soft_reset_enable;
+  int       altrom_soft_reset_during_writes;
+  u8_t      altrom_soft_reset_lock;
+
 } nextreg_t;
 
 
@@ -66,12 +70,18 @@ static void nextreg_reset_soft(void) {
   paging_reset();
 
   clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
+
+  rom_set_lock(self.altrom_soft_reset_lock);
+  altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
 }
 
 
 static void nextreg_reset_hard(void) {
-  self.selected_register = 0x00;
-  self.is_hard_reset     = 1;
+  self.selected_register               = 0x00;
+  self.is_hard_reset                   = 1;
+  self.altrom_soft_reset_enable        = 0;
+  self.altrom_soft_reset_during_writes = 0;
+  self.altrom_soft_reset_lock          = 0;
 
   nextreg_reset_soft();
 
@@ -236,6 +246,10 @@ static void nextreg_alternate_rom_write(u8_t value) {
   const int  enable        = value & 0x80;
   const int  during_writes = value & 0x40;
   const u8_t lock          = (value & 0x30) >> 4;
+
+  self.altrom_soft_reset_enable        = value & 0x08;
+  self.altrom_soft_reset_during_writes = value & 0x04;
+  self.altrom_soft_reset_lock          = value & 0x03;
 
   rom_set_lock(lock);
   altrom_activate(enable, during_writes);
