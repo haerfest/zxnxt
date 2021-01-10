@@ -106,12 +106,29 @@ u8_t ay_register_read(void) {
 
 
 void ay_register_write(u8_t value) {
-  if (self.selected_register < sizeof(self.registers)) {
-    self.registers[self.selected_register] = value;
+  if (self.selected_register >= sizeof(self.registers)) {
+    log_wrn("ay: write of $%02X to unknown register $%02X\n", value, self.selected_register);
     return;
   }
 
-  log_wrn("ay: write of $%02X to unknown register $%02X\n", value, self.selected_register);
+  self.registers[self.selected_register] = value;
+
+  switch (self.selected_register) {
+    case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE:
+      self.channels[A].tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
+      break;
+
+    case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE:
+      self.channels[B].tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
+      break;
+
+    case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE:
+      self.channels[C].tone_period_counter = self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
+      break;
+
+    default:
+      break;
+  }
 }
 
 
@@ -120,7 +137,7 @@ static void ay_channel_step(int n) {
   s8_t          sample;
 
   if (channel->tone_divider == 0) {
-    channel->tone_divider = self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE + n] << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE + n];
+    channel->tone_divider = channel->tone_period_counter;
     if (channel->tone_divider == 0) {
       channel->tone_divider = 1;
     }
