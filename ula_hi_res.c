@@ -121,22 +121,7 @@ static void ula_display_mode_hi_res_bottom_border(void) {
                                : ula_display_mode_hi_res_vsync;
 
     if (self.display_mode_handler == ula_display_mode_hi_res_vsync) {
-      self.frame_counter++;
-      if (self.frame_counter == self.display_frequency / 2) {
-        self.blink_state ^= 1;
-      } else if (self.frame_counter == self.display_frequency) {
-        self.blink_state ^= 1;
-        self.frame_counter = 0;
-      }
-
-      /* Start drawing at the top again. */
-      self.pixel = self.frame_buffer;
-
-      ula_blit();
-
-      if (!self.timex_disable_ula_interrupt) {
-        cpu_irq(32);
-      }
+      ula_frame_complete();
     }
   }
 }

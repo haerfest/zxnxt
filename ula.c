@@ -101,7 +101,7 @@ typedef struct {
   int                        clip_x2;
   int                        clip_y1;
   int                        clip_y2;
-  int                        frame_counter;
+  uint64_t                   frame_counter;
   int                        blink_state;
   s8_t                       audio_last_sample;
   ula_screen_bank_t          screen_bank;
@@ -132,6 +132,22 @@ static void ula_blit(void) {
   }
 
   SDL_RenderPresent(self.renderer);
+}
+
+
+static void ula_frame_complete(void) {
+  if ((++self.frame_counter & 15) == 0) {
+    self.blink_state ^= 1;
+  }
+
+  /* Start drawing at the top again. */
+  self.pixel = self.frame_buffer;
+
+  ula_blit();
+
+  if (!self.timex_disable_ula_interrupt) {
+    cpu_irq(32);
+  }
 }
 
 
