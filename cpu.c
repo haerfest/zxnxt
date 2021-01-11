@@ -361,3 +361,8 @@ void cpu_step(void) {
     cpu_irq_pending();
   }
 }
+
+
+u16_t cpu_pc_get(void) {
+  return PC;
+}
