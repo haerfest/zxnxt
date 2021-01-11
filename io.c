@@ -4,6 +4,7 @@
 #include "dac.h"
 #include "defs.h"
 #include "io.h"
+#include "kempston.h"
 #include "layer2.h"
 #include "log.h"
 #include "i2c.h"
@@ -59,7 +60,10 @@ u8_t io_read(u16_t address) {
   }
 
   switch (address & 0x00FF) {
-    case 0x00E3:
+    case 0x1F:
+      return kempston_read(address);
+
+    case 0xE3:
       return divmmc_control_read(address);
 
     case 0xE7:
@@ -72,7 +76,7 @@ u8_t io_read(u16_t address) {
       return ula_timex_read(address);
 
     case 0x0F:
-    case 0x1F:
+      /* case 0x1F: */
     case 0x3F:
     case 0x4F:
     case 0x5F:

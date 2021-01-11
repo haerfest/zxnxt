@@ -11,6 +11,7 @@
 #include "divmmc.h"
 #include "i2c.h"
 #include "io.h"
+#include "kempston.h"
 #include "keyboard.h"
 #include "layer2.h"
 #include "log.h"
@@ -31,13 +32,14 @@
 
 
 typedef struct {
-  SDL_Window*       window;
-  SDL_Renderer*     renderer;
-  SDL_Texture*      texture;
-  SDL_AudioDeviceID audio_device;
-  const u8_t*       keyboard_state;
-  int               is_windowed;
-  int               is_function_key_down;
+  SDL_Window*         window;
+  SDL_Renderer*       renderer;
+  SDL_Texture*        texture;
+  SDL_AudioDeviceID   audio_device;
+  SDL_GameController* controller;
+  const u8_t*         keyboard_state;
+  int                 is_windowed;
+  int                 is_function_key_down;
 } main_t;
 
 
@@ -48,19 +50,21 @@ static int main_init(void) {
   SDL_AudioSpec want;
   SDL_AudioSpec have;
   u8_t*         sram;
+  int           i;
 
   if (log_init() != 0) {
     goto exit;
   }
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
     log_err("SDL_Init: %s\n", SDL_GetError());
     goto exit_log;
   }
 
-  self.renderer = NULL;
-  self.texture  = NULL;
-  self.window   = NULL;
+  self.renderer   = NULL;
+  self.texture    = NULL;
+  self.window     = NULL;
+  self.controller = NULL;
 
   memset(&want, 0, sizeof(want));
   want.freq     = AUDIO_SAMPLE_RATE;
@@ -108,6 +112,19 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
+  log_inf("main: %d joystick/gamecontrollers attached\n", SDL_NumJoysticks());
+  for (i = 0; i < SDL_NumJoysticks(); i++) {
+    if (SDL_IsGameController(i)) {
+      self.controller = SDL_GameControllerOpen(i);
+      if (self.controller) {
+        log_inf("main: %s detected\n", SDL_GameControllerName(self.controller));
+        break;
+      }
+    }
+  }
+
+  (void) SDL_GameControllerEventState(SDL_ENABLE);
+  
   self.keyboard_state       = SDL_GetKeyboardState(NULL);
   self.is_function_key_down = 0;
   self.is_windowed          = 1;
@@ -120,8 +137,12 @@ static int main_init(void) {
     goto exit_audio;
   }
 
-  if (utils_init() != 0) {
+  if (kempston_init(self.controller) != 0) {
     goto exit_ay;
+  }
+
+  if (utils_init() != 0) {
+    goto exit_kempston;
   }
 
   if (i2c_init() != 0) {
@@ -250,11 +271,16 @@ exit_i2c:
   i2c_finit();
 exit_utils:
   utils_finit();
+exit_kempston:
+  kempston_finit();
 exit_ay:
   ay_finit();
 exit_audio:
   audio_finit();
 exit_sdl:
+  if (self.controller != NULL) {
+    SDL_GameControllerClose(self.controller);
+  }
   if (self.texture != NULL) {
     SDL_DestroyTexture(self.texture);
   }
@@ -334,6 +360,7 @@ static void main_eventloop(void) {
       cpu_step();
     }
 
+    kempston_refresh();
     keyboard_refresh();
     main_handle_function_keys();
 
@@ -366,8 +393,12 @@ static void main_finit(void) {
   sdcard_finit();
   i2c_finit();
   utils_finit();
+  kempston_finit();
   ay_finit();
   audio_finit();
+  if (self.controller) {
+    SDL_GameControllerClose(self.controller);
+  }
   SDL_DestroyTexture(self.texture);
   SDL_DestroyRenderer(self.renderer);
   SDL_DestroyWindow(self.window);
