@@ -108,7 +108,7 @@ void nextreg_select_write(u16_t address, u8_t value) {
 
 
 u8_t nextreg_select_read(u16_t address) {
-  return 0xFF;
+  return self.selected_register;
 }
 
 
