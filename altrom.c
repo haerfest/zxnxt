@@ -33,6 +33,14 @@ static void altrom_refresh_ptr(void) {
   }
 
   self.ptr = alt_128 ? self.rom0_128k : self.rom1_48k;
+
+  log_dbg("altrom: ROM%s selected (machinetype=%s, lock=%d, selected=%d, active=%s, on=%s)\n",
+          alt_128 ? "0 (128K)" : "1 (48K)",
+          self.machine_type == E_MACHINE_TYPE_ZX_48K ? "48K" : "non-48K",
+          self.lock,
+          self.selected,
+          self.is_active ? "yes" : "no",
+          self.on_write  ? "write" : "read");
 }
 
 
@@ -79,6 +87,14 @@ void altrom_activate(int active, int on_write) {
   if (active != self.is_active || on_write != self.on_write) {
     self.is_active = active;
     self.on_write  = on_write;
+
+#ifdef DEBUG
+    if (active) {
+      log_dbg("altrom: active on %s\n", on_write ? "write" : "read");
+    } else {
+      log_dbg("altrom: inactive\n");
+    }
+#endif
 
     memory_refresh_accessors(0, 2);
   }

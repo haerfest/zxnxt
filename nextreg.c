@@ -384,7 +384,7 @@ static void nextreg_internal_port_decoding_2_write(u8_t value) {
 
 
 void nextreg_data_write(u16_t address, u8_t value) {
-  log_dbg("nextreg: write of $%02X to $%04X\n", value, address);
+  log_dbg("nextreg: write of $%02X to $%04X (register $%02X)\n", value, address, self.selected_register);
 
   switch (self.selected_register) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
