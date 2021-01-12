@@ -211,6 +211,19 @@ static void cpu_fill_tables(void) {
 
 int cpu_init(void) {
   cpu_fill_tables();
+
+  self.irq_pending  = 0;
+  self.irq_duration = 0;
+  self.irq_delay    = 0;
+
+  AF   = 0xFFFF;
+  SP   = 0xFFFF;
+  BC   = 0xFFFF;
+  DE   = 0xFFFF;
+  HL   = 0xFFFF;
+  IX   = 0xFFFF;
+  IY   = 0xFFFF;
+
   cpu_reset();
 
   return 0;
@@ -222,23 +235,12 @@ void cpu_finit(void) {
 
 
 void cpu_reset(void) {
-  AF   = 0xFFFF;
-  SP   = 0xFFFF;
-  BC   = 0xFFFF;
-  DE   = 0xFFFF;
-  HL   = 0xFFFF;
-  IX   = 0xFFFF;
-  IY   = 0xFFFF;
   IFF1 = 0;
   IFF2 = 0;
   PC   = 0;
   I    = 0;
   R    = 0;
   IM   = 0;
-
-  self.irq_pending  = 0;
-  self.irq_duration = 0;
-  self.irq_delay    = 0;
 
   T(3);
 }

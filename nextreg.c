@@ -71,6 +71,7 @@ static void nextreg_reset_soft(void) {
   mmu_reset();
   paging_reset();
 
+  rom_select(0);
   rom_lock(self.altrom_soft_reset_lock);
   altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
 
@@ -82,12 +83,13 @@ static void nextreg_reset_hard(void) {
   self.selected_register               = 0x00;
   self.is_hard_reset                   = 1;
   self.altrom_soft_reset_enable        = 0;
-  self.altrom_soft_reset_during_writes = 0;
+  self.altrom_soft_reset_during_writes = 1;
   self.altrom_soft_reset_lock          = 0;
 
   nextreg_reset_soft();
 
   bootrom_activate();
+  config_set_rom_ram_bank(0);
   config_activate();
 }
 
