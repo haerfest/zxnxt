@@ -77,7 +77,7 @@ void paging_spectrum_128k_paging_write(u8_t value) {
   rom_select((rom_selected() & ~0x01) | (value & 0x10) >> 4);
   ula_screen_bank_set((value & 0x08) ? E_ULA_SCREEN_BANK_7 : E_ULA_SCREEN_BANK_5);
 
-  self.bank_slot_4 = (self.bank_slot_4 & ~0x03) | (value & 0x03);
+  self.bank_slot_4 = (self.bank_slot_4 & ~0x07) | (value & 0x07);
   mmu_bank_set(4, self.bank_slot_4);
 
   if (value & 0x20) {
