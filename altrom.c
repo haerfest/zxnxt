@@ -1,6 +1,10 @@
+#include "altrom.h"
 #include "defs.h"
 #include "log.h"
 #include "memory.h"
+
+
+#define NOT_LOCKED  0
 
 
 typedef struct {
@@ -9,10 +13,9 @@ typedef struct {
   u8_t*          ptr;
   int            is_active;
   int            on_write;
-  u8_t           selected;
-  u8_t           lock;
+  altrom_t       selected;
+  altrom_t       locked;
   machine_type_t machine_type;
-
 } self_t;
 
 
@@ -20,24 +23,34 @@ static self_t self;
 
 
 static void altrom_refresh_ptr(void) {
-  int alt_128;
-
   switch (self.machine_type) {
     case E_MACHINE_TYPE_ZX_48K:
-      alt_128 = (self.lock == 1);
+      /* We only have one ROM, which is the 48K BASIC. */
+      self.ptr = self.rom1_48k;
+      break;
+
+    case E_MACHINE_TYPE_ZX_128K_PLUS2:
+    case E_MACHINE_TYPE_ZX_PLUS2A_PLUS2B_PLUS3:
+      if (self.locked == NOT_LOCKED) {
+        /* Look at $7FFD bit 4 as if we're a 128K Spectrum: a 0 selects the
+         * 128K Editor ROM, a 1 the 48K BASIC ROM. */
+        self.ptr = (self.selected & 1) ? self.rom1_48k : self.rom0_128k;
+      } else {
+        /* Consider the ROM1 lock bit (NEXTREG $8C): if set, that selects
+         * the 48K BASIC ROM, otherwise it's the 128K Editor ROM. */
+        self.ptr = (self.locked   & 2) ? self.rom1_48k : self.rom0_128k;
+      }
       break;
 
     default:
-      alt_128 = (self.lock == 0) ? (1 - (self.selected & 0x01)) : (1 - (self.lock >> 1));
-      break;
+      log_wrn("altrom: locking not implemented for machine type %u\n", self.machine_type);
+      return;
   }
 
-  self.ptr = alt_128 ? self.rom0_128k : self.rom1_48k;
-
-  log_dbg("altrom: ROM%s selected (machinetype=%s, lock=%d, selected=%d, active=%s, on=%s)\n",
-          alt_128 ? "0 (128K)" : "1 (48K)",
-          self.machine_type == E_MACHINE_TYPE_ZX_48K ? "48K" : "non-48K",
-          self.lock,
+  log_dbg("altrom: ROM%s selected (machinetype=%u, locked=%d, selected=%d, active=%s, on=%s)\n",
+          self.ptr == self.rom0_128k ? "0 (128K)" : "1 (48K)",
+          self.machine_type,
+          self.locked,
           self.selected,
           self.is_active ? "yes" : "no",
           self.on_write  ? "write" : "read");
@@ -49,8 +62,8 @@ int altrom_init(u8_t* sram) {
   self.rom1_48k     = &sram[MEMORY_RAM_OFFSET_ALTROM1_48K];
   self.is_active    = 0;
   self.on_write     = 1;
-  self.selected     = 0;
-  self.lock         = 0;
+  self.selected     = E_ALTROM_128K_EDITOR;
+  self.locked       = NOT_LOCKED;
   self.machine_type = E_MACHINE_TYPE_CONFIG_MODE;
 
   altrom_refresh_ptr();
@@ -117,9 +130,9 @@ void altrom_select(u8_t rom) {
 }
 
 
-void altrom_set_lock(u8_t lock) {
-  if (lock != self.lock) {
-    self.lock = lock;
+void altrom_lock(u8_t rom) {
+  if (rom != self.locked) {
+    self.locked = rom;
     altrom_refresh_ptr();
   }
 }

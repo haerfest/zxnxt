@@ -71,7 +71,7 @@ static void nextreg_reset_soft(void) {
   mmu_reset();
   paging_reset();
 
-  rom_set_lock(self.altrom_soft_reset_lock);
+  rom_lock(self.altrom_soft_reset_lock);
   altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
 
   clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
@@ -247,13 +247,13 @@ static void nextreg_spectrum_memory_mapping_write(u8_t value) {
 static void nextreg_alternate_rom_write(u8_t value) {
   const int  enable        = value & 0x80;
   const int  during_writes = value & 0x40;
-  const u8_t lock          = (value & 0x30) >> 4;
+  const u8_t rom           = (value & 0x30) >> 4;
 
   self.altrom_soft_reset_enable        = value & 0x08;
   self.altrom_soft_reset_during_writes = value & 0x04;
   self.altrom_soft_reset_lock          = value & 0x03;
 
-  rom_set_lock(lock);
+  rom_lock(rom);
   altrom_activate(enable, during_writes);
 }
 
