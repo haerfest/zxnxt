@@ -87,7 +87,7 @@ u8_t rom_read(u16_t address) {
 
 
 void rom_write(u16_t address, u8_t value) {
-  log_wrn("rom: unsupported write of $%02X to $%04X\n", value, address);
+  log_dbg("rom: unsupported write of $%02X to $%04X\n", value, address);
 }
 
 
