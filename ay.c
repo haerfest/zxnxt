@@ -4,7 +4,6 @@
 #include "log.h"
 
 #define LEVEL(voltage)  ((s8_t) (AUDIO_MAX_VOLUME * voltage))
-#define MAX(a, b)       ((a) > (b) ? (a) : (b))
 
 #define N_AMPLITUDES    16
 #define N_REGISTERS     (E_AY_REGISTER_ENVELOPE_IO_PORT_B_DATA_STORE - E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE + 1)
@@ -93,9 +92,10 @@ typedef struct {
   int               ticks_div_256;
   u16_t             envelope_counter;
   u16_t             envelope_period_sixteenth;
-  u8_t              envelope_counter_sixteenth;
+  u16_t             envelope_counter_sixteenth;
   u8_t              envelope_amplitude;
   s8_t              envelope_delta;
+  u64_t             envelope_cycle;
 } self_t;
 
 
@@ -137,52 +137,76 @@ u8_t ay_register_read(void) {
 
 
 static void ay_envelope_step(void) {
-  if (--self.envelope_counter == 0) {
+  if (self.envelope_cycle == 0 || --self.envelope_counter == 0) {
     /* One cycle complete. */
     self.envelope_counter           = self.latched.envelope_period + 1;
-    self.envelope_period_sixteenth  = MAX(1, self.envelope_counter / 16);
+    self.envelope_period_sixteenth  = (self.envelope_counter + 15) / 16;
     self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
 
-    /* See Fig. 7 ENVELOPE SHAPE/CYCLE CONTROL */
-    switch (self.latched.envelope_shape & 0x0F) {
-      case 0x00:  /* 0 0 x x */
-      case 0x01:
-      case 0x02:
-      case 0x03:
-      case 0x04:  /* 0 1 x x */
-      case 0x05:
-      case 0x06:
-      case 0x07:
-      case 0x09:  /* 1 0 0 1 */
-      case 0x0F:  /* 1 1 1 1 */
-        self.envelope_amplitude = 0;
-        self.envelope_delta     = 0;
-        break;
-
-      case 0x08:  /* 1 0 0 0 */
-        self.envelope_amplitude = 15;
-        self.envelope_delta     = -1;
-        break;
-
-      case 0x0A:  /* 1 0 1 0 */
-      case 0x0E:  /* 1 1 1 0 */
-        self.envelope_delta = -self.envelope_delta;
-        break;
-
-      case 0x0B:  /* 1 0 1 1 */
-      case 0x0D:  /* 1 1 0 1 */
-        self.envelope_amplitude = 15;
-        self.envelope_delta     = 0;
-        break;
-
-      case 0x0C:  /* 1 1 0 0 */
+    if (++self.envelope_cycle == 1) {
+      /* Attack solely determines first cycle. */
+      if (self.latched.envelope_shape & 0x04) {
         self.envelope_amplitude = 0;
         self.envelope_delta     = 1;
-        break;
-    }
-  }
+      } else {
+        self.envelope_amplitude = 15;
+        self.envelope_delta     = -1;
+      }
+    } else {
+      /* See Fig. 7 ENVELOPE SHAPE/CYCLE CONTROL */
+      switch (self.latched.envelope_shape & 0x0F) {
+        case 0x00:  /* 0 0 x x */
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0x04:  /* 0 1 x x */
+        case 0x05:
+        case 0x06:
+        case 0x07:
+        case 0x09:  /* 1 0 0 1 */
+        case 0x0F:  /* 1 1 1 1 */
+          self.envelope_amplitude = 0;
+          self.envelope_delta     = 0;
+          break;
 
-  if (--self.envelope_counter_sixteenth == 0)  {
+        case 0x08:  /* 1 0 0 0 */
+          self.envelope_amplitude = 15;
+          self.envelope_delta     = -1;
+          break;
+
+        case 0x0A:  /* 1 0 1 0 */
+          if (self.envelope_cycle & 1) {
+            self.envelope_amplitude = 15;
+            self.envelope_delta     = -1;
+          } else {
+            self.envelope_amplitude = 0;
+            self.envelope_delta     = 1;
+          }
+          break;
+          
+        case 0x0E:  /* 1 1 1 0 */
+          if (self.envelope_cycle & 1) {
+            self.envelope_amplitude = 0;
+            self.envelope_delta     = 1;
+          } else {
+            self.envelope_amplitude = 15;
+            self.envelope_delta     = -1;
+          }
+          break;
+
+        case 0x0B:  /* 1 0 1 1 */
+        case 0x0D:  /* 1 1 0 1 */
+          self.envelope_amplitude = 15;
+          self.envelope_delta     = 0;
+          break;
+
+        case 0x0C:  /* 1 1 0 0 */
+          self.envelope_amplitude = 0;
+          self.envelope_delta     = 1;
+          break;
+      }
+    }
+  } else if (--self.envelope_counter_sixteenth == 0) {
     /* One step within cycle complete. */
     self.envelope_amplitude += self.envelope_delta;
     self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
@@ -322,10 +346,12 @@ void ay_register_write(u8_t value) {
     case E_AY_REGISTER_ENVELOPE_PERIOD_FINE:
     case E_AY_REGISTER_ENVELOPE_PERIOD_COARSE:
       self.latched.envelope_period = self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_FINE];
+      self.envelope_cycle          = 0;
       break;
 
     case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
       self.latched.envelope_shape = value;
+      self.envelope_cycle         = 0;
       break;
 
     default:
