@@ -76,10 +76,7 @@ typedef struct {
 typedef struct {
   u8_t  noise_period;
   u16_t envelope_period;
-  int   do_envelope_hold;
-  int   do_envelope_alternate;
-  int   do_envelope_attack;
-  int   do_envelope_continue;
+  u8_t  envelope_shape;
 } general_latched_t;
 
 
@@ -136,6 +133,161 @@ u8_t ay_register_read(void) {
 
   log_wrn("ay: unimplemented read from REGISTER port\n");
   return 0xFF;
+}
+
+
+static void ay_envelope_reset(void) {
+  self.envelope_counter           = MAX(self.latched.envelope_period, 1);
+  self.envelope_period_sixteenth  = self.envelope_counter / 16;
+  self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
+
+  /* Attack solely determines starting shape of envelope. */
+  if (self.latched.envelope_shape & 0x04) {
+    self.envelope_amplitude = 0;
+    self.envelope_delta     = 1;
+  } else {
+    self.envelope_amplitude = 15;
+    self.envelope_delta     = -1;
+  }    
+}
+
+
+static void ay_envelope_step(void) {
+  if (self.envelope_counter == 0) {
+    /* One cycle complete. */
+    self.envelope_counter           = MAX(self.latched.envelope_period, 1);
+    self.envelope_period_sixteenth  = self.envelope_counter / 16;
+    self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
+
+    /* See Fig. 7 ENVELOPE SHAPE/CYCLE CONTROL */
+    switch (self.latched.envelope_shape & 0x0F) {
+      case 0x00:  /* 0 0 x x */
+      case 0x01:
+      case 0x02:
+      case 0x03:
+      case 0x04:  /* 0 1 x x */
+      case 0x05:
+      case 0x06:
+      case 0x07:
+      case 0x09:  /* 1 0 0 1 */
+      case 0x0F:  /* 1 1 1 1 */
+        self.envelope_amplitude = 0;
+        self.envelope_delta     = 0;
+        break;
+
+      case 0x08:  /* 1 0 0 0 */
+        self.envelope_amplitude = 15;
+        self.envelope_delta     = -1;
+        break;
+
+      case 0x0A:  /* 1 0 1 0 */
+      case 0x0E:  /* 1 1 1 0 */
+        self.envelope_delta = -self.envelope_delta;
+        break;
+
+      case 0x0B:  /* 1 0 1 1 */
+      case 0x0D:  /* 1 1 0 1 */
+        self.envelope_amplitude = 15;
+        self.envelope_delta     = 0;
+        break;
+
+      case 0x0C:  /* 1 1 0 0 */
+        self.envelope_amplitude = 0;
+        self.envelope_delta     = 1;
+        break;
+    }
+  } else if (self.envelope_counter_sixteenth == 0)  {
+    /* One step within cycle complete. */
+    if ((self.envelope_delta < 0 && self.envelope_amplitude > 0) ||
+        (self.envelope_delta > 0 && self.envelope_amplitude < 15)) {
+      self.envelope_amplitude += self.envelope_delta;
+    }
+    self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
+  }
+
+  self.envelope_counter_sixteenth--;
+  self.envelope_counter--;
+}
+
+
+static void ay_noise_step(void) {
+  int advance = 0;
+
+  if (self.noise_counter == 0) {
+    self.noise_counter     = MAX(self.latched.noise_period, 1);
+    self.noise_period_half = self.noise_counter / 2;
+    advance                = 1;
+  } else if (self.noise_counter == self.noise_period_half) {
+    advance                = 1;
+  }
+
+  if (advance) {
+    /* GenNoise (c) Hacker KAY & Sergey Bulba */
+    self.noise_seed  = (self.noise_seed * 2 + 1) ^ (((self.noise_seed >> 16) ^ (self.noise_seed >> 13)) & 1);
+    self.noise_value = (self.noise_seed >> 16) & 1;
+  }
+
+  self.noise_counter--;
+}
+
+
+static void ay_channel_step(int n) {
+  ay_channel_t* channel = &self.channels[n];
+
+  if (channel->tone_counter == 0) {
+    channel->tone_counter     = MAX(channel->latched.tone_period, 1);
+    channel->tone_period_half = channel->tone_counter / 2;
+    channel->tone_value       = 1;
+  } else if (channel->tone_counter == channel->tone_period_half) {
+    channel->tone_value       = 0;
+  }
+
+  channel->tone_counter--;
+}
+
+
+static void ay_mix(int n) {
+  ay_channel_t* channel = &self.channels[n];
+  s8_t          sample  = 0;
+
+  /* Tone or noise enabled on this channel? */
+  if ((channel->latched.is_tone_enabled  && channel->tone_value) ||
+      (channel->latched.is_noise_enabled && self.noise_value)) {
+    const u8_t amplitude = channel->latched.is_amplitude_fixed ? channel->latched.amplitude : self.envelope_amplitude;
+    sample = ay_volume[amplitude];
+  }
+
+  if (sample != channel->sample_last) {
+    channel->sample_last = sample;
+    audio_add_sample(E_AUDIO_SOURCE_AY_1_CHANNEL_A + n, sample);
+  }
+}
+
+
+void ay_run(u32_t ticks) {
+  u32_t tick;
+
+  for (tick = 0; tick < ticks; tick++) {
+    if (++self.ticks_div_256 == 256) {
+      self.ticks_div_256 = 0;
+
+      ay_envelope_step();
+    }
+
+    if (++self.ticks_div_16 == 16) {
+      self.ticks_div_16 = 0;
+
+      ay_noise_step();
+
+      ay_channel_step(A);
+      ay_channel_step(B);
+      ay_channel_step(C);
+
+      ay_mix(A);
+      ay_mix(B);
+      ay_mix(C);
+    }
+  }
 }
 
 
@@ -198,132 +350,11 @@ void ay_register_write(u8_t value) {
       break;
 
     case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
-      self.latched.do_envelope_hold      = value & 0x01;
-      self.latched.do_envelope_alternate = value & 0x02;
-      self.latched.do_envelope_attack    = value & 0x04;
-      self.latched.do_envelope_continue  = value & 0x08;
-      log_inf("ay: envelope hold=%d alternate=%d attack=%d continue=%d\n",
-              self.latched.do_envelope_hold      != 0,
-              self.latched.do_envelope_alternate != 0,
-              self.latched.do_envelope_attack    != 0,
-              self.latched.do_envelope_continue  != 0);
+      self.latched.envelope_shape = value;
+      ay_envelope_reset();
       break;
 
     default:
       break;
-  }
-}
-
-
-static void ay_envelope_step(void) {
-  if (self.envelope_counter == 0) {
-    /* One cycle complete. */
-    self.envelope_counter           = MAX(self.latched.envelope_period, 1);
-    self.envelope_period_sixteenth  = self.envelope_counter / 16;
-    self.envelope_counter_sixteenth = 16;
-
-    if (!self.latched.do_envelope_continue) {
-      self.envelope_amplitude = 0;
-      self.envelope_delta     = 0;
-    } else if (self.latched.do_envelope_hold && self.latched.do_envelope_alternate) {
-      self.envelope_delta     = 0;
-      self.envelope_amplitude = self.latched.do_envelope_attack ? 0 : 15;
-    } else if (self.latched.do_envelope_hold) {
-      self.envelope_delta = 0;
-    } else if (self.latched.do_envelope_alternate) {
-      self.envelope_delta = -self.envelope_delta;
-    } else if (self.latched.do_envelope_attack) {
-      self.envelope_amplitude = 0;
-    } else {
-      self.envelope_amplitude = 15;
-    }
-  } else if (self.envelope_counter_sixteenth == 0) {
-    self.envelope_counter_sixteenth = 16;
-    self.envelope_amplitude += self.envelope_delta;
-  }
-
-  self.envelope_counter_sixteenth--;
-  self.envelope_counter--;
-}
-
-
-static void ay_noise_step(void) {
-  int advance = 0;
-
-  if (self.noise_counter == 0) {
-    self.noise_counter     = MAX(self.latched.noise_period, 1);
-    self.noise_period_half = self.noise_counter / 2;
-    advance                = 1;
-  } else if (self.noise_counter == self.noise_period_half) {
-    advance                = 1;
-  }
-
-  if (advance) {
-    /* GenNoise (c) Hacker KAY & Sergey Bulba */
-    self.noise_seed  = (self.noise_seed * 2 + 1) ^ (((self.noise_seed >> 16) ^ (self.noise_seed >> 13)) & 1);
-    self.noise_value = (self.noise_seed >> 16) & 1;
-  }
-
-  self.noise_counter--;
-}
-
-
-static void ay_channel_step(int n) {
-  ay_channel_t* channel = &self.channels[n];
-
-  if (channel->tone_counter == 0) {
-    channel->tone_counter     = MAX(channel->latched.tone_period, 1);
-    channel->tone_period_half = channel->tone_counter / 2;
-    channel->tone_value       = 1;
-  } else if (channel->tone_counter == channel->tone_period_half) {
-    channel->tone_value       = 0;
-  }
-
-  channel->tone_counter--;
-}
-
-
-/* TODO Assuming fixed amplitude for now. */
-static void ay_mix(int n) {
-  ay_channel_t* channel = &self.channels[n];
-  s8_t          sample  = 0;
-
-  /* Tone or noise enabled on this channel? */
-  if ((channel->latched.is_tone_enabled  && channel->tone_value) ||
-      (channel->latched.is_noise_enabled && self.noise_value)) {
-    const u8_t amplitude = channel->latched.is_amplitude_fixed ? channel->latched.amplitude : self.envelope_amplitude;
-    sample = ay_volume[amplitude];
-  }
-
-  if (sample != channel->sample_last) {
-    channel->sample_last = sample;
-    audio_add_sample(E_AUDIO_SOURCE_AY_1_CHANNEL_A + n, sample);
-  }
-}
-
-
-void ay_run(u32_t ticks) {
-  u32_t tick;
-
-  for (tick = 0; tick < ticks; tick++) {
-    if (++self.ticks_div_256 == 256) {
-      self.ticks_div_256 = 0;
-
-      ay_envelope_step();
-    }
-
-    if (++self.ticks_div_16 == 16) {
-      self.ticks_div_16 = 0;
-
-      ay_noise_step();
-
-      ay_channel_step(A);
-      ay_channel_step(B);
-      ay_channel_step(C);
-
-      ay_mix(A);
-      ay_mix(B);
-      ay_mix(C);
-    }
   }
 }
