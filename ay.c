@@ -346,7 +346,6 @@ void ay_register_write(u8_t value) {
     case E_AY_REGISTER_ENVELOPE_PERIOD_FINE:
     case E_AY_REGISTER_ENVELOPE_PERIOD_COARSE:
       self.latched.envelope_period = self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_FINE];
-      log_inf("ay: envelope period=%04X\n", self.latched.envelope_period);
       break;
 
     case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
