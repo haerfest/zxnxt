@@ -136,27 +136,11 @@ u8_t ay_register_read(void) {
 }
 
 
-static void ay_envelope_reset(void) {
-  self.envelope_counter           = MAX(self.latched.envelope_period, 1);
-  self.envelope_period_sixteenth  = self.envelope_counter / 16;
-  self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
-
-  /* Attack solely determines starting shape of envelope. */
-  if (self.latched.envelope_shape & 0x04) {
-    self.envelope_amplitude = 0;
-    self.envelope_delta     = 1;
-  } else {
-    self.envelope_amplitude = 15;
-    self.envelope_delta     = -1;
-  }    
-}
-
-
 static void ay_envelope_step(void) {
-  if (self.envelope_counter == 0) {
+  if (--self.envelope_counter == 0) {
     /* One cycle complete. */
-    self.envelope_counter           = MAX(self.latched.envelope_period, 1);
-    self.envelope_period_sixteenth  = self.envelope_counter / 16;
+    self.envelope_counter           = self.latched.envelope_period + 1;
+    self.envelope_period_sixteenth  = MAX(1, self.envelope_counter / 16);
     self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
 
     /* See Fig. 7 ENVELOPE SHAPE/CYCLE CONTROL */
@@ -196,25 +180,21 @@ static void ay_envelope_step(void) {
         self.envelope_delta     = 1;
         break;
     }
-  } else if (self.envelope_counter_sixteenth == 0)  {
-    /* One step within cycle complete. */
-    if ((self.envelope_delta < 0 && self.envelope_amplitude > 0) ||
-        (self.envelope_delta > 0 && self.envelope_amplitude < 15)) {
-      self.envelope_amplitude += self.envelope_delta;
-    }
-    self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
   }
 
-  self.envelope_counter_sixteenth--;
-  self.envelope_counter--;
+  if (--self.envelope_counter_sixteenth == 0)  {
+    /* One step within cycle complete. */
+    self.envelope_amplitude += self.envelope_delta;
+    self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
+  }
 }
 
 
 static void ay_noise_step(void) {
   int advance = 0;
 
-  if (self.noise_counter == 0) {
-    self.noise_counter     = MAX(self.latched.noise_period, 1);
+  if (--self.noise_counter == 0) {
+    self.noise_counter     = self.latched.noise_period + 1;
     self.noise_period_half = self.noise_counter / 2;
     advance                = 1;
   } else if (self.noise_counter == self.noise_period_half) {
@@ -226,23 +206,19 @@ static void ay_noise_step(void) {
     self.noise_seed  = (self.noise_seed * 2 + 1) ^ (((self.noise_seed >> 16) ^ (self.noise_seed >> 13)) & 1);
     self.noise_value = (self.noise_seed >> 16) & 1;
   }
-
-  self.noise_counter--;
 }
 
 
 static void ay_channel_step(int n) {
   ay_channel_t* channel = &self.channels[n];
 
-  if (channel->tone_counter == 0) {
-    channel->tone_counter     = MAX(channel->latched.tone_period, 1);
+  if (--channel->tone_counter == 0) {
+    channel->tone_counter     = channel->latched.tone_period + 1;
     channel->tone_period_half = channel->tone_counter / 2;
     channel->tone_value       = 1;
   } else if (channel->tone_counter == channel->tone_period_half) {
     channel->tone_value       = 0;
   }
-
-  channel->tone_counter--;
 }
 
 
@@ -350,7 +326,6 @@ void ay_register_write(u8_t value) {
 
     case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
       self.latched.envelope_shape = value;
-      ay_envelope_reset();
       break;
 
     default:
