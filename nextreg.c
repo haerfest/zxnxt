@@ -1,4 +1,5 @@
 #include "altrom.h"
+#include "audio.h"
 #include "ay.h"
 #include "bootrom.h"
 #include "clock.h"
@@ -23,24 +24,38 @@
 #define CORE_VERSION_SUB_MINOR  9
 
 
-typedef struct {
-  u8_t      selected_register;
-  int       is_hard_reset;
-  int       palette_disable_auto_increment;
-  palette_t palette_sprites;
-  palette_t palette_layer2;
-  palette_t palette_ula;
-  palette_t palette_selected;
-  u8_t      palette_index;
-  int       palette_index_9bit_is_first_write;
-  u8_t      fallback_colour;
-  int       ula_next_mode;
-  u8_t      ula_clip_index;
-  u8_t      ula_clip[4];  /* Elements: x1, x2, y1, y2. */
-  int       altrom_soft_reset_enable;
-  int       altrom_soft_reset_during_writes;
-  u8_t      altrom_soft_reset_lock;
+typedef enum {
+  E_NEXTREG_AY_1 = 0,
+  E_NEXTREG_AY_2,
+  E_NEXTREG_AY_3
+} nextreg_ay_t;
 
+
+typedef enum {
+  E_NEXTREG_AY_STEREO_MODE_ABC,
+  E_NEXTREG_AY_STEREO_MODE_ACB
+} nextreg_ay_stereo_mode_t;
+
+
+typedef struct {
+  u8_t                     selected_register;
+  int                      is_hard_reset;
+  int                      palette_disable_auto_increment;
+  palette_t                palette_sprites;
+  palette_t                palette_layer2;
+  palette_t                palette_ula;
+  palette_t                palette_selected;
+  u8_t                     palette_index;
+  int                      palette_index_9bit_is_first_write;
+  u8_t                     fallback_colour;
+  int                      ula_next_mode;
+  u8_t                     ula_clip_index;
+  u8_t                     ula_clip[4];  /* Elements: x1, x2, y1, y2. */
+  int                      altrom_soft_reset_enable;
+  int                      altrom_soft_reset_during_writes;
+  u8_t                     altrom_soft_reset_lock;
+  nextreg_ay_stereo_mode_t ay_stereo_mode;
+  int                      is_ay_mono[3];
 } nextreg_t;
 
 
@@ -79,18 +94,34 @@ static void nextreg_reset_soft(void) {
 }
 
 
+static void nextreg_ay_configure(nextreg_ay_t ay) {
+  const audio_channel_t a      =  self.is_ay_mono[ay] ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_LEFT;
+  const audio_channel_t b      = (self.is_ay_mono[ay] || self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ABC) ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_RIGHT;
+  const audio_channel_t c      = (self.is_ay_mono[ay] || self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ACB) ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_RIGHT;
+  const audio_source_t  source = E_AUDIO_SOURCE_AY_1_CHANNEL_A + ay * 3;
+
+  audio_assign_channel(source + 0, a);
+  audio_assign_channel(source + 1, b);
+  audio_assign_channel(source + 2, c);
+}
+
+
 static void nextreg_reset_hard(void) {
-  self.selected_register               = 0x00;
+  memset(&self, 0, sizeof(self));
+
   self.is_hard_reset                   = 1;
-  self.altrom_soft_reset_enable        = 0;
   self.altrom_soft_reset_during_writes = 1;
-  self.altrom_soft_reset_lock          = 0;
+  self.ay_stereo_mode                  = E_NEXTREG_AY_STEREO_MODE_ABC;
 
   nextreg_reset_soft();
 
   bootrom_activate();
   config_set_rom_ram_bank(0);
   config_activate();
+
+  nextreg_ay_configure(E_NEXTREG_AY_1);
+  nextreg_ay_configure(E_NEXTREG_AY_2);
+  nextreg_ay_configure(E_NEXTREG_AY_3);
 }
 
 
@@ -192,9 +223,30 @@ static u8_t nextreg_peripheral_3_setting_read(void) {
 
 
 static void nextreg_peripheral_3_setting_write(u8_t value) {
+  nextreg_ay_stereo_mode_t mode = value & 0x20 ? E_NEXTREG_AY_STEREO_MODE_ACB : E_NEXTREG_AY_STEREO_MODE_ABC;
+
+  if (mode != self.ay_stereo_mode) {
+    self.ay_stereo_mode = mode;
+
+    nextreg_ay_configure(E_NEXTREG_AY_1);
+    nextreg_ay_configure(E_NEXTREG_AY_2);
+    nextreg_ay_configure(E_NEXTREG_AY_3);
+  }
+
   if (value & 0x80) {
     paging_spectrum_128k_paging_unlock();
   }
+}
+
+
+static void nextreg_peripheral_4_setting_write(u8_t value) {
+  self.is_ay_mono[E_NEXTREG_AY_1] = (value & 0x20) >> 5;
+  self.is_ay_mono[E_NEXTREG_AY_2] = (value & 0x40) >> 6;
+  self.is_ay_mono[E_NEXTREG_AY_3] = (value & 0x80) >> 7;
+
+  nextreg_ay_configure(E_NEXTREG_AY_1);
+  nextreg_ay_configure(E_NEXTREG_AY_2);
+  nextreg_ay_configure(E_NEXTREG_AY_3);
 }
 
 
@@ -407,6 +459,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
     case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
       nextreg_peripheral_3_setting_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING:
+      nextreg_peripheral_4_setting_write(value);
       break;
 
     case E_NEXTREG_REGISTER_CPU_SPEED:
