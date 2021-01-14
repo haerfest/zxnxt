@@ -16,6 +16,7 @@ typedef enum {
 
 #define AUDIO_SAMPLE_RATE    44100
 #define AUDIO_BUFFER_LENGTH    512
+#define AUDIO_N_CHANNELS         2
 #define AUDIO_MAX_VOLUME       127
 
 

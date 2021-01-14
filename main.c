@@ -69,7 +69,7 @@ static int main_init(void) {
   memset(&want, 0, sizeof(want));
   want.freq     = AUDIO_SAMPLE_RATE;
   want.format   = AUDIO_S8;
-  want.channels = 1;
+  want.channels = AUDIO_N_CHANNELS;
   want.samples  = AUDIO_BUFFER_LENGTH;
   want.callback = audio_callback;
   

@@ -7,12 +7,23 @@
 #define N_SOURCES       (E_AUDIO_SOURCE_AY_1_CHANNEL_C - E_AUDIO_SOURCE_BEEPER + 1)
 
 
+typedef enum {
+  E_CHANNEL_LEFT,
+  E_CHANNEL_RIGHT,
+  E_CHANNEL_BOTH
+} channel_t;
+
+
 typedef struct {
   SDL_AudioDeviceID device;
+  channel_t         channels[N_SOURCES];
   s8_t              last_sample[N_SOURCES];
-  s8_t              mixed[AUDIO_BUFFER_LENGTH];
-  s16_t             mixed_last_sample_sum;
-  s8_t              mixed_last_sample;
+  s8_t              mixed[AUDIO_BUFFER_LENGTH * AUDIO_N_CHANNELS];
+  const s8_t*       mixed_end;
+  s16_t             mixed_last_sample_sum_left;
+  s16_t             mixed_last_sample_sum_right;
+  s8_t              mixed_last_sample_left;
+  s8_t              mixed_last_sample_right;
   u64_t             emptied_ticks_28mhz;
   SDL_bool          is_empty;
   SDL_cond*         emptied;
@@ -24,16 +35,19 @@ static self_t self;
 
 
 int audio_init(SDL_AudioDeviceID device) {
+  memset(&self, 0, sizeof(self));
+
   self.device                = device;
   self.emptied_ticks_28mhz   = clock_ticks();
+  self.mixed_end             = &self.mixed[AUDIO_BUFFER_LENGTH * AUDIO_N_CHANNELS];
   self.is_empty              = SDL_FALSE;
   self.emptied               = SDL_CreateCond();
   self.lock                  = SDL_CreateMutex();
-  self.mixed_last_sample_sum = 0;
-  self.mixed_last_sample     = 0;
 
-  memset(self.last_sample, 0, sizeof(self.last_sample));
-  memset(self.mixed,       0, sizeof(self.mixed));
+  self.channels[E_AUDIO_SOURCE_BEEPER        ] = E_CHANNEL_BOTH;
+  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_A] = E_CHANNEL_LEFT;
+  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_B] = E_CHANNEL_BOTH;
+  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_C] = E_CHANNEL_RIGHT;
 
   return 0;
 }
@@ -53,15 +67,30 @@ void audio_add_sample(audio_source_t source, s8_t sample) {
   index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.emptied_ticks_28mhz) / 28000000;
 
   if (index < AUDIO_BUFFER_LENGTH) {
-    /* Unmix my previous sample, and mix in the new one. */
-    self.mixed_last_sample_sum -= self.last_sample[source];
-    self.mixed_last_sample_sum += sample;
-    self.mixed_last_sample      = self.mixed_last_sample_sum / N_SOURCES;
+    s8_t* mixed;
+
+    /* Unmix my previous sample, and mix in the new one, per channel. */
+    if (self.channels[source] != E_CHANNEL_RIGHT) {
+      /* Left or both. */
+      self.mixed_last_sample_sum_left -= self.last_sample[source];
+      self.mixed_last_sample_sum_left += sample;
+      self.mixed_last_sample_left      = self.mixed_last_sample_sum_left / N_SOURCES;
+    }
+    if (self.channels[source] != E_CHANNEL_LEFT) {
+      /* Right or both. */
+      self.mixed_last_sample_sum_right -= self.last_sample[source];
+      self.mixed_last_sample_sum_right += sample;
+      self.mixed_last_sample_right      = self.mixed_last_sample_sum_right / N_SOURCES;
+    }
     
     /* Place this sample and extend it to the end of the buffer, assuming
      * for now that no further samples will arrive before the callback
      * picks up our audio buffer. */
-    memset(&self.mixed[index], self.mixed_last_sample, sizeof(self.mixed) - index);
+    mixed = &self.mixed[index * AUDIO_N_CHANNELS];
+    while (mixed < self.mixed_end) {
+      *mixed++ = self.mixed_last_sample_left;
+      *mixed++ = self.mixed_last_sample_right;
+    }
 
     self.last_sample[source] = sample;
   }
@@ -93,11 +122,16 @@ void audio_sync(void) {
 
 
 void audio_callback(void* userdata, u8_t* stream, int length) {
+  s8_t* mixed = self.mixed;
+
   /* Copy audio mix to SDL stream. */
   memcpy(stream, self.mixed, sizeof(self.mixed));
 
   /* Reset to silence. */
-  memset(self.mixed, self.mixed_last_sample, sizeof(self.mixed));
+  while (mixed < self.mixed_end) {
+    *mixed++ = self.mixed_last_sample_left;
+    *mixed++ = self.mixed_last_sample_right;
+  }
 
   /* Record when we last emptied the buffer, so we can know where in the buffer
    * to place freshly arriving audio samples. */
