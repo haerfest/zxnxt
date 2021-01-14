@@ -7,16 +7,9 @@
 #define N_SOURCES       (E_AUDIO_SOURCE_AY_1_CHANNEL_C - E_AUDIO_SOURCE_BEEPER + 1)
 
 
-typedef enum {
-  E_CHANNEL_LEFT,
-  E_CHANNEL_RIGHT,
-  E_CHANNEL_BOTH
-} channel_t;
-
-
 typedef struct {
   SDL_AudioDeviceID device;
-  channel_t         channels[N_SOURCES];
+  audio_channel_t   channels[N_SOURCES];
   s8_t              last_sample[N_SOURCES];
   s8_t              mixed[AUDIO_BUFFER_LENGTH * AUDIO_N_CHANNELS];
   const s8_t*       mixed_end;
@@ -44,16 +37,21 @@ int audio_init(SDL_AudioDeviceID device) {
   self.emptied               = SDL_CreateCond();
   self.lock                  = SDL_CreateMutex();
 
-  self.channels[E_AUDIO_SOURCE_BEEPER        ] = E_CHANNEL_BOTH;
-  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_A] = E_CHANNEL_LEFT;
-  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_B] = E_CHANNEL_BOTH;
-  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_C] = E_CHANNEL_RIGHT;
+  self.channels[E_AUDIO_SOURCE_BEEPER        ] = E_AUDIO_CHANNEL_BOTH;
+  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_A] = E_AUDIO_CHANNEL_LEFT;
+  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_B] = E_AUDIO_CHANNEL_BOTH;
+  self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_C] = E_AUDIO_CHANNEL_RIGHT;
 
   return 0;
 }
 
 
 void audio_finit(void) {
+}
+
+
+void audio_assign_channel(audio_source_t source, audio_channel_t channel) {
+  self.channels[source] = channel;
 }
 
 
@@ -70,13 +68,13 @@ void audio_add_sample(audio_source_t source, s8_t sample) {
     s8_t* mixed;
 
     /* Unmix my previous sample, and mix in the new one, per channel. */
-    if (self.channels[source] != E_CHANNEL_RIGHT) {
+    if (self.channels[source] != E_AUDIO_CHANNEL_RIGHT) {
       /* Left or both. */
       self.mixed_last_sample_sum_left -= self.last_sample[source];
       self.mixed_last_sample_sum_left += sample;
       self.mixed_last_sample_left      = self.mixed_last_sample_sum_left / N_SOURCES;
     }
-    if (self.channels[source] != E_CHANNEL_LEFT) {
+    if (self.channels[source] != E_AUDIO_CHANNEL_LEFT) {
       /* Right or both. */
       self.mixed_last_sample_sum_right -= self.last_sample[source];
       self.mixed_last_sample_sum_right += sample;
