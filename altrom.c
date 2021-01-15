@@ -13,8 +13,8 @@ typedef struct {
   u8_t*          ptr;
   int            is_active;
   int            on_write;
-  altrom_t       selected;
-  altrom_t       locked;
+  rom_t          selected;
+  rom_t          locked;
   machine_type_t machine_type;
 } self_t;
 
@@ -62,7 +62,7 @@ int altrom_init(u8_t* sram) {
   self.rom1_48k     = &sram[MEMORY_RAM_OFFSET_ALTROM1_48K];
   self.is_active    = 0;
   self.on_write     = 1;
-  self.selected     = E_ALTROM_128K_EDITOR;
+  self.selected     = E_ROM_128K_EDITOR;
   self.locked       = NOT_LOCKED;
   self.machine_type = E_MACHINE_TYPE_CONFIG_MODE;
 
@@ -122,7 +122,7 @@ void altrom_set_machine_type(machine_type_t machine_type) {
 }
 
 
-void altrom_select(u8_t rom) {
+void altrom_select(rom_t rom) {
   if (rom != self.selected) {
     self.selected = rom;
     altrom_refresh_ptr();
@@ -130,9 +130,19 @@ void altrom_select(u8_t rom) {
 }
 
 
-void altrom_lock(u8_t rom) {
+rom_t altrom_selected(void) {
+  return self.selected;
+}
+
+
+void altrom_lock(rom_t rom) {
   if (rom != self.locked) {
     self.locked = rom;
     altrom_refresh_ptr();
   }
+}
+
+
+rom_t altrom_locked(void) {
+  return self.locked;
 }

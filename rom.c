@@ -1,5 +1,6 @@
 #include "altrom.h"
 #include "defs.h"
+#include "divmmc.h"
 #include "log.h"
 #include "memory.h"
 #include "nextreg.h"
