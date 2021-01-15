@@ -3,6 +3,7 @@
 #include "defs.h"
 #include "log.h"
 
+#define MAX(a, b)       ((a) > (b) ? (a) : (b))
 #define LEVEL(voltage)  ((s8_t) (AUDIO_MAX_VOLUME * voltage))
 
 #define N_AMPLITUDES    16
@@ -95,7 +96,8 @@ typedef struct {
   u16_t             envelope_counter_sixteenth;
   u8_t              envelope_amplitude;
   s8_t              envelope_delta;
-  u64_t             envelope_cycle;
+  int               envelope_cycle_state;
+  int               is_envelope_first_cycle;
 } self_t;
 
 
@@ -137,13 +139,16 @@ u8_t ay_register_read(void) {
 
 
 static void ay_envelope_step(void) {
-  if (self.envelope_cycle == 0 || --self.envelope_counter == 0) {
+  if (--self.envelope_counter == 0) {
     /* One cycle complete. */
-    self.envelope_counter           = self.latched.envelope_period + 1;
+    self.envelope_counter           = MAX(self.latched.envelope_period, 1);
     self.envelope_period_sixteenth  = (self.envelope_counter + 15) / 16;
     self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
+    self.envelope_cycle_state       = 1 - self.envelope_cycle_state;
 
-    if (++self.envelope_cycle == 1) {
+    if (self.is_envelope_first_cycle) {
+      self.is_envelope_first_cycle = 0;
+
       /* Attack solely determines first cycle. */
       if (self.latched.envelope_shape & 0x04) {
         self.envelope_amplitude = 0;
@@ -175,7 +180,7 @@ static void ay_envelope_step(void) {
           break;
 
         case 0x0A:  /* 1 0 1 0 */
-          if (self.envelope_cycle & 1) {
+          if (self.envelope_cycle_state) {
             self.envelope_amplitude = 15;
             self.envelope_delta     = -1;
           } else {
@@ -185,7 +190,7 @@ static void ay_envelope_step(void) {
           break;
           
         case 0x0E:  /* 1 1 1 0 */
-          if (self.envelope_cycle & 1) {
+          if (self.envelope_cycle_state) {
             self.envelope_amplitude = 0;
             self.envelope_delta     = 1;
           } else {
@@ -218,7 +223,7 @@ static void ay_noise_step(void) {
   int advance = 0;
 
   if (--self.noise_counter == 0) {
-    self.noise_counter     = self.latched.noise_period + 1;
+    self.noise_counter     = MAX(self.latched.noise_period, 1);
     self.noise_period_half = self.noise_counter / 2;
     advance                = 1;
   } else if (self.noise_counter == self.noise_period_half) {
@@ -346,12 +351,11 @@ void ay_register_write(u8_t value) {
     case E_AY_REGISTER_ENVELOPE_PERIOD_FINE:
     case E_AY_REGISTER_ENVELOPE_PERIOD_COARSE:
       self.latched.envelope_period = self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_FINE];
-      self.envelope_cycle          = 0;
       break;
 
     case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
-      self.latched.envelope_shape = value;
-      self.envelope_cycle         = 0;
+      self.latched.envelope_shape  = value;
+      self.is_envelope_first_cycle = 1;
       break;
 
     default:
