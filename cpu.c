@@ -299,9 +299,15 @@ static void cpu_irq_pending(void) {
      * more than normal due to the two added wait states." */
     T(2);
   } else {
-    const u16_t vector = I << 8;
+    /* Ghouls 'n Ghosts sets I = $81, but at $8100 there is regular code!
+     * Towards the middle the table starts being filled with zeros, but only
+     * ($81FE) points somewhere meaningful. Since there is nobody to place a
+     * byte on the bus, the bus will read as $FF and Ghouls 'n Ghosts depends
+     * on this behavior.
+     */
+    const u16_t vector = (I << 8 | 0xFF) & 0xFFFE;
 
-    PC = memory_read(vector) | memory_read(vector + 1) << 8;
+    PC =  memory_read(vector + 1) << 8 | memory_read(vector);
     T(6);
 
     /* Z80 CPU User Manual:
