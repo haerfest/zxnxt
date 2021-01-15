@@ -328,17 +328,41 @@ static void main_change_cpu_speed(void) {
 }
 
 
+static void main_dump_memory(void) {
+  const u16_t pc = cpu_pc_get();
+  FILE*       fp;
+  u32_t       address;
+  char        filename[18 + 1];
+
+  (void) snprintf(filename, sizeof(filename), "memory-PC=%04X.bin", pc);
+  fp = fopen(filename, "wb");
+  if (fp == NULL) {
+    log_err("main: could not open %s for writing\n", filename);
+    return;
+  }
+
+  for (address = 0x0000; address <= 0xFFFF; address++) {
+    fputc(memory_read(address), fp);
+  }
+
+  fclose(fp);
+  log_inf("main: %s written\n", filename);
+}
+
+
 static void main_handle_function_keys(void) {
   const int f1  = self.keyboard_state[SDL_SCANCODE_F1];
   const int f4  = self.keyboard_state[SDL_SCANCODE_F4];
   const int f8  = self.keyboard_state[SDL_SCANCODE_F8];
+  const int f11 = self.keyboard_state[SDL_SCANCODE_F11];
   const int f12 = self.keyboard_state[SDL_SCANCODE_F12];
 
-  if (f1 || f4 || f8 || f12) {
+  if (f1 || f4 || f8 || f11 || f12) {
     if (!self.is_function_key_down) {
       if (f1)  main_reset(RESET_HARD);
       if (f4)  main_reset(RESET_SOFT);
       if (f8)  main_change_cpu_speed();
+      if (f11) main_dump_memory();
       if (f12) main_toggle_fullscreen();
 
       /* Prevent auto-repeat from continuous triggering. */
