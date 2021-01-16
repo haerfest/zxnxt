@@ -129,7 +129,7 @@ static void ula_display_mode_screen_x_bottom_border(void) {
                                : ula_display_mode_screen_x_vsync;
 
     if (self.display_mode_handler == ula_display_mode_screen_x_vsync) {
-      ula_frame_complete();
+      ula_vsync();
     }
   }
 }
@@ -141,10 +141,12 @@ static void ula_display_mode_screen_x_vsync(void) {
     self.display_line++;
 
     if (self.display_line == self.display_spec->total_lines + self.display_spec->blanking_period_lines) {
-      self.display_line          = 0;
-      self.display_offset        = 0;
-      self.attribute_offset      = 0;
+      self.display_line         = 0;
+      self.display_offset       = 0;
+      self.attribute_offset     = 0;
       self.display_mode_handler = ula_display_mode_screen_x_top_border;
+
+      ula_frame_complete();
     }
   }
 }

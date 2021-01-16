@@ -77,6 +77,7 @@ typedef struct {
   SDL_Texture*               texture;
   u8_t*                      sram;
   const ula_display_spec_t*  display_spec;
+  int                        did_display_spec_change;
   u16_t                      display_offsets[192];
   u8_t*                      display_ram;
   u8_t*                      display_ram_odd;
@@ -114,6 +115,13 @@ typedef struct {
 static self_t self;
 
 
+static void ula_vsync(void);
+static void ula_frame_complete(void);
+
+#include "ula_mode_x.c"
+#include "ula_hi_res.c"
+
+
 static void ula_blit(void) {
   void* pixels;
   int   pitch;
@@ -135,34 +143,8 @@ static void ula_blit(void) {
 }
 
 
-static void ula_frame_complete(void) {
-  if ((++self.frame_counter & 15) == 0) {
-    self.blink_state ^= 1;
-  }
-
-  /* Start drawing at the top again. */
-  self.pixel = self.frame_buffer;
-
-  ula_blit();
-
-  if (!self.timex_disable_ula_interrupt) {
-    cpu_irq(32);
-  }
-}
-
-
-#include "ula_mode_x.c"
-#include "ula_hi_res.c"
-
-
-static void ula_display_restart(void) {
-  self.display_spec         = &ula_display_spec[self.display_timing][self.display_frequency == 60];
-  self.display_line         = 0;
-  self.display_column       = 0;
-  self.display_pixel_mask   = 0;
-  self.frame_counter        = 0;
-  self.blink_state          = 0;
-  self.pixel                = self.frame_buffer;
+static void ula_display_reconfigure(void) {
+  self.display_spec = &ula_display_spec[self.display_timing][self.display_frequency == 60];
 
   switch (self.display_mode) {
     case E_ULA_DISPLAY_MODE_SCREEN_0:
@@ -177,6 +159,30 @@ static void ula_display_restart(void) {
     case E_ULA_DISPLAY_MODE_HI_COLOUR:
       log_wrn("ula: hi-colour mode not implemented\n");
       break;
+  }
+}
+
+
+static void ula_vsync(void) {
+  if (!self.timex_disable_ula_interrupt) {
+    cpu_irq(32ula.c);
+  }
+}
+
+
+static void ula_frame_complete(void) {
+  if ((++self.frame_counter & 15) == 0) {
+    self.blink_state ^= 1;
+  }
+
+  /* Start drawing at the top again. */
+  self.pixel = self.frame_buffer;
+
+  ula_blit();
+
+  if (self.did_display_spec_change) {
+    ula_display_reconfigure();
+    self.did_display_spec_change = 0;
   }
 }
 
@@ -236,7 +242,7 @@ static void ula_set_display_mode(ula_display_mode_t mode) {
       return;
   }
 
-  ula_display_restart();
+  self.did_display_spec_change = 1;
 }
 
 
@@ -265,10 +271,14 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.audio_last_sample           = 0;
   self.timex_disable_ula_interrupt = 0;
   self.hi_res_ink_colour           = 0;
+  self.display_line                = 0;
+  self.display_offset              = 0;
+  self.attribute_offset            = 0;
+  self.pixel                       = self.frame_buffer;
 
   ula_fill_tables();
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
-  ula_display_restart();
+  ula_display_reconfigure();
 
   return 0;
 }
@@ -328,10 +338,9 @@ void ula_display_timing_set(ula_display_timing_t timing) {
   };
 #endif
 
-  self.display_timing = timing;
+  self.display_timing          = timing;
+  self.did_display_spec_change = 1;
   log_dbg("ula: display timing set to %s\n", descriptions[timing]);
-
-  ula_display_restart();
 }
 
 
@@ -339,10 +348,9 @@ void ula_display_frequency_set(int is_60hz) {
   const int display_frequency = is_60hz ? 60 : 50;
 
   if (display_frequency != self.display_frequency) {
-    self.display_frequency = display_frequency;
+    self.display_frequency       = display_frequency;
+    self.did_display_spec_change = 1;
     log_dbg("ula: display frequency set to %d Hz\n", self.display_frequency);
-
-    ula_display_restart();
   }
 }
 
