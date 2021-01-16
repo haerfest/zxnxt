@@ -165,7 +165,7 @@ static void ula_display_reconfigure(void) {
 
 static void ula_vsync(void) {
   if (!self.timex_disable_ula_interrupt) {
-    cpu_irq(32ula.c);
+    cpu_irq(32);
   }
 }
 
