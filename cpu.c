@@ -299,13 +299,19 @@ static void cpu_irq_pending(void) {
      * more than normal due to the two added wait states." */
     T(2);
   } else {
-    /* Ghouls 'n Ghosts sets I = $81, but at $8100 there is regular code!
-     * Towards the middle the table starts being filled with zeros, but only
-     * ($81FE) points somewhere meaningful. Since there is nobody to place a
-     * byte on the bus, the bus will read as $FF and Ghouls 'n Ghosts depends
-     * on this behavior.
+    /* Ghouls 'n Ghosts depends on very specific behavior of IM 2. It sets the
+     * I register to $81, but places the vector it wants to be jumped to at
+     * $81FF and $8200. Lower locations contain either code or all zeros.
+     *
+     * Hence:
+     * - The byte read from the bus must be $FF. If you get this wrong, the
+     *   game will freeze at the intro screen, or the Spectrum will reset.
+     * - The vector to jump to must be read from $81FF and $8200, not from
+     *   $81FE and $81FF as per Zilog's documentation.  If you get this wrong,
+     *   music will play but no high scores are shown and you cannot start the
+     *   game.
      */
-    const u16_t vector = (I << 8 | 0xFF) & 0xFFFE;
+    const u16_t vector = I << 8 | 0xFF;
 
     PC =  memory_read(vector + 1) << 8 | memory_read(vector);
     T(6);
