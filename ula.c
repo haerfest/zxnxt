@@ -236,6 +236,9 @@ static void ula_display_reconfigure(void) {
 
 static void ula_irq(void) {
   if (!self.timex_disable_ula_interrupt) {
+    /* TODO IRQ should be held low for exactly 32 t-states, but that
+     * makes Ghouls 'n Ghosts and Stormlord 2 miss some interrupts,
+     * causing hearable slowdowns in their music playback. */
     cpu_irq(48);
   }
 
@@ -462,16 +465,13 @@ void ula_contention_set(int do_contend) {
 
 
 static void ula_contend_48k(void) {
-  const u32_t tstates[8] = {
-    6, 5, 4, 3, 2, 1, 0, 0
-  };
+  if (self.display_phase == E_ULA_DISPLAY_PHASE_CONTENT) {
+    const u32_t tstates[8] = {
+      6, 5, 4, 3, 2, 1, 0, 0
+    };
 
-  if (self.display_phase != E_ULA_DISPLAY_PHASE_CONTENT) {
-    /* No contention when not drawing pixels. */
-    return;
+    clock_run(tstates[(self.tstates_after_irq % 224) % 8]);
   }
-
-  clock_run(tstates[(self.tstates_after_irq % 224) % 8]);
 }
 
 
