@@ -1,12 +1,3 @@
-static void ula_display_mode_hi_res_top_border(void);
-static void ula_display_mode_hi_res_bottom_border(void);
-static void ula_display_mode_hi_res_left_border(void);
-static void ula_display_mode_hi_res_right_border(void);
-static void ula_display_mode_hi_res_content(void);
-static void ula_display_mode_hi_res_hsync(void);
-static void ula_display_mode_hi_res_vsync(void);
-
-
 static void ula_display_mode_hi_res_plot(palette_entry_t colour) {
   const u16_t RGBA = colour.red << 12 | colour.green << 8 | colour.blue << 4;
   *self.pixel++ = RGBA;
@@ -19,7 +10,7 @@ static void ula_display_mode_hi_res_top_border(void) {
   ula_display_mode_hi_res_plot(colour);
 
   if (++self.display_column == (32 + 256 + 64) * 2) {
-    self.display_mode_handler = ula_display_mode_hi_res_hsync;
+    self.display_phase = E_ULA_DISPLAY_PHASE_HORIZONTAL_SYNC;
   }
 }
 
@@ -31,8 +22,8 @@ static void ula_display_mode_hi_res_left_border(void) {
 
   if (++self.display_column == 32 * 2) {
     const u16_t line = self.display_line - self.display_spec->top_border_lines;
-    self.display_offset       = self.display_offsets[line];
-    self.display_mode_handler = ula_display_mode_hi_res_content;
+    self.display_offset = self.display_offsets[line];
+    self.display_phase  = E_ULA_DISPLAY_PHASE_CONTENT;
   }
 }
 
@@ -70,7 +61,7 @@ static void ula_display_mode_hi_res_content(void) {
 
   self.display_pixel_mask >>= 1;
   if (++self.display_column == (32 + 256) * 2) {
-    self.display_mode_handler = ula_display_mode_hi_res_right_border;
+    self.display_phase = E_ULA_DISPLAY_PHASE_RIGHT_BORDER;
   }
 }
 
@@ -81,13 +72,13 @@ static void ula_display_mode_hi_res_hsync(void) {
     self.display_line++;
 
     if (self.display_line < self.display_spec->top_border_lines) {
-      self.display_mode_handler = ula_display_mode_hi_res_top_border;
+      self.display_phase = E_ULA_DISPLAY_PHASE_TOP_BORDER;
     } else if (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) {
-      self.display_mode_handler = ula_display_mode_hi_res_left_border;
+      self.display_phase = E_ULA_DISPLAY_PHASE_LEFT_BORDER;
     } else if (self.display_line < self.display_spec->total_lines) {
-      self.display_mode_handler = ula_display_mode_hi_res_bottom_border;
+      self.display_phase = E_ULA_DISPLAY_PHASE_BOTTOM_BORDER;
     } else {
-      self.display_mode_handler = ula_display_mode_hi_res_vsync;
+      self.display_phase = E_ULA_DISPLAY_PHASE_VERTICAL_SYNC;
     }
   }
 }
@@ -99,7 +90,7 @@ static void ula_display_mode_hi_res_right_border(void) {
   ula_display_mode_hi_res_plot(colour);
 
   if (++self.display_column == (32 + 256 + 64) * 2) {
-    self.display_mode_handler = ula_display_mode_hi_res_hsync;
+    self.display_phase = E_ULA_DISPLAY_PHASE_HORIZONTAL_SYNC;
   }
 }
 
@@ -110,7 +101,7 @@ static void ula_display_mode_hi_res_bottom_border(void) {
   ula_display_mode_hi_res_plot(colour);
 
   if (++self.display_column == (32 + 256 + 64) * 2) {
-    self.display_mode_handler = ula_display_mode_hi_res_hsync;
+    self.display_phase = E_ULA_DISPLAY_PHASE_HORIZONTAL_SYNC;
   }
 }
 
@@ -127,9 +118,9 @@ static void ula_display_mode_hi_res_vsync(void) {
     self.display_line++;
 
     if (self.display_line == self.display_spec->total_lines + self.display_spec->blanking_period_lines) {
-      self.display_line         = 0;
-      self.display_offset       = 0;
-      self.display_mode_handler = ula_display_mode_hi_res_top_border;
+      self.display_line   = 0;
+      self.display_offset = 0;
+      self.display_phase  = E_ULA_DISPLAY_PHASE_TOP_BORDER;
 
       ula_frame_complete();
     }

@@ -11,17 +11,33 @@
 #include "ula.h"
 
 
+/* Forward definitions for the various display modes. */
+static void ula_irq(void);
+static void ula_frame_complete(void);
+
+
 #define PALETTE_OFFSET_INK      0
 #define PALETTE_OFFSET_PAPER   16
 #define PALETTE_OFFSET_BORDER  16
 
 
 typedef enum {
-  E_ULA_DISPLAY_MODE_SCREEN_0  = 0x00,
-  E_ULA_DISPLAY_MODE_SCREEN_1  = 0x01,
-  E_ULA_DISPLAY_MODE_HI_COLOUR = 0x02,
-  E_ULA_DISPLAY_MODE_HI_RES    = 0x06
+  E_ULA_DISPLAY_MODE_SCREEN_0,
+  E_ULA_DISPLAY_MODE_SCREEN_1,
+  E_ULA_DISPLAY_MODE_HI_COLOUR,
+  E_ULA_DISPLAY_MODE_HI_RES
 } ula_display_mode_t;
+
+
+typedef enum {
+  E_ULA_DISPLAY_PHASE_TOP_BORDER,
+  E_ULA_DISPLAY_PHASE_LEFT_BORDER,
+  E_ULA_DISPLAY_PHASE_RIGHT_BORDER,
+  E_ULA_DISPLAY_PHASE_BOTTOM_BORDER,
+  E_ULA_DISPLAY_PHASE_HORIZONTAL_SYNC,
+  E_ULA_DISPLAY_PHASE_VERTICAL_SYNC,
+  E_ULA_DISPLAY_PHASE_CONTENT
+} ula_display_phase_t;
 
 
 /** See: https://wiki.specnext.dev/Reference_machines. */
@@ -69,9 +85,6 @@ static const SDL_Rect ula_source_rect = {
 };
 
 
-typedef void (*ula_display_mode_handler)(void);
-
-
 typedef struct {
   SDL_Renderer*              renderer;
   SDL_Texture*               texture;
@@ -86,7 +99,9 @@ typedef struct {
   u8_t                       display_pixel_mask;
   ula_display_timing_t       display_timing;
   int                        display_frequency;
-  ula_display_mode_handler   display_mode_handler;
+  ula_display_mode_t         display_mode;
+  ula_display_mode_t         display_mode_requested;
+  ula_display_phase_t        display_phase;
   unsigned int               display_line;
   unsigned int               display_column;  
   u16_t                      attribute_offsets[192];
@@ -107,20 +122,67 @@ typedef struct {
   s8_t                       audio_last_sample;
   ula_screen_bank_t          screen_bank;
   int                        timex_disable_ula_interrupt;
-  ula_display_mode_t         display_mode;
   u8_t                       hi_res_ink_colour;
   int                        do_contend;
+  u32_t                      tstates_after_irq;
 } self_t;
 
 
 static self_t self;
 
 
-static void ula_irq(void);
-static void ula_frame_complete(void);
-
 #include "ula_mode_x.c"
 #include "ula_hi_res.c"
+
+
+#define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES   - E_ULA_DISPLAY_MODE_SCREEN_0    + 1)
+#define N_DISPLAY_PHASES  (E_ULA_DISPLAY_PHASE_CONTENT - E_ULA_DISPLAY_PHASE_TOP_BORDER + 1)
+
+typedef void (*ula_display_mode_handler_t)(void);
+
+const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES][N_DISPLAY_PHASES] = {
+  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
+  {
+    ula_display_mode_screen_x_top_border,
+    ula_display_mode_screen_x_left_border,
+    ula_display_mode_screen_x_right_border,
+    ula_display_mode_screen_x_bottom_border,
+    ula_display_mode_screen_x_hsync,
+    ula_display_mode_screen_x_vsync,
+    ula_display_mode_screen_x_content
+  },
+  /* E_ULA_DISPLAY_MODE_SCREEN_1 */
+  {
+    ula_display_mode_screen_x_top_border,
+    ula_display_mode_screen_x_left_border,
+    ula_display_mode_screen_x_right_border,
+    ula_display_mode_screen_x_bottom_border,
+    ula_display_mode_screen_x_hsync,
+    ula_display_mode_screen_x_vsync,
+    ula_display_mode_screen_x_content
+  },
+  /* E_ULA_DISPLAY_MODE_HI_COLOUR
+   * TODO Not implemented yet */
+  {
+    ula_display_mode_screen_x_top_border,
+    ula_display_mode_screen_x_left_border,
+    ula_display_mode_screen_x_right_border,
+    ula_display_mode_screen_x_bottom_border,
+    ula_display_mode_screen_x_hsync,
+    ula_display_mode_screen_x_vsync,
+    ula_display_mode_screen_x_content
+  },
+  /* E_ULA_DISPLAY_MODE_HI_RES */
+  {
+    ula_display_mode_hi_res_top_border,
+    ula_display_mode_hi_res_left_border,
+    ula_display_mode_hi_res_right_border,
+    ula_display_mode_hi_res_bottom_border,
+    ula_display_mode_hi_res_hsync,
+    ula_display_mode_hi_res_vsync,
+    ula_display_mode_hi_res_content
+  }
+};
 
 
 static void ula_blit(void) {
@@ -146,19 +208,31 @@ static void ula_blit(void) {
 
 static void ula_display_reconfigure(void) {
   self.display_spec = &ula_display_spec[self.display_timing][self.display_frequency == 60];
+  self.display_mode = self.display_mode_requested;
 
   switch (self.display_mode) {
     case E_ULA_DISPLAY_MODE_SCREEN_0:
+      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      self.attribute_ram = &self.display_ram[192 * 32];
+      break;
+      
     case E_ULA_DISPLAY_MODE_SCREEN_1:
-      self.display_mode_handler = ula_display_mode_screen_x_top_border;
+      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024 + 0x2000];
+      self.attribute_ram = &self.display_ram[192 * 32];
       break;
-
-    case E_ULA_DISPLAY_MODE_HI_RES:
-      self.display_mode_handler = ula_display_mode_hi_res_top_border;
-      break;
-
+      
     case E_ULA_DISPLAY_MODE_HI_COLOUR:
-      log_wrn("ula: hi-colour mode not implemented\n");
+      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      self.attribute_ram = &self.display_ram[0x2000];
+      break;
+      
+    case E_ULA_DISPLAY_MODE_HI_RES:
+      self.display_ram     = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+      self.display_ram_odd = &self.display_ram[0x2000];
+      break;
+
+    default:
+      log_wrn("ula: invalid display mode %d\n", mode);
       break;
   }
 }
@@ -168,6 +242,8 @@ static void ula_irq(void) {
   if (!self.timex_disable_ula_interrupt) {
     cpu_irq(48);
   }
+
+  self.tstates_after_irq = 0;
 }
 
 
@@ -194,8 +270,10 @@ void ula_run(u32_t ticks_14mhz) {
   u32_t       tick;
 
   for (tick = 0; tick < ticks_14mhz; tick += divider) {
-    self.display_mode_handler();
+    ula_display_handlers[self.display_mode][self.display_phase]();
   }
+
+  self.tstates_after_irq += ticks_14mhz / 4;
 }
 
 
@@ -215,34 +293,7 @@ static void ula_fill_tables(void) {
 
 
 static void ula_set_display_mode(ula_display_mode_t mode) {
-  self.display_mode = mode;
-  
-  switch (self.display_mode) {
-    case E_ULA_DISPLAY_MODE_SCREEN_0:
-      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
-      self.attribute_ram = &self.display_ram[192 * 32];
-      break;
-      
-    case E_ULA_DISPLAY_MODE_SCREEN_1:
-      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024 + 0x2000];
-      self.attribute_ram = &self.display_ram[192 * 32];
-      break;
-      
-    case E_ULA_DISPLAY_MODE_HI_COLOUR:
-      self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
-      self.attribute_ram = &self.display_ram[0x2000];
-      break;
-      
-    case E_ULA_DISPLAY_MODE_HI_RES:
-      self.display_ram     = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
-      self.display_ram_odd = &self.display_ram[0x2000];
-      break;
-
-    default:
-      log_wrn("ula: invalid display mode %d\n", mode);
-      return;
-  }
-
+  self.display_mode_requested  = mode;
   self.did_display_spec_change = 1;
 }
 
@@ -316,7 +367,26 @@ void ula_timex_write(u16_t address, u8_t value) {
   self.timex_disable_ula_interrupt = (value & 0x40) >> 6;
   self.hi_res_ink_colour           = (value & 0x38) >> 3;
 
-  ula_set_display_mode(value & 0x07);
+  switch (value & 0x07) {
+    case 0x00:
+      ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
+      break;
+
+    case 0x01:
+      ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_1);
+      break;
+
+    case 0x02:
+      ula_set_display_mode(E_ULA_DISPLAY_MODE_HI_COLOUR);
+      break;
+
+    case 0x06:
+      ula_set_display_mode(E_ULA_DISPLAY_MODE_HI_RES);
+      break;
+
+    default:
+      break;
+  }
 }
 
 
@@ -392,6 +462,17 @@ void ula_contention_set(int do_contend) {
 }
 
 
+static u32_t ula_contention_delay_48k(void) {
+  if (self.display_phase != E_ULA_DISPLAY_PHASE_CONTENT) {
+    /* No contention when not drawing pixels. */
+    return 0;
+  }
+
+  /* TODO Figure out what the contention is. */
+  return 0;
+}
+
+
 u32_t ula_contention_delay(u8_t bank) {
   if (!self.do_contend) {
     /* Contention can be disabled by writing to a Next register. */
@@ -411,21 +492,18 @@ u32_t ula_contention_delay(u8_t bank) {
   switch (self.display_timing) {
     case E_ULA_DISPLAY_TIMING_ZX_48K:
       /* Only bank 5 is contended. */
-      if (bank != 5) {
-        return 0;
-      }
-      break;
+      return (bank == 5) ? ula_contention_delay_48k() : 0;
 
     case E_ULA_DISPLAY_TIMING_ZX_128K:
-      /* Only odd banks are contended. */
       if ((bank & 1) == 0) {
+        /* Only odd banks are contended. */
         return 0;
       }
       break;
 
     case E_ULA_DISPLAY_TIMING_ZX_PLUS_2A:
-      /* Only banks four and above are contended. */
       if (bank < 4) {
+        /* Only banks four and above are contended. */
         return 0;
       }
       break;
