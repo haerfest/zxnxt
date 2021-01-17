@@ -37,7 +37,7 @@ void                 ula_screen_bank_set(ula_screen_bank_t bank);
 ula_screen_bank_t    ula_screen_bank_get(void);
 int                  ula_contention_get(void);
 void                 ula_contention_set(int do_contend);
-u32_t                ula_contention_delay(u8_t bank);
+void                 ula_contend(u8_t bank);
 
 
 #endif  /* __ULA_H */

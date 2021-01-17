@@ -230,10 +230,6 @@ static void ula_display_reconfigure(void) {
       self.display_ram     = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
       self.display_ram_odd = &self.display_ram[0x2000];
       break;
-
-    default:
-      log_wrn("ula: invalid display mode %d\n", mode);
-      break;
   }
 }
 
@@ -458,59 +454,74 @@ int ula_contention_get(void) {
 
 
 void ula_contention_set(int do_contend) {
-  self.do_contend = do_contend;
+  if (do_contend != self.do_contend) {
+    self.do_contend = do_contend;
+    log_inf("ula: memory contention %sabled\n", do_contend ? "en" : "dis");
+  }
 }
 
 
-static u32_t ula_contention_delay_48k(void) {
+static void ula_contend_48k(void) {
+  const u32_t tstates[8] = {
+    6, 5, 4, 3, 2, 1, 0, 0
+  };
+
   if (self.display_phase != E_ULA_DISPLAY_PHASE_CONTENT) {
     /* No contention when not drawing pixels. */
-    return 0;
+    return;
   }
 
-  /* TODO Figure out what the contention is. */
-  return 0;
+  clock_run(tstates[(self.tstates_after_irq % 224) % 8]);
 }
 
 
-u32_t ula_contention_delay(u8_t bank) {
+static void ula_contend_128k(void) {
+}
+
+
+static void ula_contend_plus_2(void) {
+}
+
+
+void ula_contend(u8_t bank) {
   if (!self.do_contend) {
     /* Contention can be disabled by writing to a Next register. */
-    return 0;
+    return;
   }
 
   if (clock_cpu_speed_get() != E_CLOCK_CPU_SPEED_3MHZ) {
     /* Contention only plays a role when running at 3.5 MHz. */
-    return 0;
+    return;
   }
 
   if (bank > 7) {
     /* Only banks 0-7 can be contended. */
-    return 0;
+    return;
   }
 
   switch (self.display_timing) {
     case E_ULA_DISPLAY_TIMING_ZX_48K:
-      /* Only bank 5 is contended. */
-      return (bank == 5) ? ula_contention_delay_48k() : 0;
+      if (bank == 5) {
+        /* Only bank 5 is contended. */
+        ula_contend_48k();
+      }
+      break;
 
     case E_ULA_DISPLAY_TIMING_ZX_128K:
-      if ((bank & 1) == 0) {
+      if ((bank & 1) == 1) {
         /* Only odd banks are contended. */
-        return 0;
+        ula_contend_128k();
       }
       break;
 
     case E_ULA_DISPLAY_TIMING_ZX_PLUS_2A:
-      if (bank < 4) {
+      if (bank > 3) {
         /* Only banks four and above are contended. */
-        return 0;
+        ula_contend_plus_2();
       }
       break;
 
     default:
       break;
   }
-
-  return 0;
 }
