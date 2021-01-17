@@ -636,7 +636,7 @@ def otxr(op: str) -> C:
     '''
 
 def out_C_r(r: str) -> C:
-    return f'io_write(BC, {r}); T(4);'
+    return f'io_write(BC, {r}); T(4 + 4);'
 
 def out_n_a() -> C:
     return '''
