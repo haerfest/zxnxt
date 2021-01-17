@@ -178,9 +178,10 @@ typedef struct {
 
   /* Interrupt mode. */
   u8_t  im;
-  int   irq_pending;   /* Non-zero if IRQ pending.                  */
-  u32_t irq_duration;  /* T-states until irq_pending resets.        */
-  u32_t irq_delay;     /* Instructions until irq_pending processed. */
+  int   irq_pending;          /* Non-zero if IRQ pending.                     */
+  u32_t irq_duration;         /* T-states until irq_pending resets.           */
+  int   irq_delay;            /* Non-zero if any pending IRQ must be delayed. */
+  int   irq_pending_delayed;  /* Non-zero if IRQ pending and delayed.         */
 
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
@@ -212,9 +213,10 @@ static void cpu_fill_tables(void) {
 int cpu_init(void) {
   cpu_fill_tables();
 
-  self.irq_pending  = 0;
-  self.irq_duration = 0;
-  self.irq_delay    = 0;
+  self.irq_pending         = 0;
+  self.irq_duration        = 0;
+  self.irq_delay           = 0;
+  self.irq_pending_delayed = 0;
 
   AF   = 0xFFFF;
   SP   = 0xFFFF;
@@ -269,9 +271,13 @@ void cpu_irq(u32_t duration) {
 static void cpu_irq_pending(void) {
   /* After EI the next RETN must complete before servicing IRQ. */
   if (self.irq_delay) {
-    self.irq_delay = 0;
+    self.irq_delay           = 0;
+    self.irq_pending_delayed = 1;
     return;
   }
+
+  /* No longer any pending but delayed IRQs. */
+  self.irq_pending_delayed = 0;
 
   /* Interrupts must be enabled. */
   if (IFF1 == 0) {
@@ -359,7 +365,7 @@ void cpu_step(void) {
   cpu_trace();
   cpu_execute_next_opcode();
 
-  if (self.irq_pending) {
+  if (self.irq_pending || self.irq_pending_delayed) {
     cpu_irq_pending();
   }
 }

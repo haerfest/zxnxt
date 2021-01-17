@@ -236,10 +236,7 @@ static void ula_display_reconfigure(void) {
 
 static void ula_irq(void) {
   if (!self.timex_disable_ula_interrupt) {
-    /* TODO IRQ should be held low for exactly 32 t-states, but that
-     * makes Ghouls 'n Ghosts and Stormlord 2 miss some interrupts,
-     * causing hearable slowdowns in their music playback. */
-    cpu_irq(48);
+    cpu_irq(32);
   }
 
   self.tstates_after_irq = 0;
