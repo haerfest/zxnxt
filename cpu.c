@@ -286,18 +286,15 @@ static void cpu_irq_pending(void) {
   /* Disable further interrupts. */
   IFF1 = IFF2 = 0;
 
+  /* Acknowledge interrupt. */
+  T(7);
+
   /* Save the program counter. */
   memory_write(--SP, PCH); T(3);
   memory_write(--SP, PCL); T(3);
 
   if (IM == 1) {
     PC = 0x0038;
-
-    /* Z80 CPU User Manual:
-     *
-     * "The number of cycles required to complete the restart instruction is two
-     * more than normal due to the two added wait states." */
-    T(2);
   } else {
     /* Ghouls 'n Ghosts depends on very specific behavior of IM 2. It sets the
      * I register to $81, but places the vector it wants to be jumped to at
@@ -312,17 +309,8 @@ static void cpu_irq_pending(void) {
      *   game.
      */
     const u16_t vector = I << 8 | 0xFF;
-
-    PC =  memory_read(vector + 1) << 8 | memory_read(vector);
+    PC = memory_read(vector + 1) << 8 | memory_read(vector);
     T(6);
-
-    /* Z80 CPU User Manual:
-     *
-     * "This mode of response requires 19 clock periods to complete (seven to
-     * fetch the lower eight bits from the interrupting device, six to save the
-     * program counter, and six to obtain the jump address)."
-     */
-    T(7);
   }
 }
 
