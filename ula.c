@@ -109,6 +109,7 @@ typedef struct {
   int                        timex_disable_ula_interrupt;
   ula_display_mode_t         display_mode;
   u8_t                       hi_res_ink_colour;
+  int                        do_contend;
 } self_t;
 
 
@@ -378,4 +379,60 @@ void ula_screen_bank_set(ula_screen_bank_t bank) {
 
 ula_screen_bank_t ula_screen_bank_get(void) {
   return self.screen_bank;
+}
+
+
+int ula_contention_get(void) {
+  return self.do_contend;
+}
+
+
+void ula_contention_set(int do_contend) {
+  self.do_contend = do_contend;
+}
+
+
+u32_t ula_contention_delay(u8_t bank) {
+  if (!self.do_contend) {
+    /* Contention can be disabled by writing to a Next register. */
+    return 0;
+  }
+
+  if (clock_cpu_speed_get() != E_CLOCK_CPU_SPEED_3MHZ) {
+    /* Contention only plays a role when running at 3.5 MHz. */
+    return 0;
+  }
+
+  if (bank > 7) {
+    /* Only banks 0-7 can be contended. */
+    return 0;
+  }
+
+  switch (self.display_timing) {
+    case E_ULA_DISPLAY_TIMING_ZX_48K:
+      /* Only bank 5 is contended. */
+      if (bank != 5) {
+        return 0;
+      }
+      break;
+
+    case E_ULA_DISPLAY_TIMING_ZX_128K:
+      /* Only odd banks are contended. */
+      if ((bank & 1) == 0) {
+        return 0;
+      }
+      break;
+
+    case E_ULA_DISPLAY_TIMING_ZX_PLUS_2A:
+      /* Only banks four and above are contended. */
+      if (bank < 4) {
+        return 0;
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return 0;
 }

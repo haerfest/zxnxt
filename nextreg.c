@@ -80,6 +80,7 @@ static void nextreg_reset_soft(void) {
 
   ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
+  ula_contention_set(1);
 
   ay_reset();
   io_reset();
@@ -218,12 +219,13 @@ static void nextreg_peripheral_1_setting_write(u8_t value) {
 
 
 static u8_t nextreg_peripheral_3_setting_read(void) {
-  return !paging_spectrum_128k_paging_is_locked() << 7;
+  return (!paging_spectrum_128k_paging_is_locked() << 7)
+       | (!ula_contention_get() << 6);
 }
 
 
 static void nextreg_peripheral_3_setting_write(u8_t value) {
-  nextreg_ay_stereo_mode_t mode = value & 0x20 ? E_NEXTREG_AY_STEREO_MODE_ACB : E_NEXTREG_AY_STEREO_MODE_ABC;
+  const nextreg_ay_stereo_mode_t mode = value & 0x20 ? E_NEXTREG_AY_STEREO_MODE_ACB : E_NEXTREG_AY_STEREO_MODE_ABC;
 
   if (mode != self.ay_stereo_mode) {
     self.ay_stereo_mode = mode;
@@ -236,6 +238,8 @@ static void nextreg_peripheral_3_setting_write(u8_t value) {
   if (value & 0x80) {
     paging_spectrum_128k_paging_unlock();
   }
+
+  ula_contention_set((value & 0x40) == 0);
 }
 
 
