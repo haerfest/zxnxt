@@ -25,17 +25,12 @@ typedef enum {
 } clock_cpu_speed_t;
 
 
-/* Called from the clock whenever 'ticks' 28 MHz master clock ticks have elapsed. */
-typedef void (*clock_callback_t)(u64_t ticks, unsigned int delta);
-
-
 int                  clock_init(void);
 void                 clock_finit(void);
 clock_cpu_speed_t    clock_cpu_speed_get(void);
 void                 clock_cpu_speed_set(clock_cpu_speed_t speed);
 clock_video_timing_t clock_video_timing_get(void);
 void                 clock_video_timing_set(clock_video_timing_t timing);
-int                  clock_register_callback(clock_callback_t callback);
 void                 clock_run(u32_t cpu_ticks);
 u64_t                clock_ticks(void);
 
