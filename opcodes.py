@@ -558,8 +558,8 @@ def logical_r(op: str, r: str) -> C:
 def logical_pss(op: str, xy: Optional[str] = None) -> C:
     return f'''
         WZ    = {wz(xy)};
-        A {op}= memory_read(WZ);                            T(4);
-        F     = SZ53P(A) | {"HF_MASK" if op == '&' else 0}; T(3);
+        A {op}= memory_read(WZ);                            T(3);
+        F     = SZ53P(A) | {"HF_MASK" if op == '&' else 0};
     '''
 
 def lxrx(op: str) -> C:
@@ -701,9 +701,12 @@ def res_b_r(b: int, r: str) -> C:
     return f'{r} &= ~(1 << {b});'
 
 def ret(cond: Optional[str] = None) -> C:
-    s = 'T(1);\n'
+    s = ''
     if cond:
-        s += f'if ({cond}) {{\n';
+        s += f'''
+            T(1);
+            if ({cond}) {{
+        '''
 
     s += '''
         PCL = memory_read(SP++); T(3);
