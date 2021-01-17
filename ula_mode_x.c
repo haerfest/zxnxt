@@ -87,9 +87,16 @@ static void ula_display_mode_screen_x_hsync(void) {
   if (++self.display_column == 32 + 256 + 64 + 96) {
     self.display_column = 0;
     self.display_line++;
-    self.display_mode_handler = (self.display_line < self.display_spec->top_border_lines)                                    ? ula_display_mode_screen_x_top_border
-                               : (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) ? ula_display_mode_screen_x_left_border
-                               : ula_display_mode_screen_x_bottom_border;
+
+    if (self.display_line < self.display_spec->top_border_lines) {
+      self.display_mode_handler = ula_display_mode_screen_x_top_border;
+    } else if (self.display_line < self.display_spec->top_border_lines + self.display_spec->display_lines) {
+      self.display_mode_handler = ula_display_mode_screen_x_left_border;
+    } else if (self.display_line < self.display_spec->total_lines) {
+      self.display_mode_handler = ula_display_mode_screen_x_bottom_border;
+    } else {
+      self.display_mode_handler = ula_display_mode_screen_x_vsync;
+    }
   }
 }
 
@@ -105,38 +112,25 @@ static void ula_display_mode_screen_x_right_border(void) {
 }
 
 
-/**
- * https://wiki.specnext.dev/Reference_machines
- *
- * "The ULA VBLANK Interrupt is the point at which the ULA sends an interrupt
- * to the Z80 causing it to wake from HALT instructions and run the frame
- * service routine. On all non-HDMI machines, this happens immediately before
- * the blanking period begins, except for Pentagon where it happens 1 line
- * earlier. On HDMI, because of the longer blanking period, it happens during
- * the blanking period rather than before. At 50Hz, it happens 25 lines into
- * the blanking period, leaving 15 lines between the interrupt and the actual
- * start of the top border (close to the 14 lines it would be on VGA output).
- * At 60Hz, it happens 24 lines into blanking, leaving only 9 lines."
- */
 static void ula_display_mode_screen_x_bottom_border(void) {
   const palette_entry_t colour = palette_read_rgb(self.palette, PALETTE_OFFSET_BORDER + self.border_colour);
 
   ula_display_mode_x_plot(colour);
 
   if (++self.display_column == 32 + 256 + 64) {
-    self.display_mode_handler = (self.display_line < self.display_spec->total_lines)
-                               ? ula_display_mode_screen_x_hsync
-                               : ula_display_mode_screen_x_vsync;
-
-    if (self.display_mode_handler == ula_display_mode_screen_x_vsync) {
-      ula_vsync();
-    }
+    self.display_mode_handler = ula_display_mode_screen_x_hsync;
   }
 }
 
 
 static void ula_display_mode_screen_x_vsync(void) {
-  if (++self.display_column == 32 + 256 + 64 + 96) {
+  self.display_column++;
+
+  if (self.display_column == 32) {
+    if (self.display_line == self.display_spec->total_lines) {
+      ula_irq();
+    }
+  } else if (self.display_column == 32 + 256 + 64 + 96) {
     self.display_column = 0;
     self.display_line++;
 

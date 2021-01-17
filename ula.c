@@ -43,7 +43,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
     /* 60 Hz */ {   0,   0,  0,  0,  0 }
   },
   /* ZX Spectrum 48K */ {
-    /* 50 Hz */ { 312, 192, 57, 14, 49 },
+    /* 50 Hz */ { 312, 192, 56,  8, 56 },  /* Next seems to differ? */
     /* 60 Hz */ { 262, 192, 33, 14, 23 }
   },
   /* ZX Spectrum 128K/+2 */ {
@@ -115,7 +115,7 @@ typedef struct {
 static self_t self;
 
 
-static void ula_vsync(void);
+static void ula_irq(void);
 static void ula_frame_complete(void);
 
 #include "ula_mode_x.c"
@@ -163,7 +163,7 @@ static void ula_display_reconfigure(void) {
 }
 
 
-static void ula_vsync(void) {
+static void ula_irq(void) {
   if (!self.timex_disable_ula_interrupt) {
     cpu_irq(48);
   }
