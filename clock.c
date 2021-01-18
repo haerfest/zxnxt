@@ -115,14 +115,14 @@ void clock_run(u32_t cpu_ticks) {
   /* Update system clock. */
   self.ticks_28mhz += ticks_28mhz;
 
-  /* Update 14 MHz clock. */
+  /* Update 14 MHz clock for ULA. */
   ticks_14mhz = (self.ticks_28mhz - self.sync_14mhz) / 2;
   if (ticks_14mhz > 0) {
-    ula_run(ticks_14mhz);
+    ticks_14mhz = ula_run(ticks_14mhz);
     self.sync_14mhz += ticks_14mhz * 2;
   }
 
-  /* Update 2 MHz clock. */
+  /* Update 2 MHz clock for AY. */
   ticks_2mhz = (self.ticks_28mhz - self.sync_2mhz) / 16;
   if (ticks_2mhz > 0) {
     ay_run(ticks_2mhz);

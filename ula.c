@@ -67,7 +67,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
     /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* ZX Spectrum +2A/+2B/+3 */ {
-    /* 50 Hz */ { 311, 192, 57, 14, 48 },
+    /* 50 Hz */ { 311, 192, 56,  8, 56 },
     /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* Pentagon */ {
@@ -124,7 +124,7 @@ typedef struct {
   int                        timex_disable_ula_interrupt;
   u8_t                       hi_res_ink_colour;
   int                        do_contend;
-  u32_t                      tstates_after_irq;
+  u32_t                      ticks_14mhz_after_irq;
 } self_t;
 
 
@@ -239,7 +239,7 @@ static void ula_irq(void) {
     cpu_irq(32);
   }
 
-  self.tstates_after_irq = 0;
+  self.ticks_14mhz_after_irq = 0;
 }
 
 
@@ -260,16 +260,30 @@ static void ula_frame_complete(void) {
 }
 
 
-/* Runs the ULA for 'ticks_14mhz', i.e. ticks of the ULA's 14 MHz clock. */
-void ula_run(u32_t ticks_14mhz) {
-  const u32_t divider = (self.display_mode == E_ULA_DISPLAY_MODE_HI_RES ? 1 : 2);
-  u32_t       tick;
+u32_t ula_run(u32_t ticks_14mhz) {
+  u32_t tick;
 
-  for (tick = 0; tick < ticks_14mhz; tick += divider) {
-    ula_display_handlers[self.display_mode][self.display_phase]();
+  if (self.display_mode == E_ULA_DISPLAY_MODE_HI_RES) {
+    /* This one consumes all the 14 MHz clock ticks. */
+    for (tick = 0; tick < ticks_14mhz; tick++) {
+      self.ticks_14mhz_after_irq++;
+      ula_display_handlers[self.display_mode][self.display_phase]();
+    }
+  } else {
+    /* All other modes need a 7 MHz clock. */
+    const u32_t ticks_7mhz = ticks_14mhz / 2;
+
+    /* We may not consume all 14 Mhz ticks. */
+    ticks_14mhz = ticks_7mhz * 2;
+
+    for (tick = 0; tick < ticks_7mhz; tick++) {
+      self.ticks_14mhz_after_irq += 2;
+      ula_display_handlers[self.display_mode][self.display_phase]();
+    }
   }
 
-  self.tstates_after_irq += ticks_14mhz / 4;
+  /* Return how many ticks we consumed. */
+  return ticks_14mhz;
 }
 
 
@@ -467,7 +481,7 @@ static void ula_contend_48k(void) {
       6, 5, 4, 3, 2, 1, 0, 0
     };
 
-    clock_run(tstates[(self.tstates_after_irq % 224) % 8]);
+    clock_run(tstates[((self.ticks_14mhz_after_irq / 4) % 224) % 8]);
   }
 }
 
