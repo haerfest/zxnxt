@@ -152,14 +152,14 @@ def bsrl() -> C:
 def call(cond: Optional[str] = None) -> C:
     s = '''
         Z = memory_read(PC++);   T(3);
-        W = memory_read(PC++);   T(4);
+        W = memory_read(PC++);   T(3);
     '''
 
     if cond:
         s += f'if ({cond}) {{\n'
 
     s += '''
-        memory_write(--SP, PCH); T(3);
+        memory_write(--SP, PCH); T(4);
         memory_write(--SP, PCL); T(3);
         PC = WZ;
     '''
@@ -311,7 +311,7 @@ def exx() -> C:
 
 def halt() -> C:
     return '''
-        if (!self.irq_pending || IFF1 == 0) {
+        if (!(self.irq_pending || self.irq_pending_delayed) || IFF1 == 0) {
           PC--;
         }
     '''
@@ -319,6 +319,7 @@ def halt() -> C:
 def im(mode: int) -> C:
     return f'''
         IM = {mode};
+        log_inf("cpu: IM {mode}, I=$%02X\\n", I);
     '''
 
 def in_A_n() -> C:
@@ -457,6 +458,7 @@ def ld_I_A() -> C:
     return '''
         T(1);
         I = A;
+        log_inf("cpu: I=$%02X\\n", I);
     '''
 
 def ld_pdd_r(dd: str, r: str, xy: Optional[str] = None) -> C:
