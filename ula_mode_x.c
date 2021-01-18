@@ -36,10 +36,6 @@ static void ula_display_mode_screen_x_content(void) {
   palette_entry_t colour;
   u8_t            index;
 
-  if (self.display_line == self.display_spec->top_border_lines && self.display_column == 32) {
-    log_inf("ula: tstates=%f\n", self.ticks_14mhz_after_irq / 4.0);
-  }
-
   if (self.display_pixel_mask == 0x00) {
     self.display_pixel_mask = 0x80;
     self.display_byte       = self.display_ram[self.display_offset++];
