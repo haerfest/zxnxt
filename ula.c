@@ -367,9 +367,15 @@ void ula_write(u16_t address, u8_t value) {
 
 
 u8_t ula_timex_read(u16_t address) {
-  return self.timex_disable_ula_interrupt << 6 |
-         self.hi_res_ink_colour           << 3 |
-         self.display_mode;
+  if (self.display_phase == E_ULA_DISPLAY_PHASE_CONTENT) {
+    /* Implement floating bus behaviour. This fixes Arkanoid freezing at the
+     * start of the first level and prevents flickering and slowdown in
+     * Short Circuit.
+     */
+    return self.attribute_byte;
+  }
+
+  return 0xFF;
 }
 
 
