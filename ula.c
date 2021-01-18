@@ -475,13 +475,20 @@ void ula_contention_set(int do_contend) {
 }
 
 
+/**
+ * TODO: See https://worldofspectrum.org/faq/reference/48kreference.htm#Contention
+ *
+ * The contention actually starts at t-state 14335, i.e. one t-state *before*
+ * the first pixel in the top-left corner is being drawn.
+ */
 static void ula_contend_48k(void) {
   if (self.display_phase == E_ULA_DISPLAY_PHASE_CONTENT) {
-    const u32_t tstates[8] = {
+    const u32_t delay[8] = {
       6, 5, 4, 3, 2, 1, 0, 0
     };
+    const u32_t t_states = self.ticks_14mhz_after_irq / 4;
 
-    clock_run(tstates[((self.ticks_14mhz_after_irq / 4) % 224) % 8]);
+    clock_run(delay[(t_states % 224) % 8]);
   }
 }
 
