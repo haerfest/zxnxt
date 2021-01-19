@@ -214,7 +214,7 @@ def cpxr(op: str) -> C:
       u16_t result;
       Z      = memory_read(HL{op}{op}); T(3);
       result = A - Z;
-      --BC; R++; T(5);
+      --BC; T(5);
       if (!(BC == 0 || result == 0)) {{
           PC -= 2; T(5);
       }} else {{
@@ -319,7 +319,7 @@ def halt() -> C:
 def im(mode: int) -> C:
     return f'''
         IM = {mode};
-        log_inf("cpu: IM {mode}, I=$%02X\\n", I);
+        log_dbg("cpu: IM {mode}, I=$%02X\\n", I);
     '''
 
 def in_A_n() -> C:
@@ -368,7 +368,6 @@ def inxr(op: str) -> C:
         memory_write(HL{op}{op}, Z); T(4);
         if (--B) {{
             PC -= 2; T(5);
-            R++;
         }} else {{
             F |= ZF_MASK | NF_MASK;
         }}
@@ -458,7 +457,7 @@ def ld_I_A() -> C:
     return '''
         T(1);
         I = A;
-        log_inf("cpu: I=$%02X\\n", I);
+        log_dbg("cpu: I=$%02X\\n", I);
     '''
 
 def ld_pdd_r(dd: str, r: str, xy: Optional[str] = None) -> C:
@@ -631,7 +630,6 @@ def otxr(op: str) -> C:
         io_write(BC, Z);             T(4);
         if (B) {{
             PC -= 2; T(5);
-            R++;
         }} else {{
             F |= ZF_MASK | NF_MASK;
         }}
