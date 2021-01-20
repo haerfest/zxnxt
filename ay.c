@@ -81,6 +81,7 @@ typedef struct {
 
 
 typedef struct {
+  audio_source_t    source;
   u8_t              registers[N_REGISTERS];
   ay_register_t     selected_register;
   ay_channel_t      channels[N_CHANNELS];
@@ -89,8 +90,6 @@ typedef struct {
   int               noise_value;
   u8_t              noise_counter;
   u8_t              noise_period_half;
-  int               ticks_div_16;
-  int               ticks_div_256;
   u16_t             envelope_counter;
   u16_t             envelope_period_sixteenth;
   u16_t             envelope_counter_sixteenth;
@@ -98,6 +97,16 @@ typedef struct {
   s8_t              envelope_delta;
   int               envelope_cycle_state;
   int               is_envelope_first_cycle;
+  int               is_left_enabled;
+  int               is_right_enabled;
+} ay_t;
+
+
+typedef struct {
+  u8_t selected_ay;
+  ay_t ays[3];
+  int  ticks_div_16;
+  int  ticks_div_256;
 } self_t;
 
 
@@ -115,51 +124,69 @@ void ay_finit(void) {
 
 
 void ay_reset(void) {
+  int i;
+
   memset(&self, 0, sizeof(self));
 
   /* All AY channels are off by default. */
-  self.registers[E_AY_REGISTER_ENABLE] = 0xFF;
-  self.noise_seed                      = 0xFFFF;
+  for (i = 0; i < 3; i++) {
+    self.ays[i].registers[E_AY_REGISTER_ENABLE] = 0xFF;
+    self.ays[i].noise_seed                      = 0xFFFF;
+  }
+
+  self.ays[0].source = E_AUDIO_SOURCE_AY_1_CHANNEL_A;
+  self.ays[1].source = E_AUDIO_SOURCE_AY_2_CHANNEL_A;
+  self.ays[2].source = E_AUDIO_SOURCE_AY_3_CHANNEL_A;
 }
 
 
 void ay_register_select(u8_t value) {
-  self.selected_register = value;
+  if ((value & 0x9C) == 0x9C) {
+    const u8_t n = 3 - (value & 0x03);
+    if (n != 3) {
+      self.selected_ay = n;
+      self.ays[n].is_left_enabled  = (value & 0x40) >> 6;
+      self.ays[n].is_right_enabled = (value & 0x20) >> 5;
+      return;
+    }
+  } else if (value <= E_AY_REGISTER_ENVELOPE_IO_PORT_B_DATA_STORE) {
+    self.ays[self.selected_ay].selected_register = value;
+    return;
+  }
+  
+  log_wrn("ay: invalid selected register $%02X\n", value);
 }
 
 
 u8_t ay_register_read(void) {
-  if (self.selected_register < sizeof(self.registers)) {
-    return self.registers[self.selected_register];
-  }
-
-  log_wrn("ay: unimplemented read from REGISTER port\n");
-  return 0xFF;
+  const ay_t* ay = &self.ays[self.selected_ay];
+  
+  return ay->registers[ay->selected_register];
 }
 
 
-static void ay_envelope_step(void) {
-  if (--self.envelope_counter == 0) {
+static void ay_envelope_step(ay_t* ay) {
+  if (--ay->envelope_counter == 0) {
     /* One cycle complete. */
-    self.envelope_counter           = MAX(self.latched.envelope_period, 1);
-    self.envelope_period_sixteenth  = (self.envelope_counter + 15) / 16;
-    self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
-    self.envelope_cycle_state       = 1 - self.envelope_cycle_state;
+    ay->envelope_counter           = MAX(ay->latched.envelope_period, 1);
+    ay->envelope_period_sixteenth  = (ay->envelope_counter + 15) / 16;
+    ay->envelope_counter_sixteenth = ay->envelope_period_sixteenth;
+    ay->envelope_cycle_state       = 1 - ay->envelope_cycle_state;
 
-    if (self.is_envelope_first_cycle) {
-      self.is_envelope_first_cycle = 0;
+    if (ay->is_envelope_first_cycle) {
+      ay->is_envelope_first_cycle = 0;
 
       /* Attack solely determines first cycle. */
-      if (self.latched.envelope_shape & 0x04) {
-        self.envelope_amplitude = 0;
-        self.envelope_delta     = 1;
+      if (ay->latched.envelope_shape & 0x04) {
+        ay->envelope_amplitude = 0;
+        ay->envelope_delta     = 1;
       } else {
-        self.envelope_amplitude = 15;
-        self.envelope_delta     = -1;
+        ay->envelope_amplitude = 15;
+        ay->envelope_delta     = -1;
       }
     } else {
       /* See Fig. 7 ENVELOPE SHAPE/CYCLE CONTROL */
-      switch (self.latched.envelope_shape & 0x0F) {
+      switch (ay->latched.envelope_shape & 0x0F) {
         case 0x00:  /* 0 0 x x */
         case 0x01:
         case 0x02:
@@ -170,76 +197,76 @@ static void ay_envelope_step(void) {
         case 0x07:
         case 0x09:  /* 1 0 0 1 */
         case 0x0F:  /* 1 1 1 1 */
-          self.envelope_amplitude = 0;
-          self.envelope_delta     = 0;
+          ay->envelope_amplitude = 0;
+          ay->envelope_delta     = 0;
           break;
 
         case 0x08:  /* 1 0 0 0 */
-          self.envelope_amplitude = 15;
-          self.envelope_delta     = -1;
+          ay->envelope_amplitude = 15;
+          ay->envelope_delta     = -1;
           break;
 
         case 0x0A:  /* 1 0 1 0 */
-          if (self.envelope_cycle_state) {
-            self.envelope_amplitude = 15;
-            self.envelope_delta     = -1;
+          if (ay->envelope_cycle_state) {
+            ay->envelope_amplitude = 15;
+            ay->envelope_delta     = -1;
           } else {
-            self.envelope_amplitude = 0;
-            self.envelope_delta     = 1;
+            ay->envelope_amplitude = 0;
+            ay->envelope_delta     = 1;
           }
           break;
           
         case 0x0E:  /* 1 1 1 0 */
-          if (self.envelope_cycle_state) {
-            self.envelope_amplitude = 0;
-            self.envelope_delta     = 1;
+          if (ay->envelope_cycle_state) {
+            ay->envelope_amplitude = 0;
+            ay->envelope_delta     = 1;
           } else {
-            self.envelope_amplitude = 15;
-            self.envelope_delta     = -1;
+            ay->envelope_amplitude = 15;
+            ay->envelope_delta     = -1;
           }
           break;
 
         case 0x0B:  /* 1 0 1 1 */
         case 0x0D:  /* 1 1 0 1 */
-          self.envelope_amplitude = 15;
-          self.envelope_delta     = 0;
+          ay->envelope_amplitude = 15;
+          ay->envelope_delta     = 0;
           break;
 
         case 0x0C:  /* 1 1 0 0 */
-          self.envelope_amplitude = 0;
-          self.envelope_delta     = 1;
+          ay->envelope_amplitude = 0;
+          ay->envelope_delta     = 1;
           break;
       }
     }
-  } else if (--self.envelope_counter_sixteenth == 0) {
+  } else if (--ay->envelope_counter_sixteenth == 0) {
     /* One step within cycle complete. */
-    self.envelope_amplitude += self.envelope_delta;
-    self.envelope_counter_sixteenth = self.envelope_period_sixteenth;
+    ay->envelope_amplitude += ay->envelope_delta;
+    ay->envelope_counter_sixteenth = ay->envelope_period_sixteenth;
   }
 }
 
 
-static void ay_noise_step(void) {
+static void ay_noise_step(ay_t* ay) {
   int advance = 0;
 
-  if (--self.noise_counter == 0) {
-    self.noise_counter     = MAX(self.latched.noise_period, 1);
-    self.noise_period_half = self.noise_counter / 2;
+  if (--ay->noise_counter == 0) {
+    ay->noise_counter     = MAX(ay->latched.noise_period, 1);
+    ay->noise_period_half = ay->noise_counter / 2;
     advance                = 1;
-  } else if (self.noise_counter == self.noise_period_half) {
+  } else if (ay->noise_counter == ay->noise_period_half) {
     advance                = 1;
   }
 
   if (advance) {
     /* GenNoise (c) Hacker KAY & Sergey Bulba */
-    self.noise_seed  = (self.noise_seed * 2 + 1) ^ (((self.noise_seed >> 16) ^ (self.noise_seed >> 13)) & 1);
-    self.noise_value = (self.noise_seed >> 16) & 1;
+    ay->noise_seed  = (ay->noise_seed * 2 + 1) ^ (((ay->noise_seed >> 16) ^ (ay->noise_seed >> 13)) & 1);
+    ay->noise_value = (ay->noise_seed >> 16) & 1;
   }
 }
 
 
-static void ay_channel_step(int n) {
-  ay_channel_t* channel = &self.channels[n];
+static void ay_channel_step(ay_t* ay, int n) {
+  ay_channel_t* channel = &ay->channels[n];
 
   if (--channel->tone_counter == 0) {
     channel->tone_counter     = channel->latched.tone_period + 1;
@@ -251,20 +278,20 @@ static void ay_channel_step(int n) {
 }
 
 
-static void ay_mix(int n) {
-  ay_channel_t* channel = &self.channels[n];
+static void ay_mix(ay_t* ay, int n) {
+  ay_channel_t* channel = &ay->channels[n];
   s8_t          sample  = 0;
 
   /* Tone or noise enabled on this channel? */
   if ((channel->latched.is_tone_enabled  && channel->tone_value) ||
-      (channel->latched.is_noise_enabled && self.noise_value)) {
-    const u8_t amplitude = channel->latched.is_amplitude_fixed ? channel->latched.amplitude : self.envelope_amplitude;
+      (channel->latched.is_noise_enabled && ay->noise_value)) {
+    const u8_t amplitude = channel->latched.is_amplitude_fixed ? channel->latched.amplitude : ay->envelope_amplitude;
     sample = ay_volume[amplitude];
   }
 
   if (sample != channel->sample_last) {
     channel->sample_last = sample;
-    audio_add_sample(E_AUDIO_SOURCE_AY_1_CHANNEL_A + n, sample);
+    audio_add_sample(ay->source + n, sample);
   }
 }
 
@@ -276,86 +303,103 @@ void ay_run(u32_t ticks) {
     if (++self.ticks_div_256 == 256) {
       self.ticks_div_256 = 0;
 
-      ay_envelope_step();
+      ay_envelope_step(&self.ays[0]);
+      ay_envelope_step(&self.ays[1]);
+      ay_envelope_step(&self.ays[2]);
     }
 
     if (++self.ticks_div_16 == 16) {
       self.ticks_div_16 = 0;
 
-      ay_noise_step();
+      ay_noise_step(&self.ays[0]);
+      ay_noise_step(&self.ays[1]);
+      ay_noise_step(&self.ays[2]);
 
-      ay_channel_step(A);
-      ay_channel_step(B);
-      ay_channel_step(C);
+      ay_channel_step(&self.ays[0], A);
+      ay_channel_step(&self.ays[0], B);
+      ay_channel_step(&self.ays[0], C);
 
-      ay_mix(A);
-      ay_mix(B);
-      ay_mix(C);
+      ay_channel_step(&self.ays[1], A);
+      ay_channel_step(&self.ays[1], B);
+      ay_channel_step(&self.ays[1], C);
+
+      ay_channel_step(&self.ays[2], A);
+      ay_channel_step(&self.ays[2], B);
+      ay_channel_step(&self.ays[2], C);
+
+      ay_mix(&self.ays[0], A);
+      ay_mix(&self.ays[0], B);
+      ay_mix(&self.ays[0], C);
+
+      ay_mix(&self.ays[1], A);
+      ay_mix(&self.ays[1], B);
+      ay_mix(&self.ays[1], C);
+
+      ay_mix(&self.ays[2], A);
+      ay_mix(&self.ays[2], B);
+      ay_mix(&self.ays[2], C);
     }
   }
 }
 
 
 void ay_register_write(u8_t value) {
-  if (self.selected_register >= sizeof(self.registers)) {
-    log_wrn("ay: write of $%02X to unknown register $%02X\n", value, self.selected_register);
-    return;
-  }
+  ay_t* ay = &self.ays[self.selected_ay];
 
-  self.registers[self.selected_register] = value;
+  ay->registers[ay->selected_register] = value;
 
-  switch (self.selected_register) {
+  switch (ay->selected_register) {
     case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE:
-      self.channels[A].latched.tone_period = (self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] & 0x0F) << 8 | self.registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
+      ay->channels[A].latched.tone_period = (ay->registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] & 0x0F) << 8 | ay->registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
       break;
 
     case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE:
-      self.channels[B].latched.tone_period = (self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] & 0x0F) << 8 | self.registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
+      ay->channels[B].latched.tone_period = (ay->registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] & 0x0F) << 8 | ay->registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
       break;
 
     case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE:
-      self.channels[C].latched.tone_period = (self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] & 0x0F) << 8 | self.registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
+      ay->channels[C].latched.tone_period = (ay->registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] & 0x0F) << 8 | ay->registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
       break;
 
     case E_AY_REGISTER_NOISE_PERIOD:
-      self.latched.noise_period = value & 0x1F;
+      ay->latched.noise_period = value & 0x1F;
       break;
 
     case E_AY_REGISTER_ENABLE:
-      self.channels[A].latched.is_tone_enabled  = !(value & 0x01);
-      self.channels[B].latched.is_tone_enabled  = !(value & 0x02);
-      self.channels[C].latched.is_tone_enabled  = !(value & 0x04);
-      self.channels[A].latched.is_noise_enabled = !(value & 0x08);
-      self.channels[B].latched.is_noise_enabled = !(value & 0x10);
-      self.channels[C].latched.is_noise_enabled = !(value & 0x20);
+      ay->channels[A].latched.is_tone_enabled  = !(value & 0x01);
+      ay->channels[B].latched.is_tone_enabled  = !(value & 0x02);
+      ay->channels[C].latched.is_tone_enabled  = !(value & 0x04);
+      ay->channels[A].latched.is_noise_enabled = !(value & 0x08);
+      ay->channels[B].latched.is_noise_enabled = !(value & 0x10);
+      ay->channels[C].latched.is_noise_enabled = !(value & 0x20);
       break;
 
     case E_AY_REGISTER_CHANNEL_A_AMPLITUDE:
-      self.channels[A].latched.amplitude          = value & 0x0F;
-      self.channels[A].latched.is_amplitude_fixed = !(value & 0x010);
+      ay->channels[A].latched.amplitude          = value & 0x0F;
+      ay->channels[A].latched.is_amplitude_fixed = !(value & 0x010);
       break;
 
     case E_AY_REGISTER_CHANNEL_B_AMPLITUDE:
-      self.channels[B].latched.amplitude          = value & 0x0F;
-      self.channels[B].latched.is_amplitude_fixed = !(value & 0x010);
+      ay->channels[B].latched.amplitude          = value & 0x0F;
+      ay->channels[B].latched.is_amplitude_fixed = !(value & 0x010);
       break;
 
     case E_AY_REGISTER_CHANNEL_C_AMPLITUDE:
-      self.channels[C].latched.amplitude          = value & 0x0F;
-      self.channels[C].latched.is_amplitude_fixed = !(value & 0x010);
+      ay->channels[C].latched.amplitude          = value & 0x0F;
+      ay->channels[C].latched.is_amplitude_fixed = !(value & 0x010);
       break;
 
     case E_AY_REGISTER_ENVELOPE_PERIOD_FINE:
     case E_AY_REGISTER_ENVELOPE_PERIOD_COARSE:
-      self.latched.envelope_period = self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_COARSE] << 8 | self.registers[E_AY_REGISTER_ENVELOPE_PERIOD_FINE];
+      ay->latched.envelope_period = ay->registers[E_AY_REGISTER_ENVELOPE_PERIOD_COARSE] << 8 | ay->registers[E_AY_REGISTER_ENVELOPE_PERIOD_FINE];
       break;
 
     case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
-      self.latched.envelope_shape  = value;
-      self.is_envelope_first_cycle = 1;
+      ay->latched.envelope_shape  = value;
+      ay->is_envelope_first_cycle = 1;
       break;
 
     default:

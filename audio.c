@@ -4,7 +4,7 @@
 #include "defs.h"
 
 
-#define N_SOURCES       (E_AUDIO_SOURCE_AY_1_CHANNEL_C - E_AUDIO_SOURCE_BEEPER + 1)
+#define N_SOURCES       (E_AUDIO_SOURCE_AY_3_CHANNEL_C - E_AUDIO_SOURCE_BEEPER + 1)
 
 
 typedef struct {
