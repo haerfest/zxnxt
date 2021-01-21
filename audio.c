@@ -62,7 +62,7 @@ void audio_add_sample(audio_source_t source, s8_t sample) {
   SDL_LockAudioDevice(self.device);
 
   /* Calculate where to place the new sample. */
-  index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.emptied_ticks_28mhz) / 28000000;
+  index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.emptied_ticks_28mhz) / clock_28mhz_get();
 
   if (index < AUDIO_BUFFER_LENGTH) {
     s8_t* mixed;

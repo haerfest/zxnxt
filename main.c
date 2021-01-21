@@ -375,20 +375,20 @@ static void main_handle_function_keys(void) {
 
 
 static void main_eventloop(void) {
+  u64_t until_ticks;
+
   audio_resume();
 
   while (!SDL_QuitRequested()) {
-    const u64_t audio_filled = clock_ticks() + 28000000L * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
+    until_ticks = clock_ticks() + clock_28mhz_get() / 20;
 
-    while (clock_ticks() < audio_filled) {
+    while (clock_ticks() < until_ticks) {
       cpu_step();
     }
 
     kempston_refresh();
     keyboard_refresh();
     main_handle_function_keys();
-
-    audio_sync();
   }
 
   audio_pause();

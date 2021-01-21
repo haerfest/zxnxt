@@ -27,6 +27,7 @@ typedef enum {
 
 int                  clock_init(void);
 void                 clock_finit(void);
+u32_t                clock_28mhz_get(void);
 clock_cpu_speed_t    clock_cpu_speed_get(void);
 void                 clock_cpu_speed_set(clock_cpu_speed_t speed);
 clock_video_timing_t clock_video_timing_get(void);
