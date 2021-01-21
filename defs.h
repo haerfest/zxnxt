@@ -32,7 +32,7 @@
  * take care of the vertical doubling when blitting.
  */
 #define FRAME_BUFFER_WIDTH   704
-#define FRAME_BUFFER_HEIGHT  298
+#define FRAME_BUFFER_HEIGHT  312
 
 #define WINDOW_WIDTH         640
 #define WINDOW_HEIGHT        512
