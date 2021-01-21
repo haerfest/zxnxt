@@ -40,10 +40,11 @@ typedef struct {
   const u8_t*         keyboard_state;
   int                 is_windowed;
   int                 is_function_key_down;
-} main_t;
+  int                 is_quit_requested;
+} self_t;
 
 
-static main_t self;
+static self_t self;
 
 
 static int main_init(void) {
@@ -379,16 +380,8 @@ static void main_eventloop(void) {
 
   audio_resume();
 
-  while (!SDL_QuitRequested()) {
-    until_ticks = clock_ticks() + clock_28mhz_get() / 50;
-
-    while (clock_ticks() < until_ticks) {
-      cpu_step();
-    }
-
-    kempston_refresh();
-    keyboard_refresh();
-    main_handle_function_keys();
+  while (!self.is_quit_requested) {
+    cpu_step();
   }
 
   audio_pause();
@@ -429,6 +422,23 @@ static void main_finit(void) {
   SDL_CloseAudioDevice(self.audio_device);
   SDL_Quit();
   log_finit();
+}
+
+
+u32_t main_next_host_sync_get(void) {
+  return (unsigned long) clock_28mhz_get() * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
+}
+
+
+void main_sync(void) {
+  /* Perform these housekeeping tasks in downtime. */
+  kempston_refresh();
+  keyboard_refresh();
+  main_handle_function_keys();
+
+  self.is_quit_requested = SDL_QuitRequested();
+
+  audio_sync();
 }
 
 

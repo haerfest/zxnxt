@@ -1,9 +1,9 @@
 #include <stdlib.h>
-#include "audio.h"
 #include "ay.h"
 #include "clock.h"
 #include "defs.h"
 #include "log.h"
+#include "main.h"
 #include "ula.h"
 
 
@@ -36,7 +36,7 @@ typedef struct {
   u64_t                ticks_28mhz;      /* At max dot clock overflows in 20k years. */
   u64_t                sync_14mhz;       /* Last 28 MHz tick where we synced the 14 MHz ULA clock. */
   u64_t                sync_2mhz;        /* Last 28 MHz tick where we synced the 1.75 MHz AY-3-8912 clock. */
-  u64_t                sync_audio_next;  /* Next moment at which to sync with reality (= host's audio timing). */
+  u64_t                sync_host_next;   /* Next moment at which to sync with reality. */
 } self_t;
 
 
@@ -48,25 +48,13 @@ u32_t clock_28mhz_get(void) {
 }
 
 
-static void clock_calculate_next_audio_sync_ticks(void) {
-  self.sync_audio_next += (unsigned long) frequency_28mhz[self.video_timing] * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
-}
-
-
-static int clock_do_need_audio_sync(void) {
-  return self.ticks_28mhz >= self.sync_audio_next;
-}
-
-
 int clock_init(void) {
-  self.video_timing    = E_CLOCK_VIDEO_TIMING_VGA_BASE;
-  self.cpu_speed       = E_CLOCK_CPU_SPEED_3MHZ;
-  self.ticks_28mhz     = 0;
-  self.sync_14mhz      = self.ticks_28mhz;
-  self.sync_2mhz       = self.ticks_28mhz;
-  self.sync_audio_next = 0;
-
-  clock_calculate_next_audio_sync_ticks();
+  self.video_timing   = E_CLOCK_VIDEO_TIMING_VGA_BASE;
+  self.cpu_speed      = E_CLOCK_CPU_SPEED_3MHZ;
+  self.ticks_28mhz    = 0;
+  self.sync_14mhz     = self.ticks_28mhz;
+  self.sync_2mhz      = self.ticks_28mhz;
+  self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get();
 
   return 0;
 }
@@ -147,8 +135,8 @@ void clock_run(u32_t cpu_ticks) {
     self.sync_2mhz += ticks_2mhz * 16;
   }
 
-  if (clock_do_need_audio_sync()) {
-    audio_sync();
-    clock_calculate_next_audio_sync_ticks();
+  if (self.ticks_28mhz >= self.sync_host_next) {
+    main_sync();
+    self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get();
   }
 }
