@@ -221,8 +221,9 @@ static void nextreg_peripheral_1_setting_write(u8_t value) {
 
 
 static u8_t nextreg_peripheral_3_setting_read(void) {
-  return (!paging_spectrum_128k_paging_is_locked() << 7)
-       | (!ula_contention_get() << 6);
+  return !paging_spectrum_128k_paging_is_locked() << 7
+       | !ula_contention_get() << 6
+       | (self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ACB) << 5;
 }
 
 
@@ -244,6 +245,13 @@ static void nextreg_peripheral_3_setting_write(u8_t value) {
   ula_contention_set((value & 0x40) == 0);
 
   ula_timex_read_set((value & 0x02) != 0);
+}
+
+
+static u8_t nextreg_peripheral_4_setting_read(void) {
+  return self.is_ay_mono[E_NEXTREG_AY_3] << 7
+       | self.is_ay_mono[E_NEXTREG_AY_2] << 6
+       | self.is_ay_mono[E_NEXTREG_AY_1] << 5;
 }
 
 
@@ -561,6 +569,9 @@ u8_t nextreg_data_read(u16_t address) {
 
     case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
       return nextreg_peripheral_3_setting_read();
+
+    case E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING:
+      return nextreg_peripheral_4_setting_read();
 
     case E_NEXTREG_REGISTER_CPU_SPEED:
       return nextreg_cpu_speed_read();
