@@ -380,7 +380,7 @@ static void main_eventloop(void) {
   audio_resume();
 
   while (!SDL_QuitRequested()) {
-    until_ticks = clock_ticks() + clock_28mhz_get() / 20;
+    until_ticks = clock_ticks() + clock_28mhz_get() / 50;
 
     while (clock_ticks() < until_ticks) {
       cpu_step();
