@@ -5,6 +5,7 @@
 
 
 #define N_SOURCES       (E_AUDIO_SOURCE_AY_3_CHANNEL_C - E_AUDIO_SOURCE_BEEPER + 1)
+#define SQRT_N_SOURCES  3  /* More or less, provides headroom. */
 
 
 typedef struct {
@@ -72,13 +73,13 @@ void audio_add_sample(audio_source_t source, s8_t sample) {
       /* Left or both. */
       self.mixed_last_sample_sum_left -= self.last_sample[source];
       self.mixed_last_sample_sum_left += sample;
-      self.mixed_last_sample_left      = self.mixed_last_sample_sum_left / N_SOURCES;
+      self.mixed_last_sample_left      = self.mixed_last_sample_sum_left / SQRT_N_SOURCES;
     }
     if (self.channels[source] != E_AUDIO_CHANNEL_LEFT) {
       /* Right or both. */
       self.mixed_last_sample_sum_right -= self.last_sample[source];
       self.mixed_last_sample_sum_right += sample;
-      self.mixed_last_sample_right      = self.mixed_last_sample_sum_right / N_SOURCES;
+      self.mixed_last_sample_right      = self.mixed_last_sample_sum_right / SQRT_N_SOURCES;
     }
     
     /* Place this sample and extend it to the end of the buffer, assuming

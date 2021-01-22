@@ -359,7 +359,7 @@ u8_t ula_read(u16_t address) {
 
 void ula_write(u16_t address, u8_t value) {
   const u8_t speaker_state = value & 0x10;
-  const s8_t sample        = speaker_state ? 127 : 0;
+  const s8_t sample        = speaker_state ? AUDIO_MAX_VOLUME : 0;
 
   audio_add_sample(E_AUDIO_SOURCE_BEEPER, sample);
 
