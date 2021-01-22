@@ -89,7 +89,6 @@ typedef struct {
   u32_t             noise_seed;
   int               noise_value;
   u8_t              noise_counter;
-  u8_t              noise_period_half;
   u16_t             envelope_counter;
   u16_t             envelope_period_sixteenth;
   u16_t             envelope_counter_sixteenth;
@@ -247,17 +246,9 @@ static void ay_envelope_step(ay_t* ay) {
 
 
 static void ay_noise_step(ay_t* ay) {
-  int advance = 0;
-
   if (--ay->noise_counter == 0) {
-    ay->noise_counter     = MAX(ay->latched.noise_period, 1);
-    ay->noise_period_half = ay->noise_counter / 2;
-    advance                = 1;
-  } else if (ay->noise_counter == ay->noise_period_half) {
-    advance                = 1;
-  }
+    ay->noise_counter = MAX(ay->latched.noise_period, 1);
 
-  if (advance) {
     /* GenNoise (c) Hacker KAY & Sergey Bulba */
     ay->noise_seed  = (ay->noise_seed * 2 + 1) ^ (((ay->noise_seed >> 16) ^ (ay->noise_seed >> 13)) & 1);
     ay->noise_value = (ay->noise_seed >> 16) & 1;
