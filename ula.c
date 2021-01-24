@@ -125,7 +125,7 @@ typedef struct {
   u8_t                       hi_res_ink_colour;
   int                        do_contend;
   u32_t                      ticks_14mhz_after_irq;
-  int                        is_timex_read_enabled;
+  int                        is_timex_enabled;
 } self_t;
 
 
@@ -338,7 +338,7 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.display_offset              = 0;
   self.attribute_offset            = 0;
   self.pixel                       = self.frame_buffer;
-  self.is_timex_read_enabled       = 0;
+  self.is_timex_enabled       = 0;
 
   ula_fill_tables();
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
@@ -368,13 +368,13 @@ void ula_write(u16_t address, u8_t value) {
 }
 
 
-void ula_timex_read_set(int do_enable) {
-  self.is_timex_read_enabled = do_enable;
+void ula_timex_set(int do_enable) {
+  self.is_timex_enabled = do_enable;
 }
 
 
 u8_t ula_timex_read(u16_t address) {
-  if (self.is_timex_read_enabled) {
+  if (self.is_timex_enabled) {
     return self.timex_disable_ula_interrupt << 6
          | self.hi_res_ink_colour           << 3
          | self.display_mode;
@@ -393,6 +393,10 @@ u8_t ula_timex_read(u16_t address) {
 
 
 void ula_timex_write(u16_t address, u8_t value) {
+  if (!self.is_timex_enabled) {
+    return;
+  }
+
   self.timex_disable_ula_interrupt = (value & 0x40) >> 6;
   self.hi_res_ink_colour           = (value & 0x38) >> 3;
 

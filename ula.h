@@ -25,7 +25,7 @@ int                  ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t
 void                 ula_finit(void);
 u8_t                 ula_read(u16_t address);
 void                 ula_write(u16_t address, u8_t value);
-void                 ula_timex_read_set(int do_enable);
+void                 ula_timex_set(int do_enable);
 u8_t                 ula_timex_read(u16_t address);
 void                 ula_timex_write(u16_t address, u8_t value);
 ula_display_timing_t ula_display_timing_get(void);
