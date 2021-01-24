@@ -133,6 +133,8 @@ static int main_init(void) {
   }
 
   (void) SDL_GameControllerEventState(SDL_ENABLE);
+
+  (void) SDL_ShowCursor(SDL_DISABLE);
   
   self.keyboard_state       = SDL_GetKeyboardState(NULL);
   self.is_function_key_down = 0;
