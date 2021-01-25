@@ -31,11 +31,15 @@
  * rectangle and display that. Actually, we only draw at 704x298 and let SDL
  * take care of the vertical doubling when blitting.
  */
-#define FRAME_BUFFER_WIDTH   704
-#define FRAME_BUFFER_HEIGHT  312
+#define FRAME_BUFFER_WIDTH           704
+#define FRAME_BUFFER_HEIGHT          312
 
-#define WINDOW_WIDTH         640
-#define WINDOW_HEIGHT        512
+#define WINDOW_WIDTH                 640
+#define WINDOW_HEIGHT                512
+
+#define FULLSCREEN_MIN_WIDTH         (2 * WINDOW_WIDTH)
+#define FULLSCREEN_MIN_HEIGHT        (2 * WINDOW_HEIGHT)
+#define FULLSCREEN_MIN_REFRESH_RATE  60
 
 
 typedef enum {

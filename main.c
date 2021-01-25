@@ -28,6 +28,9 @@
 #include "utils.h"
 
 
+#define MAIN_PIXELFORMAT  SDL_PIXELFORMAT_RGBA4444
+
+
 /* Tasks we want to schedule after the CPU has finished an instruction. */
 typedef enum {
   E_MAIN_TASK_NONE,
@@ -55,6 +58,13 @@ static self_t self;
 
 
 static int main_init(void) {
+  SDL_DisplayMode mode = {
+    .format       = MAIN_PIXELFORMAT,
+    .w            = FULLSCREEN_MIN_WIDTH,
+    .h            = FULLSCREEN_MIN_HEIGHT,
+    .refresh_rate = FULLSCREEN_MIN_REFRESH_RATE
+  };
+
   SDL_AudioSpec want;
   SDL_AudioSpec have;
   u8_t*         sram;
@@ -95,6 +105,11 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
+  if (SDL_SetWindowDisplayMode(self.window, &mode) != 0) {
+    log_err("main: SDL_SetWindowDisplayMode error: %s\n", SDL_GetError());
+    goto exit_sdl;
+  }
+  
   self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED);
   if (self.renderer == NULL) {
     log_err("main: SDL_CreateRenderer error: %s\n", SDL_GetError());
@@ -116,7 +131,7 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  self.texture = SDL_CreateTexture(self.renderer, SDL_PIXELFORMAT_RGBA4444, SDL_TEXTUREACCESS_STREAMING, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
+  self.texture = SDL_CreateTexture(self.renderer, MAIN_PIXELFORMAT, SDL_TEXTUREACCESS_STREAMING, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
   if (self.texture == NULL) {
     log_err("main: SDL_CreateTexture error: %s\n", SDL_GetError());
     goto exit_sdl;
@@ -329,6 +344,14 @@ static void main_toggle_fullscreen(void) {
 
   if (self.is_windowed) {
     SDL_SetWindowSize(self.window, WINDOW_WIDTH, WINDOW_HEIGHT);
+  } else {
+    SDL_DisplayMode mode;
+
+    if (SDL_GetWindowDisplayMode(self.window, &mode) != 0) {
+      log_err("main: SDL_GetWindowDisplayMode error: %s\n", SDL_GetError());
+      return;
+    }
+    log_inf("main: %dx%d, %d Hz\n", mode.w, mode.h, mode.refresh_rate);
   }
 }
 
