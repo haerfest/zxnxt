@@ -4,7 +4,7 @@
 #include "defs.h"
 #include "log.h"
 #include "main.h"
-#include "ula.h"
+#include "slu.h"
 
 
 /**
@@ -121,10 +121,10 @@ void clock_run(u32_t cpu_ticks) {
   /* Update system clock. */
   self.ticks_28mhz += ticks_28mhz;
 
-  /* Update 14 MHz clock for ULA. */
+  /* Update 14 MHz clock for SLU. */
   ticks_14mhz = (self.ticks_28mhz - self.sync_14mhz) / 2;
   if (ticks_14mhz > 0) {
-    ticks_14mhz = ula_run(ticks_14mhz);
+    ticks_14mhz = slu_run(ticks_14mhz);
     self.sync_14mhz += ticks_14mhz * 2;
   }
 

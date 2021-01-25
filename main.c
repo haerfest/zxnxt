@@ -22,6 +22,7 @@
 #include "palette.h"
 #include "rom.h"
 #include "sdcard.h"
+#include "slu.h"
 #include "spi.h"
 #include "ula.h"
 #include "utils.h"
@@ -234,14 +235,20 @@ static int main_init(void) {
     goto exit_ula;
   }
 
-  if (cpu_init() != 0) {
+  if (slu_init() != 0) {
     goto exit_layer2;
+  }
+
+  if (cpu_init() != 0) {
+    goto exit_slu;
   }
 
   memory_refresh_accessors(0, 8);
 
   return 0;
 
+exit_slu:
+  slu_finit();
 exit_layer2:
   layer2_finit();
 exit_ula:
@@ -425,6 +432,7 @@ static void main_eventloop(void) {
 
 static void main_finit(void) {
   cpu_finit();
+  slu_finit();
   layer2_finit();
   ula_finit();
   keyboard_finit();
