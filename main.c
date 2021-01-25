@@ -311,12 +311,19 @@ exit:
 
 
 static void main_toggle_fullscreen(void) {
-  const u32_t flags = self.is_windowed ? SDL_WINDOW_FULLSCREEN: 0;
+  const u32_t     flags = self.is_windowed ? SDL_WINDOW_FULLSCREEN: 0;
+  SDL_DisplayMode mode;
   
   if (SDL_SetWindowFullscreen(self.window, flags) != 0) {
     log_err("main: SDL_SetWindowFullscreen error: %s\n", SDL_GetError());
     return;
   }
+
+  if (SDL_GetWindowDisplayMode(self.window, &mode) != 0) {
+    log_err("main: SDL_GetWindowDisplayMode error: %s\n", SDL_GetError());
+    return;
+  }
+  log_dbg("main: fullscreen %dx%d, %d Hz\n", mode.w, mode.h, mode.refresh_rate);
 
   self.is_windowed = !self.is_windowed;
 }
