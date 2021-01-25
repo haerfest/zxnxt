@@ -230,7 +230,7 @@ static int main_init(void) {
     goto exit_keyboard;
   }
 
-  if (layer2_init() != 0) {
+  if (layer2_init(sram) != 0) {
     goto exit_ula;
   }
 

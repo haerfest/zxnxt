@@ -5,10 +5,12 @@
 #include "defs.h"
 
 
-int  layer2_init(void);
+int  layer2_init(u8_t* sram);
 void layer2_finit(void);
 u8_t layer2_read(u16_t address);
 void layer2_write(u16_t address, u8_t value);
+void layer2_bank_active_set(u8_t bank);
+void layer2_bank_shadow_set(u8_t bank);
 
 
 #endif  /* __LAYER2_H */

@@ -7,6 +7,7 @@
 #include "cpu.h"
 #include "defs.h"
 #include "io.h"
+#include "layer2.h"
 #include "log.h"
 #include "memory.h"
 #include "mmu.h"
@@ -453,6 +454,11 @@ static void nextreg_internal_port_decoding_2_write(u8_t value) {
 }
 
 
+static void nextreg_layer2_active_ram_bank_write(u8_t value) {
+  layer2_bank_active_set(value & 0x7F);
+}
+
+
 void nextreg_data_write(u16_t address, u8_t value) {
   log_dbg("nextreg: write of $%02X to $%04X (register $%02X)\n", value, address, self.selected_register);
 
@@ -487,6 +493,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
     case E_NEXTREG_REGISTER_VIDEO_TIMING:
       nextreg_video_timing_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
+      nextreg_layer2_active_ram_bank_write(value);
       break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_ULA:
