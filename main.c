@@ -319,13 +319,11 @@ static void main_toggle_fullscreen(void) {
     return;
   }
 
-  if (SDL_GetWindowDisplayMode(self.window, &mode) != 0) {
-    log_err("main: SDL_GetWindowDisplayMode error: %s\n", SDL_GetError());
-    return;
-  }
-  log_dbg("main: fullscreen %dx%d, %d Hz\n", mode.w, mode.h, mode.refresh_rate);
-
   self.is_windowed = !self.is_windowed;
+
+  if (self.is_windowed) {
+    SDL_SetWindowSize(self.window, WINDOW_WIDTH, WINDOW_HEIGHT);
+  }
 }
 
 
