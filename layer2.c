@@ -62,8 +62,18 @@ void layer2_write(u16_t address, u8_t value) {
 }
 
 
+u8_t layer2_bank_active_get(void) {
+  return self.bank_active;
+}
+
+
 void layer2_bank_active_set(u8_t bank) {
   self.bank_active = bank;
+}
+
+
+u8_t layer2_bank_shadow_get(void) {
+  return self.bank_shadow;
 }
 
 

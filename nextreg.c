@@ -14,6 +14,7 @@
 #include "nextreg.h"
 #include "palette.h"
 #include "paging.h"
+#include "slu.h"
 #include "rom.h"
 #include "ula.h"
 
@@ -63,6 +64,11 @@ typedef struct {
 static nextreg_t self;
 
 
+static void nextreg_cpu_speed_write(u8_t value);
+static void nextreg_layer2_active_ram_bank_write(u8_t value);
+static void nextreg_layer2_shadow_ram_bank_write(u8_t value);
+
+
 static void nextreg_reset_soft(void) {
   self.palette_disable_auto_increment    = 0;
   self.palette_selected                  = E_PALETTE_ULA_FIRST;
@@ -92,7 +98,9 @@ static void nextreg_reset_soft(void) {
   rom_lock(self.altrom_soft_reset_lock);
   altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
 
-  clock_cpu_speed_set(E_CLOCK_CPU_SPEED_3MHZ);
+  nextreg_cpu_speed_write(E_CLOCK_CPU_SPEED_3MHZ);
+  nextreg_layer2_active_ram_bank_write(8);
+  nextreg_layer2_shadow_ram_bank_write(11);
 }
 
 
@@ -454,8 +462,35 @@ static void nextreg_internal_port_decoding_2_write(u8_t value) {
 }
 
 
+u8_t nextreg_layer2_active_ram_bank_read(void) {
+  return layer2_bank_active_get();
+}
+
+
 static void nextreg_layer2_active_ram_bank_write(u8_t value) {
   layer2_bank_active_set(value & 0x7F);
+}
+
+
+u8_t nextreg_layer2_shadow_ram_bank_read(void) {
+  return layer2_bank_shadow_get();
+}
+
+
+static void nextreg_layer2_shadow_ram_bank_write(u8_t value) {
+  layer2_bank_shadow_set(value & 0x7F);
+}
+
+
+static u8_t nextreg_sprite_layers_system_read(void) {
+  /* TODO: Implement other bits in this register. */
+  return slu_layer_priority_get() << 2;
+}
+
+
+void nextreg_sprite_layers_system_write(u8_t value) {
+  /* TODO: Implement other bits in this register. */
+  slu_layer_priority_set((value & 0x1C) >> 2);
 }
 
 
@@ -497,6 +532,14 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
     case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
       nextreg_layer2_active_ram_bank_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LAYER2_SHADOW_RAM_BANK:
+      nextreg_layer2_shadow_ram_bank_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
+      nextreg_sprite_layers_system_write(value);
       break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_ULA:
@@ -577,14 +620,23 @@ u8_t nextreg_data_read(u16_t address) {
     case E_NEXTREG_REGISTER_RESET:
       return nextreg_reset_read();
 
+    case E_NEXTREG_REGISTER_CPU_SPEED:
+      return nextreg_cpu_speed_read();
+
     case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
       return nextreg_peripheral_3_setting_read();
 
     case E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING:
       return nextreg_peripheral_4_setting_read();
 
-    case E_NEXTREG_REGISTER_CPU_SPEED:
-      return nextreg_cpu_speed_read();
+    case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
+      return nextreg_layer2_active_ram_bank_read();
+
+    case E_NEXTREG_REGISTER_LAYER2_SHADOW_RAM_BANK:
+      return nextreg_layer2_shadow_ram_bank_read();
+
+    case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
+      return nextreg_sprite_layers_system_read();
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_ULA:
       return nextreg_clip_window_ula_read();
