@@ -77,14 +77,6 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
 };
 
 
-static const SDL_Rect ula_source_rect = {
-  .x = 0,
-  .y = 56 - 32,
-  .w = WINDOW_WIDTH,
-  .h = WINDOW_HEIGHT / 2
-};
-
-
 typedef struct {
   SDL_Renderer*              renderer;
   SDL_Texture*               texture;
@@ -187,6 +179,12 @@ const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES][N_DISPLAY
 
 
 static void ula_blit(void) {
+  SDL_Rect ula_source_rect = {
+    .x = 0,
+    .y = self.display_spec->top_border_lines - 32,
+    .w = WINDOW_WIDTH,
+    .h = WINDOW_HEIGHT / 2
+  };
   void* pixels;
   int   pitch;
 
