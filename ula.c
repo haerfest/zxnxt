@@ -79,7 +79,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
 
 static const SDL_Rect ula_source_rect = {
   .x = 0,
-  .y = 17,
+  .y = 56 - 32,
   .w = WINDOW_WIDTH,
   .h = WINDOW_HEIGHT / 2
 };
