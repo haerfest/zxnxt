@@ -898,10 +898,9 @@ def sbc_A_r(r: str) -> C:
         const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
         const u8_t a     = A;
         s16_t      result;
-        Z      = {r};
-        result = A - Z - carry;
+        result = A - {r} - carry;
         A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, Z + carry, A) | VF_SUB(a, Z + carry, A) | NF_MASK | (result < 0) << CF_SHIFT;
+        F      = SZ53(A) | HF_SUB(a, {r} + carry, A) | VF_SUB(a, {r} + carry, A) | NF_MASK | (result < 0) << CF_SHIFT;
     '''
 
 def sbc_HL_ss(ss: str) -> C:
