@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"
@@ -178,6 +179,7 @@ typedef struct {
 
   /* Interrupt mode. */
   u8_t  im;
+  int   nmi_pending;          /* Non-zero if NMI pending.                     */
   int   irq_pending;          /* Non-zero if IRQ pending.                     */
   u32_t irq_duration;         /* T-states until irq_pending resets.           */
   int   irq_delay;            /* Non-zero if any pending IRQ must be delayed. */
@@ -211,12 +213,9 @@ static void cpu_fill_tables(void) {
 
 
 int cpu_init(void) {
-  cpu_fill_tables();
+  memset(&self, 0, sizeof(self));
 
-  self.irq_pending         = 0;
-  self.irq_duration        = 0;
-  self.irq_delay           = 0;
-  self.irq_pending_delayed = 0;
+  cpu_fill_tables();
 
   AF   = 0xFFFF;
   SP   = 0xFFFF;
@@ -265,6 +264,11 @@ static void cpu_tick(u32_t ticks) {
 void cpu_irq(u32_t duration) {
   self.irq_pending  = 1;
   self.irq_duration = duration;  /* In T-states. */
+}
+
+
+void cpu_nmi(void) {
+  self.nmi_pending = 1;
 }
 
 
@@ -321,6 +325,27 @@ static void cpu_irq_pending(void) {
 }
 
 
+static void cpu_nmi_pending(void) {
+  self.nmi_pending = 0;
+
+  /* Save the IFF1 state. */
+  IFF2 = IFF1;
+
+  /* Disable further interrupts. */
+  IFF1 = 0;
+
+  /* Acknowledge interrupt. */
+  T(7);
+
+  /* Save the program counter. */
+  memory_write(--SP, PCH); T(3);
+  memory_write(--SP, PCL); T(3);
+
+  /* Jump to the NMI routine. */ 
+  PC = 0x0066;
+}
+
+
 #ifdef TRACE
 
 static void cpu_sprintf_rom(char* buffer) {
@@ -364,6 +389,10 @@ static void cpu_trace(void) {
 void cpu_step(void) {
   cpu_trace();
   cpu_execute_next_opcode();
+
+  if (self.nmi_pending) {
+    cpu_nmi_pending();
+  }
 
   if (self.irq_pending || self.irq_pending_delayed) {
     cpu_irq_pending();

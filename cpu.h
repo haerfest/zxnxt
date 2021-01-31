@@ -10,6 +10,7 @@ void  cpu_finit(void);
 void  cpu_reset(void);
 void  cpu_step(void);
 void  cpu_irq(u32_t duration);
+void  cpu_nmi(void);
 u16_t cpu_pc_get(void);
 
 

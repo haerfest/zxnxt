@@ -58,6 +58,9 @@ typedef struct {
   u8_t                     altrom_soft_reset_lock;
   nextreg_ay_stereo_mode_t ay_stereo_mode;
   int                      is_ay_mono[3];
+  int                      is_hotkey_cpu_speed_enabled;
+  int                      is_hotkey_nmi_multiface_enabled;
+  int                      is_hotkey_nmi_divmmc_enabled;
 } nextreg_t;
 
 
@@ -84,6 +87,7 @@ static void nextreg_reset_soft(void) {
   self.ula_clip[1]                       = 255;
   self.ula_clip[2]                       = 0;
   self.ula_clip[3]                       = 191;
+  self.is_hotkey_cpu_speed_enabled       = 1;
 
   ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
@@ -122,6 +126,8 @@ static void nextreg_reset_hard(void) {
   self.is_hard_reset                   = 1;
   self.altrom_soft_reset_during_writes = 1;
   self.ay_stereo_mode                  = E_NEXTREG_AY_STEREO_MODE_ABC;
+  self.is_hotkey_nmi_multiface_enabled = 0;
+  self.is_hotkey_nmi_divmmc_enabled    = 0;
 
   nextreg_reset_soft();
 
@@ -226,6 +232,21 @@ static void nextreg_machine_type_write(u8_t value) {
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
   ula_display_frequency_set((value & 0x04) >> 2);
+}
+
+
+static u8_t nextreg_peripheral_2_setting_read(void) {
+  return self.is_hotkey_cpu_speed_enabled     << 7
+       | self.is_hotkey_nmi_divmmc_enabled    << 4
+       | self.is_hotkey_nmi_multiface_enabled << 3;
+}
+
+
+static void nextreg_peripheral_2_setting_write(u8_t value) {
+  self.is_hotkey_cpu_speed_enabled     = (value & 0x80) >> 7;
+  self.is_hotkey_nmi_divmmc_enabled    = (value & 0x10) >> 4;
+  self.is_hotkey_nmi_multiface_enabled = (value & 0x08) >> 3;
+
 }
 
 
@@ -496,8 +517,12 @@ void nextreg_sprite_layers_system_write(u8_t value) {
 
 void nextreg_data_write(u16_t address, u8_t value) {
   log_dbg("nextreg: write of $%02X to $%04X (register $%02X)\n", value, address, self.selected_register);
+  nextreg_write_internal(self.selected_register, value);
+}
 
-  switch (self.selected_register) {
+
+void nextreg_write_internal(u8_t reg, u8_t value) {
+  switch (reg) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
       nextreg_config_mapping_write(value);
       break;
@@ -512,6 +537,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
     case E_NEXTREG_REGISTER_PERIPHERAL_1_SETTING:
       nextreg_peripheral_1_setting_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING:
+      nextreg_peripheral_2_setting_write(value);
       break;
 
     case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
@@ -598,7 +627,7 @@ void nextreg_data_write(u16_t address, u8_t value) {
       break;
 
     default:
-      log_wrn("nextreg: unimplemented write of $%02X to Next register $%02X\n", value, self.selected_register);
+      log_wrn("nextreg: unimplemented write of $%02X to Next register $%02X\n", value, reg);
       break;
   }
 }
@@ -606,8 +635,12 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
 u8_t nextreg_data_read(u16_t address) {
   log_dbg("nextreg: read from $%04X\n", address);
+  return nextreg_read_internal(self.selected_register);
+}
 
-  switch (self.selected_register) {
+
+u8_t nextreg_read_internal(u8_t reg) {
+  switch (reg) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
       return MACHINE_ID;
 
@@ -622,6 +655,9 @@ u8_t nextreg_data_read(u16_t address) {
 
     case E_NEXTREG_REGISTER_CPU_SPEED:
       return nextreg_cpu_speed_read();
+
+    case E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING:
+      return nextreg_peripheral_2_setting_read();
 
     case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
       return nextreg_peripheral_3_setting_read();
@@ -670,7 +706,7 @@ u8_t nextreg_data_read(u16_t address) {
       return mmu_page_get(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL);
 
     default:
-      log_wrn("nextreg: unimplemented read from Next register $%02X\n", self.selected_register);
+      log_wrn("nextreg: unimplemented read from Next register $%02X\n", reg);
       break;
   }
 

@@ -56,6 +56,8 @@ void nextreg_data_write(u16_t address, u8_t value);
 u8_t nextreg_data_read(u16_t address);
 void nextreg_select_write(u16_t address, u8_t value);
 u8_t nextreg_select_read(u16_t address);
+void nextreg_write_internal(u8_t reg, u8_t value);
+u8_t nextreg_read_internal(u8_t reg);
 
 
 #endif  /* __NEXTREG_H */

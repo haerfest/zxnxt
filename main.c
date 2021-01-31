@@ -36,7 +36,6 @@ typedef enum {
   E_MAIN_TASK_NONE,
   E_MAIN_TASK_RESET_HARD,
   E_MAIN_TASK_RESET_SOFT,
-  E_MAIN_TASK_CHANGE_CPU_SPEED,
   E_MAIN_TASK_QUIT
 } main_task_t;
 
@@ -357,23 +356,42 @@ static void main_toggle_fullscreen(void) {
 
 
 static void main_reset(int hard) {
-  const u8_t selected = nextreg_select_read(NEXTREG_SELECT);
-  nextreg_select_write(NEXTREG_SELECT, E_NEXTREG_REGISTER_RESET);
-  nextreg_data_write(NEXTREG_DATA, hard ? 0x02 : 0x01);
-  nextreg_select_write(NEXTREG_SELECT, selected);
+  nextreg_write_internal(E_NEXTREG_REGISTER_RESET, hard ? 0x02: 0x01);
 }
 
 
 static void main_change_cpu_speed(void) {
-  const u8_t selected = nextreg_select_read(NEXTREG_SELECT);
-  u8_t       speed;
+  u8_t speed;
 
-  /* TODO: Only allow this when enabled in peripheral 2 setting. */
-  nextreg_select_write(NEXTREG_SELECT, E_NEXTREG_REGISTER_CPU_SPEED);
-  speed = nextreg_data_read(NEXTREG_DATA) & 0x03;
-  speed = speed + 1;
-  nextreg_data_write(NEXTREG_DATA, speed & 0x03);
-  nextreg_select_write(NEXTREG_SELECT, selected);
+  if (!(nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING) & 0x80)) {
+    return;
+  }
+
+  speed = nextreg_read_internal(E_NEXTREG_REGISTER_CPU_SPEED);
+  nextreg_write_internal(E_NEXTREG_REGISTER_CPU_SPEED, (speed + 1) & 0x03);
+}
+
+static void main_nmi_divmmc(void) {
+  if (!(nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING) & 0x10)) {
+    return;
+  }
+
+  /* TODO: Prevent if Multiface is active. */
+
+  cpu_nmi();
+}
+
+
+static void main_nmi_multiface(void) {
+  if (!(nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING) & 0x08)) {
+    return;
+  }
+
+  if (divmmc_is_active()) {
+    return;
+  }
+
+  cpu_nmi();
 }
 
 
@@ -403,14 +421,18 @@ static void main_handle_function_keys(void) {
   const int f1  = self.keyboard_state[SDL_SCANCODE_F1];
   const int f4  = self.keyboard_state[SDL_SCANCODE_F4];
   const int f8  = self.keyboard_state[SDL_SCANCODE_F8];
+  const int f9  = self.keyboard_state[SDL_SCANCODE_F9];
+  const int f10 = self.keyboard_state[SDL_SCANCODE_F10];
   const int f11 = self.keyboard_state[SDL_SCANCODE_F11];
   const int f12 = self.keyboard_state[SDL_SCANCODE_F12];
 
-  if (f1 || f4 || f8 || f11 || f12) {
+  if (f1 || f4 || f8 || f9 || f10 || f11 || f12) {
     if (!self.is_function_key_down) {
       if (f1)  self.task = E_MAIN_TASK_RESET_HARD;
       if (f4)  self.task = E_MAIN_TASK_RESET_SOFT;
-      if (f8)  self.task = E_MAIN_TASK_CHANGE_CPU_SPEED;
+      if (f8)  main_change_cpu_speed();
+      if (f9)  main_nmi_multiface();
+      if (f10) main_nmi_divmmc();
       if (f11) main_dump_memory();
       if (f12) main_toggle_fullscreen();
 
@@ -432,20 +454,9 @@ static void main_eventloop(void) {
       cpu_step();
     }
 
-    switch (self.task) {
-      case E_MAIN_TASK_RESET_HARD:
-      case E_MAIN_TASK_RESET_SOFT:
-        main_reset(self.task == E_MAIN_TASK_RESET_HARD);
-        self.task = E_MAIN_TASK_NONE;
-        break;
-
-      case E_MAIN_TASK_CHANGE_CPU_SPEED:
-        main_change_cpu_speed();
-        self.task = E_MAIN_TASK_NONE;
-        break;
-
-      default:
-        break;
+    if (self.task == E_MAIN_TASK_RESET_HARD || self.task == E_MAIN_TASK_RESET_SOFT) {
+      main_reset(self.task == E_MAIN_TASK_RESET_HARD);
+      self.task = E_MAIN_TASK_NONE;
     }
   }
 
