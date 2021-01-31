@@ -391,10 +391,6 @@ u8_t ula_timex_read(u16_t address) {
 
 
 void ula_timex_write(u16_t address, u8_t value) {
-  if (!self.is_timex_enabled) {
-    return;
-  }
-
   self.timex_disable_ula_interrupt = (value & 0x40) >> 6;
   self.hi_res_ink_colour           = (value & 0x38) >> 3;
 
