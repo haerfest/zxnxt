@@ -7,6 +7,7 @@
 #include "cpu.h"
 #include "defs.h"
 #include "io.h"
+#include "keyboard.h"
 #include "layer2.h"
 #include "log.h"
 #include "memory.h"
@@ -229,6 +230,12 @@ static void nextreg_machine_type_write(u8_t value) {
 
     rom_set_machine_type(machine_type);
   }
+}
+
+
+static u8_t nextreg_core_boot_read(void) {
+  return keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_DRIVE) << 1
+       | keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_NMI);
 }
 
 
@@ -699,6 +706,9 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_CORE_VERSION_SUB_MINOR:
       return CORE_VERSION_SUB_MINOR;
+
+    case E_NEXTREG_REGISTER_CORE_BOOT:
+      return nextreg_core_boot_read();
 
     case E_NEXTREG_REGISTER_CPU_SPEED:
       return nextreg_cpu_speed_read();

@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include "defs.h"
+#include "keyboard.h"
 #include "log.h"
 
 
@@ -61,6 +62,29 @@ int keyboard_init(void) {
 
 void keyboard_finit(void) {
 }
+
+
+int keyboard_is_special_key_pressed(keyboard_special_key_t key) {
+  switch (key) {
+    case E_KEYBOARD_SPECIAL_KEY_CPU_SPEED:
+      return self.state[SDL_SCANCODE_F8] ? 1 : 0;
+
+    case E_KEYBOARD_SPECIAL_KEY_DRIVE:
+      return self.state[SDL_SCANCODE_F10] ? 1 : 0;
+      
+    case E_KEYBOARD_SPECIAL_KEY_NMI:
+      return self.state[SDL_SCANCODE_F9] ? 1 : 0;
+      
+    case E_KEYBOARD_SPECIAL_KEY_RESET_HARD:
+      return self.state[SDL_SCANCODE_F1] ? 1 : 0;
+
+    case E_KEYBOARD_SPECIAL_KEY_RESET_SOFT:
+      return self.state[SDL_SCANCODE_F4] ? 1 : 0;
+
+    default:
+      return 0;
+  }
+} 
 
 
 #define HALF_ROW_L(a,b,c,d,e) ((self.pressed[a] << 0) | (self.pressed[b] << 1) | (self.pressed[c] << 2) | (self.pressed[d] << 3) | self.pressed[e] << 4)

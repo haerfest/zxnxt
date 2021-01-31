@@ -427,23 +427,23 @@ static void main_dump_memory(void) {
 
 
 static void main_handle_function_keys(void) {
-  const int f1  = self.keyboard_state[SDL_SCANCODE_F1];
-  const int f4  = self.keyboard_state[SDL_SCANCODE_F4];
-  const int f8  = self.keyboard_state[SDL_SCANCODE_F8];
-  const int f9  = self.keyboard_state[SDL_SCANCODE_F9];
-  const int f10 = self.keyboard_state[SDL_SCANCODE_F10];
-  const int f11 = self.keyboard_state[SDL_SCANCODE_F11];
-  const int f12 = self.keyboard_state[SDL_SCANCODE_F12];
+  const int key_reset_hard = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_RESET_HARD);
+  const int key_reset_soft = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_RESET_SOFT);
+  const int key_cpu_speed  = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_CPU_SPEED);
+  const int key_nmi        = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_NMI);
+  const int key_drive      = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_DRIVE);
+  const int f11            = self.keyboard_state[SDL_SCANCODE_F11];
+  const int f12            = self.keyboard_state[SDL_SCANCODE_F12];
 
-  if (f1 || f4 || f8 || f9 || f10 || f11 || f12) {
+  if (key_reset_hard || key_reset_soft || key_cpu_speed || key_nmi || key_drive || f11 || f12) {
     if (!self.is_function_key_down) {
-      if (f1)  self.task = E_MAIN_TASK_RESET_HARD;
-      if (f4)  self.task = E_MAIN_TASK_RESET_SOFT;
-      if (f8)  main_change_cpu_speed();
-      if (f9)  main_nmi_multiface();
-      if (f10) main_nmi_divmmc();
-      if (f11) main_dump_memory();
-      if (f12) main_toggle_fullscreen();
+      if (key_reset_hard)  self.task = E_MAIN_TASK_RESET_HARD;
+      if (key_reset_soft)  self.task = E_MAIN_TASK_RESET_SOFT;
+      if (key_cpu_speed)   main_change_cpu_speed();
+      if (key_nmi)         main_nmi_multiface();
+      if (key_drive)       main_nmi_divmmc();
+      if (f11)             main_dump_memory();
+      if (f12)             main_toggle_fullscreen();
 
       /* Prevent auto-repeat from continuous triggering. */
       self.is_function_key_down = 1;
