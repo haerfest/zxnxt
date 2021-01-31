@@ -82,39 +82,51 @@ void keyboard_refresh(void) {
 
   /* Then implement some of the additional keys on later models. */
   if (self.state[SDL_SCANCODE_BACKSPACE]) {
+    /* Delete. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_0] = 1;
   }
   if (self.state[SDL_SCANCODE_GRAVE]) {
+    /* Edit. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_1] = 1;
   }
   if (self.state[SDL_SCANCODE_LEFT]) {
+    /* Left. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_5] = 1;
   }
   if (self.state[SDL_SCANCODE_DOWN]) {
+    /* Down. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_6] = 1;
   }
   if (self.state[SDL_SCANCODE_UP]) {
+    /* Up. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_7] = 1;
   }
   if (self.state[SDL_SCANCODE_RIGHT]) {
+    /* Right. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_8] = 1;
   }
   if (self.state[SDL_SCANCODE_ESCAPE]) {
+    /* Break. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_SPACE] = 1;
   }
   if (self.state[SDL_SCANCODE_SEMICOLON]) {
+    /* ; */
     self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_O] = 1;
   }
-    if (self.state[SDL_SCANCODE_APOSTROPHE]) {
+  if (self.state[SDL_SCANCODE_APOSTROPHE]) {
+    /* " */
     self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_P] = 1;
   }
   if (self.state[SDL_SCANCODE_COMMA]) {
+    /* , */
     self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_N] = 1;
   }
   if (self.state[SDL_SCANCODE_PERIOD]) {
+    /* . */
     self.pressed[E_KEY_SYMBOL_SHIFT] = self.pressed[E_KEY_M] = 1;
   }
   if (self.state[SDL_SCANCODE_TAB]) {
+    /* Extend Mode. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_SYMBOL_SHIFT] = 1;
   }
 
