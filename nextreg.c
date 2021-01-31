@@ -40,6 +40,7 @@ typedef enum {
 
 
 typedef struct {
+  u8_t                     registers[256];
   u8_t                     selected_register;
   int                      is_hard_reset;
   int                      palette_disable_auto_increment;
@@ -163,11 +164,6 @@ u8_t nextreg_select_read(u16_t address) {
 }
 
 
-static u8_t nextreg_reset_read(void) {
-  return self.is_hard_reset ? 0x02 : 0x01;
-}
-
-
 static void nextreg_reset_write(u8_t value) {
   if (value & 0x03) {
     /* Hard or soft reset. */
@@ -181,6 +177,12 @@ static void nextreg_reset_write(u8_t value) {
     cpu_reset();
 
     log_dbg("nextreg: %s reset\n", self.is_hard_reset ? "hard" : "soft");
+    return;
+  }
+
+  if (value & 0x0C) {
+    /* MF or DivMMC NMI. */
+    cpu_nmi();
   }
 }
 
@@ -630,6 +632,9 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       log_wrn("nextreg: unimplemented write of $%02X to Next register $%02X\n", value, reg);
       break;
   }
+
+  /* Always remember the last value written. */
+  self.registers[reg] = value;
 }
 
 
@@ -649,9 +654,6 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_CORE_VERSION_SUB_MINOR:
       return CORE_VERSION_SUB_MINOR;
-
-    case E_NEXTREG_REGISTER_RESET:
-      return nextreg_reset_read();
 
     case E_NEXTREG_REGISTER_CPU_SPEED:
       return nextreg_cpu_speed_read();
@@ -706,11 +708,11 @@ u8_t nextreg_read_internal(u8_t reg) {
       return mmu_page_get(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL);
 
     default:
-      log_wrn("nextreg: unimplemented read from Next register $%02X\n", reg);
       break;
   }
 
-  return 0xFF;
+  /* By default, return the last value written. */
+  return self.registers[reg];
 }
 
 

@@ -16,6 +16,7 @@
 #include "layer2.h"
 #include "log.h"
 #include "memory.h"
+#include "mf.h"
 #include "mmu.h"
 #include "nextreg.h"
 #include "paging.h"
@@ -233,8 +234,12 @@ static int main_init(void) {
     goto exit_paging;
   }
 
-  if (clock_init() != 0) {
+  if (mf_init(sram) != 0) {
     goto exit_divmmc;
+  }
+
+  if (clock_init() != 0) {
+    goto exit_mf;
   }
 
   if (keyboard_init() != 0) {
@@ -271,6 +276,8 @@ exit_keyboard:
   keyboard_finit();
 exit_clock:
   clock_finit();
+exit_mf:
+  mf_finit();
 exit_divmmc:
   divmmc_finit();
 exit_paging:
@@ -376,9 +383,11 @@ static void main_nmi_divmmc(void) {
     return;
   }
 
-  /* TODO: Prevent if Multiface is active. */
+  if (mf_is_active()) {
+    return;
+  }
 
-  cpu_nmi();
+  nextreg_write_internal(E_NEXTREG_REGISTER_RESET, 0x04);
 }
 
 
@@ -391,7 +400,7 @@ static void main_nmi_multiface(void) {
     return;
   }
 
-  cpu_nmi();
+  nextreg_write_internal(E_NEXTREG_REGISTER_RESET, 0x08);
 }
 
 
@@ -471,6 +480,7 @@ static void main_finit(void) {
   ula_finit();
   keyboard_finit();
   clock_finit();
+  mf_finit();
   divmmc_finit();
   paging_finit();
   mmu_finit();
