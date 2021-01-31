@@ -298,6 +298,30 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
 }
 
 
+static void nextreg_peripheral_5_setting_write(u8_t value) {
+  if (!config_is_active()) {
+    return;
+  }
+
+  switch (value >> 5) {
+    case 0:
+      /* Multiface +3. */
+      io_mf_ports_set(0x3F, 0xBF);
+      break;
+
+    case 1:
+      /* Multiface 128 v87.2. */
+      io_mf_ports_set(0xBF, 0x3F);
+      break;
+
+    default:
+      /* Multiface 128 v87.12 or Multiface 1. */
+      io_mf_ports_set(0x9F, 0x1F);
+      break;
+  }
+}
+
+
 static u8_t nextreg_cpu_speed_read(void) {
   const u8_t speed = clock_cpu_speed_get();
 
@@ -479,9 +503,18 @@ static void nextreg_internal_port_decoding_0_write(u8_t value) {
 }
 
 
+static void nextreg_internal_port_decoding_1_write(u8_t value) {
+  io_mf_port_decoding_enable(value & 0x02);
+}
+
+
 static void nextreg_internal_port_decoding_2_write(u8_t value) {
   io_port_enable(0xBFFD, value & 0x01);
   io_port_enable(0xFFFD, value & 0x01);
+}
+
+
+static void nextreg_internal_port_decoding_3_write(u8_t value) {
 }
 
 
@@ -553,6 +586,10 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       nextreg_peripheral_4_setting_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_PERIPHERAL_5_SETTING:
+      nextreg_peripheral_5_setting_write(value);
+      break;
+
     case E_NEXTREG_REGISTER_CPU_SPEED:
       nextreg_cpu_speed_write(value);
       break;
@@ -616,8 +653,16 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       nextreg_internal_port_decoding_0_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1:
+      nextreg_internal_port_decoding_1_write(value);
+      break;
+
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
       nextreg_internal_port_decoding_2_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
+      nextreg_internal_port_decoding_3_write(value);
       break;
 
     case E_NEXTREG_REGISTER_ALTERNATE_ROM:

@@ -3,20 +3,24 @@
 #include "nextreg.h"
 #include "dac.h"
 #include "defs.h"
+#include "i2c.h"
 #include "io.h"
 #include "kempston.h"
 #include "layer2.h"
 #include "log.h"
-#include "i2c.h"
+#include "mf.h"
 #include "paging.h"
 #include "spi.h"
 #include "ula.h"
 
 
 typedef struct {
-  int is_port_7FFD_enabled;
-  int is_port_BFFD_enabled;
-  int is_port_FFFD_enabled;
+  int  is_port_7FFD_enabled;
+  int  is_port_BFFD_enabled;
+  int  is_port_FFFD_enabled;
+  u8_t mf_port_enable;
+  u8_t mf_port_disable;
+  int  is_mf_port_decoding_enabled;
 } self_t;
 
 
@@ -30,13 +34,27 @@ int io_init(void) {
 
 
 void io_reset(void) {
-  self.is_port_7FFD_enabled = 1;
-  self.is_port_BFFD_enabled = 1;
-  self.is_port_FFFD_enabled = 1;
+  self.is_port_7FFD_enabled        = 1;
+  self.is_port_BFFD_enabled        = 1;
+  self.is_port_FFFD_enabled        = 1;
+  self.mf_port_enable              = 0x3F;
+  self.mf_port_disable             = 0xBF;
+  self.is_mf_port_decoding_enabled = 1;
 }
 
 
 void io_finit(void) {
+}
+
+
+void io_mf_port_decoding_enable(int do_enable) {
+  self.is_mf_port_decoding_enabled = do_enable;
+}
+
+
+void io_mf_ports_set(u8_t enable, u8_t disable) {
+  self.mf_port_enable  = enable;
+  self.mf_port_disable = disable;
 }
 
 
@@ -58,6 +76,16 @@ u8_t io_read(u16_t address) {
   if ((address & 0xC007) == 0xC005) {
     /* 0xFFFD */
     return self.is_port_FFFD_enabled ? ay_register_read() : 0xFF;
+  }
+
+  if (self.is_mf_port_decoding_enabled) {
+    if (address == self.mf_port_enable) {
+      return mf_enable_read(address);
+    }
+
+    if (address == self.mf_port_disable) {
+      return mf_disable_read(address);
+    }
   }
 
   switch (address & 0x00FF) {
@@ -141,6 +169,18 @@ void io_write(u16_t address, u8_t value) {
       paging_spectrum_128k_paging_write(value);
     }
     return;
+  }
+
+  if (self.is_mf_port_decoding_enabled) {
+    if (address == self.mf_port_enable) {
+      mf_enable_write(address, value);
+      return;
+    }
+
+    if (address == self.mf_port_disable) {
+      mf_disable_write(address, value);
+      return;
+    }
   }
 
   switch (address & 0xC007) {

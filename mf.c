@@ -27,12 +27,23 @@ int mf_is_active(void) {
 }
 
 
-u8_t mf_read(u16_t address) {
-  log_dbg("mf: unimplemented read from $%04X\n", address);
+u8_t mf_enable_read(u16_t address) {
+  log_dbg("mf: unimplemented read from ENABLE $%04X\n", address);
   return 0xFF;
 }
 
 
-void mf_write(u16_t address, u8_t value) {
-  log_dbg("mf: unimplemented write of $%02X to $%04X\n", value, address);
+void mf_enable_write(u16_t address, u8_t value) {
+  log_dbg("mf: unimplemented write of $%02X to ENABLE $%04X\n", value, address);
+}
+
+
+u8_t mf_disable_read(u16_t address) {
+  log_dbg("mf: unimplemented read from DISABLE $%04X\n", address);
+  return 0xFF;
+}
+
+
+void mf_disable_write(u16_t address, u8_t value) {
+  log_dbg("mf: unimplemented write of $%02X to DISABLE $%04X\n", value, address);
 }
