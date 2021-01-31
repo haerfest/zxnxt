@@ -7,6 +7,7 @@
 #include "io.h"
 #include "log.h"
 #include "memory.h"
+#include "mf.h"
 
 #ifdef TRACE
 #include "bootrom.h"
@@ -177,13 +178,16 @@ typedef struct {
   u8_t i;
   u8_t r;
 
-  /* Interrupt mode. */
-  u8_t  im;
-  int   nmi_pending;          /* Non-zero if NMI pending.                     */
+  /* IRQ. */
+  u8_t  im;                   /* Interrupt mode.                              */
   int   irq_pending;          /* Non-zero if IRQ pending.                     */
   u32_t irq_duration;         /* T-states until irq_pending resets.           */
   int   irq_delay;            /* Non-zero if any pending IRQ must be delayed. */
   int   irq_pending_delayed;  /* Non-zero if IRQ pending and delayed.         */
+
+  /* NMI. */
+  int              nmi_pending;  /* Non-zero if NMI pending.                  */
+  cpu_nmi_reason_t nmi_reason;   /* Reason for NMI.                           */
 
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
@@ -267,8 +271,9 @@ void cpu_irq(u32_t duration) {
 }
 
 
-void cpu_nmi(void) {
+void cpu_nmi(cpu_nmi_reason_t reason) {
   self.nmi_pending = 1;
+  self.nmi_reason  = reason;
 }
 
 
@@ -343,6 +348,11 @@ static void cpu_nmi_pending(void) {
 
   /* Jump to the NMI routine. */ 
   PC = 0x0066;
+
+  if (self.nmi_reason == E_CPU_NMI_REASON_MF) {
+    mf_activate();
+    memory_refresh_accessors(0, 2);
+  }
 }
 
 

@@ -4,6 +4,7 @@
 #include "defs.h"
 #include "divmmc.h"
 #include "log.h"
+#include "mf.h"
 #include "mmu.h"
 #include "memory.h"
 #include "rom.h"
@@ -93,6 +94,9 @@ void memory_refresh_accessors(int page, int n_pages) {
       } else if (config_is_active()) {
         self.readers[i] = config_read;
         self.writers[i] = config_write;
+      } else if (mf_is_active()) {
+        self.readers[i] = (i == 0) ? mf_rom_read  : mf_ram_read;
+        self.writers[i] = (i == 0) ? mf_rom_write : mf_ram_write;
       } else if (divmmc_is_active()) {
         self.readers[i] = (i == 0) ? divmmc_rom_read  : divmmc_ram_read;
         self.writers[i] = (i == 0) ? divmmc_rom_write : divmmc_ram_write;

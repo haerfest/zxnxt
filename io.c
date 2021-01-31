@@ -49,6 +49,7 @@ void io_finit(void) {
 
 void io_mf_port_decoding_enable(int do_enable) {
   self.is_mf_port_decoding_enabled = do_enable;
+  log_dbg("io: MF port decoding %s\n", do_enable ? "enabled" : "disabled");
 }
 
 
@@ -79,11 +80,11 @@ u8_t io_read(u16_t address) {
   }
 
   if (self.is_mf_port_decoding_enabled) {
-    if (address == self.mf_port_enable) {
+    if ((address & 0x00FF) == self.mf_port_enable) {
       return mf_enable_read(address);
     }
 
-    if (address == self.mf_port_disable) {
+    if ((address & 0x00FF) == self.mf_port_disable) {
       return mf_disable_read(address);
     }
   }
@@ -172,7 +173,7 @@ void io_write(u16_t address, u8_t value) {
   }
 
   if (self.is_mf_port_decoding_enabled) {
-    if (address == self.mf_port_enable) {
+    if ((address & 0x00FF) == self.mf_port_enable) {
       mf_enable_write(address, value);
       return;
     }

@@ -181,9 +181,14 @@ static void nextreg_reset_write(u8_t value) {
     return;
   }
 
-  if (value & 0x0C) {
-    /* MF or DivMMC NMI. */
-    cpu_nmi();
+  if (value & 0x08) {
+    cpu_nmi(E_CPU_NMI_REASON_MF);
+    return;
+  }
+
+  if (value & 0x04) {
+    cpu_nmi(E_CPU_NMI_REASON_DIVMMC);
+    return;
   }
 }
 
@@ -234,6 +239,7 @@ static void nextreg_machine_type_write(u8_t value) {
 
 
 static u8_t nextreg_core_boot_read(void) {
+  log_dbg("nextreg: MF / DRIVE key status read\n");
   return keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_DRIVE) << 1
        | keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_NMI);
 }
