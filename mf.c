@@ -1,17 +1,19 @@
 #include <string.h>
 #include "defs.h"
+#include "io.h"
 #include "log.h"
 #include "memory.h"
 
 
 /**
- * See https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/blob/master/cores/zxnext/src/device/multiface.vhd
+ * See https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/device/multiface.vhd
  */
 
 
 typedef struct {
   u8_t* sram;
-  int   is_active;
+  int   is_invisible;
+  int   is_enabled;
 } self_t;
 
 
@@ -19,8 +21,10 @@ static self_t self;
 
 
 int mf_init(u8_t* sram) {
-  memset(&self, 0, sizeof(self));
-  self.sram = sram;
+  self.sram         = sram;
+  self.is_invisible = 1;
+  self.is_enabled   = 0;
+
   return 0;
 }
 
@@ -30,34 +34,58 @@ void mf_finit(void) {
 
 
 void mf_activate(void) {
-  self.is_active = 1;
+  self.is_enabled   = 1;
+  self.is_invisible = 0;
+
+  memory_refresh_accessors(0, 2);
 }
 
 
 int mf_is_active(void) {
-  return self.is_active;
+  return self.is_enabled;
 }
 
 
 u8_t mf_enable_read(u16_t address) {
-  log_dbg("mf: unimplemented read from ENABLE $%04X\n", address);
+  if (!self.is_invisible) {
+    switch (address >> 8) {
+      case 0x1F:
+        return io_read(0x1FFD);
+
+      case 0x7F:
+        return io_read(0x7FFD);
+
+      default:
+        break;
+    }
+  }
+
+  if (self.is_invisible == 0) {
+    self.is_enabled = 1;
+  } else {
+    self.is_enabled = 0;
+  }
+
+  memory_refresh_accessors(0, 2);
+
   return 0xFF;
 }
 
 
 void mf_enable_write(u16_t address, u8_t value) {
-  log_dbg("mf: unimplemented write of $%02X to ENABLE $%04X\n", value, address);
 }
 
 
 u8_t mf_disable_read(u16_t address) {
-  log_dbg("mf: unimplemented read from DISABLE $%04X\n", address);
+  self.is_enabled = 0;
+  memory_refresh_accessors(0, 2);
+
   return 0xFF;
 }
 
 
 void mf_disable_write(u16_t address, u8_t value) {
-  log_dbg("mf: unimplemented write of $%02X to DISABLE $%04X\n", value, address);
+  self.is_invisible = 1;
 }
 
 

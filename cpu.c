@@ -351,7 +351,6 @@ static void cpu_nmi_pending(void) {
 
   if (self.nmi_reason == E_CPU_NMI_REASON_MF) {
     mf_activate();
-    memory_refresh_accessors(0, 2);
   }
 }
 
