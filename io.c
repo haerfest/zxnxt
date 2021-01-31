@@ -41,11 +41,12 @@ void io_finit(void) {
 
 
 u8_t io_read(u16_t address) {
-  log_dbg("io: read from $%04X\n", address);
-
   if ((address & 0x0001) == 0x0000) {
     return ula_read(address);
   }
+
+  /* Keyboard reads are not that useful to log, so log here. */
+  log_dbg("io: read from $%04X\n", address);
 
   /* TODO: Bit 14 of address must be set on Plus 3? */
   if ((address & 0x8003) == 0x0001) {
