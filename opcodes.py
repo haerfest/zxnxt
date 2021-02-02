@@ -178,7 +178,7 @@ def cp_n() -> C:
         u16_t result;
         TMP    = memory_read(PC++); T(3);
         result = A - TMP;
-        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (A < TMP) << CF_SHIFT;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
     '''
 
 def cp_pss(xy: Optional[str] = None) -> C:
@@ -187,13 +187,13 @@ def cp_pss(xy: Optional[str] = None) -> C:
         WZ     = {wz(xy)};
         TMP    = memory_read(WZ); T(3);
         result = A - TMP;
-        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (A < TMP) << CF_SHIFT;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
     '''
 
 def cp_r(r: str) -> C:
     return f'''
         const u16_t result = A - {r};
-        F                  = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
+        F                  = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
     '''
 
 def cpx(op: str) -> C:
