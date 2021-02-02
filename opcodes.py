@@ -73,7 +73,7 @@ def add_A_n() -> C:
     return '''
         const u8_t n       = memory_read(PC++); T(3);
         const u16_t result = A + n;
-        F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | (result > 0xFF) << CF_SHIFT;
+        F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | (result & 0x0100 ? CF_MASK : 0);
         A = result & 0xFF;
     '''
 
@@ -83,14 +83,14 @@ def add_A_pss(xy: Optional[str] = None) -> C:
         WZ     = {wz(xy)};
         TMP    = memory_read(WZ); T(3);
         result = A + TMP;
-        F      = SZ53(result & 0xFF) | HF_ADD(A, TMP, result) | VF_ADD(A, TMP, result) | (result > 0xFF) << CF_SHIFT;
+        F      = SZ53(result & 0xFF) | HF_ADD(A, TMP, result) | VF_ADD(A, TMP, result) | (result & 0x0100 ? CF_MASK : 0);
         A      = result & 0xFF;
     '''
 
 def add_A_r(r: str) -> C:
     return f'''
         const u16_t result = A + {r};
-        F = SZ53(result & 0xFF) | HF_ADD(A, {r}, result) | VF_ADD(A, {r}, result) | (result > 0xFF) << CF_SHIFT;
+        F = SZ53(result & 0xFF) | HF_ADD(A, {r}, result) | VF_ADD(A, {r}, result) | (result & 0x0100 ? CF_MASK : 0);
         A = result & 0xFF;
     '''
 
@@ -1014,7 +1014,7 @@ def sub_n() -> C:
         u16_t result;
         Z      = memory_read(PC++); T(3);
         result = A - Z;
-        F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | (A < Z) << CF_SHIFT;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | VF_SUB(A, Z, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
         A      = result & 0xFF;
     '''
 
@@ -1024,14 +1024,14 @@ def sub_pss(xy: Optional[str] = None) -> C:
         WZ     = {wz(xy)};
         TMP    = memory_read(WZ); T(3);
         result = A - TMP;
-        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (A < TMP) << CF_SHIFT;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
         A      = result & 0xFF;
     '''
 
 def sub_r(r: str) -> C:
     return f'''
         const u16_t result = A - {r};
-        F                  = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (A < {r}) << CF_SHIFT;
+        F                  = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
         A                  = result & 0xFF;
     '''
 
