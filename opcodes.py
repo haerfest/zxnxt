@@ -71,7 +71,7 @@ def adc_HL_ss(ss: str) -> C:
 
 def add_A_n() -> C:
     return '''
-        const u8_t n       = memory_read(PC++); T(3);
+        const u8_t  n      = memory_read(PC++); T(3);
         const u16_t result = A + n;
         F = SZ53(result & 0xFF) | HF_ADD(A, n, result) | VF_ADD(A, n, result) | (result & 0x0100 ? CF_MASK : 0);
         A = result & 0xFF;
@@ -873,34 +873,30 @@ def rst(address: int) -> C:
 def sbc_A_n() -> C:
     return '''
         const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
-        const u8_t a     = A;
         u16_t      result;
         TMP    = memory_read(PC++); T(3);
         result = A - TMP - carry;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
         A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, TMP, A) | VF_SUB(a, TMP, A) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
     '''
 
 def sbc_A_pss(xy: Optional[str] = None) -> C:
     return f'''
         const u8_t  carry = (F & CF_MASK) >> CF_SHIFT;
-        const u8_t  a     = A;
         u16_t       result;
         WZ     = {wz(xy)};
         TMP    = memory_read(WZ); T(3);
         result = A - TMP - carry;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, TMP, result) | VF_SUB(A, TMP, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
         A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, TMP, A) | VF_SUB(a, TMP, A) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
     '''
 
 def sbc_A_r(r: str) -> C:
     return f'''
-        const u8_t carry = (F & CF_MASK) >> CF_SHIFT;
-        const u8_t a     = A;
-        u16_t      result;
-        result = A - {r} - carry;
+        const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
+        const u16_t result = A - {r} - carry;
+        F      = SZ53(result & 0xFF) | HF_SUB(A, {r}, result) | VF_SUB(A, {r}, result) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
         A      = result & 0xFF;
-        F      = SZ53(A) | HF_SUB(a, {r}, A) | VF_SUB(a, {r}, A) | NF_MASK | (result & 0x0100 ? CF_MASK : 0);
     '''
 
 def sbc_HL_ss(ss: str) -> C:
