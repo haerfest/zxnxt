@@ -206,10 +206,23 @@ static void ula_blit(void) {
 
 
 static void ula_display_reconfigure(void) {
-  self.display_spec = &ula_display_spec[self.display_timing][self.display_frequency == 60];
-  self.display_mode = self.display_mode_requested;
+  /**
+   * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/ports.txt
+   *
+   * "If the screen is located in bank 7, the ula fetches a standard spectrum
+   * display ignoring modes selected in port 0xFF."
+   *
+   * It doesn't specify _which_ standard display, so I assume either is
+   * supported.
+   */
+  const ula_display_mode_t mode = (self.screen_bank == E_ULA_SCREEN_BANK_7) ? (self.display_mode_requested & 1) : self.display_mode_requested;
 
-  switch (self.display_mode) {
+  /* Remember the requested mode in case we honor it in bank 5. */
+  self.display_mode = self.display_mode_requested;
+  self.display_spec = &ula_display_spec[self.display_timing][self.display_frequency == 60];
+
+  /* Use the effective mode, which depends on the actual bank. */
+  switch (mode) {
     case E_ULA_DISPLAY_MODE_SCREEN_0:
       self.display_ram   = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
       self.attribute_ram = &self.display_ram[192 * 32];
@@ -469,8 +482,13 @@ void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
 
 
 void ula_screen_bank_set(ula_screen_bank_t bank) {
-  self.screen_bank = bank;
-  self.display_ram = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
+  if (bank != self.screen_bank) {
+    self.screen_bank            = bank;
+    self.display_mode_requested = self.display_mode;  /* Does not change. */
+
+    /* Changing the bank has an immediate effect. */
+    ula_display_reconfigure();
+  }
 }
 
 
