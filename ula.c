@@ -379,8 +379,10 @@ void ula_write(u16_t address, u8_t value) {
 }
 
 
-void ula_timex_set(int do_enable) {
+void ula_timex_video_mode_read_enable(int do_enable) {
   self.is_timex_enabled = do_enable;
+
+  log_dbg("ula: timex port set to %s\n", do_enable ? "return video mode" : "floating bus");
 }
 
 
@@ -404,6 +406,8 @@ u8_t ula_timex_read(u16_t address) {
 
 
 void ula_timex_write(u16_t address, u8_t value) {
+  log_dbg("ula: timex write of $%02X to $%04X\n", value, address);
+
   self.timex_disable_ula_interrupt = (value & 0x40) >> 6;
   self.hi_res_ink_colour           = (value & 0x38) >> 3;
 
@@ -489,6 +493,8 @@ void ula_screen_bank_set(ula_screen_bank_t bank) {
     /* Changing the bank has an immediate effect. */
     ula_display_reconfigure();
   }
+
+  log_dbg("ula: screen bank set to %u\n", bank);
 }
 
 

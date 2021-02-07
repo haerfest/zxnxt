@@ -141,7 +141,7 @@ static void nextreg_reset_hard(void) {
   nextreg_ay_configure(E_NEXTREG_AY_2);
   nextreg_ay_configure(E_NEXTREG_AY_3);
 
-  ula_timex_set(0);
+  ula_timex_video_mode_read_enable(0);
 }
 
 
@@ -289,7 +289,7 @@ static void nextreg_peripheral_3_setting_write(u8_t value) {
 
   ula_contention_set((value & 0x40) == 0);
 
-  ula_timex_set((value & 0x02) != 0);
+  ula_timex_video_mode_read_enable((value & 0x04) != 0);
 }
 
 
