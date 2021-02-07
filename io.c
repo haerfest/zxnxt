@@ -142,7 +142,7 @@ u8_t io_read(u16_t address) {
       return paging_spectrum_128k_paging_read();
 
     case 0xDFFD:
-      paging_spectrum_plus_3_paging_read();
+      paging_spectrum_next_bank_extension_read();
       break;
 
     default:
@@ -249,11 +249,9 @@ void io_write(u16_t address, u8_t value) {
       layer2_write(address, value);
       return;
 
-#if 0
     case 0x1FFD:
       paging_spectrum_plus_3_paging_write(value);
       return;
-#endif
 
     case 0x243B:
       nextreg_select_write(address, value);
@@ -263,11 +261,9 @@ void io_write(u16_t address, u8_t value) {
       nextreg_data_write(address, value);
       return;
 
-#if 0
     case 0xDFFD:
       paging_spectrum_next_bank_extension_write(value);
       return;
-#endif
 
     default:
       break;

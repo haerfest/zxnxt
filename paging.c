@@ -48,6 +48,8 @@ void paging_spectrum_128k_paging_unlock(void) {
 
 
 u8_t paging_spectrum_128k_paging_read(void) {
+  log_dbg("paging: Spectrum 128K paging read\n");
+
   return self.is_spectrum_128k_paging_locked            << 5 |
          (rom_selected() & 0x01)                        << 4 |
          (ula_screen_bank_get() == E_ULA_SCREEN_BANK_7) << 3 |
@@ -64,6 +66,13 @@ u8_t paging_spectrum_128k_paging_read(void) {
  */
 
 
+static void paging_mmu_update(void) {
+  mmu_page_set(0, MMU_ROM_PAGE);
+  mmu_page_set(1, MMU_ROM_PAGE);
+  mmu_bank_set(4, self.bank_slot_4);
+}
+
+
 void paging_spectrum_128k_paging_write(u8_t value) {
   log_dbg("paging: Spectrum 128K paging write of $%02X\n", value);
 
@@ -78,30 +87,49 @@ void paging_spectrum_128k_paging_write(u8_t value) {
   ula_screen_bank_set((value & 0x08) ? E_ULA_SCREEN_BANK_7 : E_ULA_SCREEN_BANK_5);
 
   self.bank_slot_4 = (self.bank_slot_4 & ~0x07) | (value & 0x07);
-  mmu_bank_set(4, self.bank_slot_4);
 
   if (value & 0x20) {
     self.is_spectrum_128k_paging_locked = 1;
   }
 
-  mmu_page_set(0, MMU_ROM_PAGE);
-  mmu_page_set(1, MMU_ROM_PAGE);
+  paging_mmu_update();
 }
 
 
 u8_t paging_spectrum_next_bank_extension_read(void) {
+  log_dbg("paging: Spectrum Next bank extension read\n");
+
+  /* Is write-only. */
   return 0xFF;
 }
 
 
 void paging_spectrum_next_bank_extension_write(u8_t value) {
+  log_dbg("paging: Spectrum Next bank extension write of $%02X\n", value);
+
+  self.bank_slot_4 = (value & 0x0F) << 3 | (self.bank_slot_4 & 0x07);
+  paging_mmu_update();
 }
 
 
 u8_t paging_spectrum_plus_3_paging_read(void) {
-  return 0xFF;
+  log_dbg("paging: Spectrum +3 paging read\n");
+
+  return (rom_selected() & 0x02) << 1;
 }
 
 
 void paging_spectrum_plus_3_paging_write(u8_t value) {
+  const u8_t is_special = value & 0x01;
+
+  log_dbg("paging: Spectrum +3 paging write of $%02X\n", value);
+
+  if (is_special) {
+    log_wrn("paging: special paging not implemented yet\n");
+  } else {
+    const u8_t rom = (value & 0x04) >> 1 | (rom_selected() & 0x01);
+    rom_select(rom);
+  }
+
+  paging_mmu_update();
 }

@@ -1,8 +1,8 @@
 #include <string.h>
 #include "defs.h"
-#include "io.h"
 #include "log.h"
 #include "memory.h"
+#include "paging.h"
 
 
 /**
@@ -50,10 +50,10 @@ u8_t mf_enable_read(u16_t address) {
   if (!self.is_invisible) {
     switch (address >> 8) {
       case 0x1F:
-        return io_read(0x1FFD);
+        return paging_spectrum_plus_3_paging_read();
 
       case 0x7F:
-        return io_read(0x7FFD);
+        return paging_spectrum_128k_paging_read();
 
       default:
         break;
