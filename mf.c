@@ -12,7 +12,7 @@
 
 typedef struct {
   u8_t* sram;
-  int   is_invisible;
+  int   is_visible;
   int   is_enabled;
 } self_t;
 
@@ -21,10 +21,8 @@ static self_t self;
 
 
 int mf_init(u8_t* sram) {
-  self.sram         = sram;
-  self.is_invisible = 1;
-  self.is_enabled   = 0;
-
+  memset(&self, 0, sizeof(self));
+  self.sram = sram;
   return 0;
 }
 
@@ -34,8 +32,8 @@ void mf_finit(void) {
 
 
 void mf_activate(void) {
-  self.is_enabled   = 1;
-  self.is_invisible = 0;
+  self.is_enabled = 1;
+  self.is_visible = 1;
 
   memory_refresh_accessors(0, 2);
 }
@@ -47,7 +45,7 @@ int mf_is_active(void) {
 
 
 u8_t mf_enable_read(u16_t address) {
-  if (!self.is_invisible) {
+  if (self.is_visible) {
     switch (address >> 8) {
       case 0x1F:
         return paging_spectrum_plus_3_paging_read();
@@ -60,7 +58,7 @@ u8_t mf_enable_read(u16_t address) {
     }
   }
 
-  if (self.is_invisible == 0) {
+  if (self.is_visible) {
     self.is_enabled = 1;
   } else {
     self.is_enabled = 0;
@@ -85,7 +83,7 @@ u8_t mf_disable_read(u16_t address) {
 
 
 void mf_disable_write(u16_t address, u8_t value) {
-  self.is_invisible = 1;
+  self.is_visible = 0;
 }
 
 
