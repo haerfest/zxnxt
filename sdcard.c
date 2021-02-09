@@ -168,14 +168,16 @@ u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
   u8_t response;
 
   /* If there is no response left, should we request one on the fly? */
-  if (self[n].response_index == self[n].response_length) {
-    if (self[n].command == E_CMD_READ_MULTIPLE_BLOCK) {
-      self[n].position += self[n].block_length;
-      self[n].response_length = sdcard_block_read(n, self[n].response_buffer);
-      self[n].response_index  = 0;
+  if (self[n].fp != NULL) {
+    if (self[n].response_index == self[n].response_length) {
+      if (self[n].command == E_CMD_READ_MULTIPLE_BLOCK) {
+        self[n].position += self[n].block_length;
+        self[n].response_length = sdcard_block_read(n, self[n].response_buffer);
+        self[n].response_index  = 0;
+      }
     }
   }
-    
+
   /* Is there a response available? */
   if (self[n].response_index < self[n].response_length) {
     return self[n].response_buffer[self[n].response_index++];
