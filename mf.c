@@ -9,6 +9,7 @@
  * See:
  * - https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/device/multiface.vhd
  * - http://www.1000bit.it/support/manuali/sinclair/zxspectrum/multiface/multiface1.html
+ * - https://k1.spdns.de/Vintage/Sinclair/82/Peripherals/Multiface%20I%2C%20128%2C%20and%20%2B3%20(Romantic%20Robot)/
  */
 
 
@@ -52,6 +53,14 @@ u8_t mf_enable_read(u16_t address) {
   log_dbg("mf: read ENABLE  $%04X (is_visible=%c, is_enabled=%c)\n", address, self.is_visible ? 'Y' : 'N', self.is_enabled ? 'Y' : 'N');
 
   if (self.is_visible) {
+    self.is_enabled = 1;
+  } else {
+    self.is_enabled = 0;
+  }
+
+  memory_refresh_accessors(0, 2);
+
+  if (self.is_visible) {
     switch (address >> 8) {
       case 0x1F:
         return paging_spectrum_plus_3_paging_read();
@@ -64,13 +73,6 @@ u8_t mf_enable_read(u16_t address) {
     }
   }
 
-  if (self.is_visible) {
-    self.is_enabled = 1;
-  } else {
-    self.is_enabled = 0;
-  }
-
-  memory_refresh_accessors(0, 2);
 
   return 0xFF;
 }
