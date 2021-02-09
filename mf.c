@@ -6,7 +6,9 @@
 
 
 /**
- * See https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/device/multiface.vhd
+ * See:
+ * - https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/device/multiface.vhd
+ * - http://www.1000bit.it/support/manuali/sinclair/zxspectrum/multiface/multiface1.html
  */
 
 
@@ -32,6 +34,8 @@ void mf_finit(void) {
 
 
 void mf_activate(void) {
+  log_dbg("mf: activated\n");
+
   self.is_enabled = 1;
   self.is_visible = 1;
 
@@ -45,6 +49,8 @@ int mf_is_active(void) {
 
 
 u8_t mf_enable_read(u16_t address) {
+  log_dbg("mf: read ENABLE  $%04X (is_visible=%c, is_enabled=%c)\n", address, self.is_visible ? 'Y' : 'N', self.is_enabled ? 'Y' : 'N');
+
   if (self.is_visible) {
     switch (address >> 8) {
       case 0x1F:
@@ -71,10 +77,13 @@ u8_t mf_enable_read(u16_t address) {
 
 
 void mf_enable_write(u16_t address, u8_t value) {
+  log_dbg("mf: write of $%02X to ENABLE  $%04X (is_visible=%c, is_enabled=%c)\n", value, address, self.is_visible ? 'Y' : 'N', self.is_enabled ? 'Y' : 'N');
 }
 
 
 u8_t mf_disable_read(u16_t address) {
+  log_dbg("mf: read DISABLE $%04X (is_visible=%c, is_enabled=%c)\n", address, self.is_visible ? 'Y' : 'N', self.is_enabled ? 'Y' : 'N');
+
   self.is_enabled = 0;
   memory_refresh_accessors(0, 2);
 
@@ -83,6 +92,8 @@ u8_t mf_disable_read(u16_t address) {
 
 
 void mf_disable_write(u16_t address, u8_t value) {
+  log_dbg("mf: write of $%02X to DISABLE $%04X (is_visible=%c, is_enabled=%c)\n", value, address, self.is_visible ? 'Y' : 'N', self.is_enabled ? 'Y' : 'N');
+
   self.is_visible = 0;
 }
 
