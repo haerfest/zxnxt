@@ -138,10 +138,10 @@ def bsla() -> C:
     return 'DE <<= B & 0x1F;'
 
 def bsra() -> C:
-    return 'DE = (u16_t) ((s16_t) DE >> (B & 0x1F));'
+    return 'DE = (s16_t) DE >> (B & 0x1F);'
 
 def bsrf() -> C:
-    return 'DE = ~(((u16_t) ~DE) >> (B & 0x1F));'
+    return 'DE = ~((u16_t) ~DE >> (B & 0x1F));'
 
 def bsrl() -> C:
     return 'DE >>= B & 0x1F;'
@@ -682,9 +682,9 @@ def pxdn() -> C:
         if ((HL & 0x0700) != 0x0700) {
             HL += 256;
         } else if ((HL & 0xE0) != 0xE0) {
-            HL = HL & 0xF8FF + 0x20;
+            HL = (HL & 0xF8FF) + 0x20;
         } else {
-           HL = HL & 0xF81F + 0x0800;
+           HL = (HL & 0xF81F) + 0x0800;
         }
     '''
 
@@ -1032,10 +1032,7 @@ def sub_r(r: str) -> C:
     '''
 
 def swap() -> C:
-    return '''
-        A = A >> 4 | A << 4;
-        T(8);
-    '''
+    return 'A = A >> 4 | A << 4;'
 
 def test() -> C:
     return '''
@@ -1171,6 +1168,7 @@ def ed_table() -> Table:
         0xB2: ('INIR',           partial(inxr, '+')),
         0xB3: ('OTIR',           partial(otxr, '+')),
         0xB4: ('LIRX',           partial(lxrx, '+')),
+        # TODO 0xB7: LDPIRX / LPRX
         0xB8: ('LDDR',           partial(ldxr, '-')),
         0xB9: ('CPDR',           partial(cpxr, '-')),
         0xBA: ('INDR',           partial(inxr, '-')),
