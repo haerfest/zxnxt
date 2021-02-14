@@ -12,7 +12,7 @@
  */
 
 
-#define SDSC_MAX_SIZE     (2L * 1024 * 1024 * 1024 - 1)
+#define SDSC_MAX_SIZE     (2U * 1024 * 1024 * 1024 - 1)
 #define N_SDCARDS         2
 #define MAX_BLOCK_LENGTH  1024
 #define SDCARD_IMAGE      "tbblue.mmc"
