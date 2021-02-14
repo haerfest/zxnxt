@@ -131,7 +131,7 @@ def bit_b_pss(b: int, xy: Optional[str] = None) -> C:
 def brlc() -> C:
     return '''
         DE = (DE << (B & 0x0F))
-           | (DE >> (0x10 - B & 0x0F));
+           | (DE >> (0x10 - (B & 0x0F)));
     '''
 
 def bsla() -> C:
@@ -406,7 +406,7 @@ def jp_pss(ss: str) -> C:
 
 def jpc() -> C:
     return '''
-        PC = PC & 0xC000 + (io_read(BC) << 6);
+        PC = (PC & 0xC000) + (io_read(BC) << 6);
         T(5);
     '''
 
@@ -1565,7 +1565,7 @@ log_dbg("%04X ", PC);
 T(4);
 ''')
     if not prefix:
-        f.write('R = (R & 0x80) | (++R & 0x7F);\n')
+        f.write('R = (R & 0x80) | ((R + 1) & 0x7F);\n')
     f.write('switch (opcode) {\n')
 
     for opcode in sorted(instructions):
@@ -1683,7 +1683,7 @@ static void {name}(void) {{
 
         f.write(f'''
 void cpu_execute_next_opcode(void) {{
-  R = (R & 0x80) | (++R & 0x7F);
+  R = (R & 0x80) | ((R + 1) & 0x7F);
   {decoder}
 }}
 ''')
