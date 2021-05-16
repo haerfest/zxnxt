@@ -1,6 +1,7 @@
 #include <string.h>
 #include "defs.h"
 #include "slu.h"
+#include "tilemap.h"
 #include "ula.h"
 
 

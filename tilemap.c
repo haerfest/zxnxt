@@ -30,10 +30,12 @@ void tilemap_finit(void) {
 
 
 void tilemap_tilemap_control_write(u8_t value) {
+  self.control = value;
 }
 
 
 void tilemap_default_tilemap_attribute_write(u8_t value) {
+  self.default_attribute = value;
 }
 
 
