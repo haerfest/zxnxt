@@ -33,6 +33,7 @@
  */
 #define FRAME_BUFFER_WIDTH           640
 #define FRAME_BUFFER_HEIGHT          256
+#define FRAME_BUFFER_SIZE            (FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2)
 
 #define OVERSCAN_TOP                 24
 #define OVERSCAN_BOTTOM              24

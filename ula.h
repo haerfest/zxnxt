@@ -39,6 +39,7 @@ int                  ula_contention_get(void);
 void                 ula_contention_set(int do_contend);
 void                 ula_contend(u8_t bank);
 void                 ula_did_complete_frame(void);
+u8_t*                ula_frame_buffer_get(void);
 
 
 #endif  /* __ULA_H */

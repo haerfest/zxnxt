@@ -164,7 +164,7 @@
 typedef struct {
   SDL_Renderer*        renderer;
   SDL_Texture*         texture;
-  u8_t*                blended_frame_buffer;
+  u16_t*               blended_frame_buffer;
   slu_layer_priority_t layer_priority;
   u32_t                beam_row;
   u32_t                beam_column;
@@ -178,7 +178,7 @@ static self_t self;
 int slu_init(SDL_Renderer* renderer, SDL_Texture* texture) {
   memset(&self, 0, sizeof(self));
 
-  self.blended_frame_buffer = malloc(FRAME_BUFFER_WIDTH * FRAME_BUFFER_HEIGHT * 2);
+  self.blended_frame_buffer = malloc(FRAME_BUFFER_SIZE);
   if (self.blended_frame_buffer == NULL) {
     log_err("slu: out of memory\n");
     return -1;
@@ -200,6 +200,9 @@ void slu_finit(void) {
 
 
 static void slu_blend_layers(void) {
+  const u8_t* ula_frame_buffer = ula_frame_buffer_get();
+
+  memcpy(self.blended_frame_buffer, ula_frame_buffer, FRAME_BUFFER_SIZE);
 }
 
 

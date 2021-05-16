@@ -207,7 +207,7 @@ static void ula_set_display_mode(ula_display_mode_t mode) {
 
 
 int ula_init(u8_t* sram) {
-  self.frame_buffer = malloc(FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
+  self.frame_buffer = malloc(FRAME_BUFFER_SIZE);
   if (self.frame_buffer == NULL) {
     log_err("ula: out of memory\n");
     return -1;
@@ -461,4 +461,9 @@ void ula_contend(u8_t bank) {
     default:
       break;
   }
+}
+
+
+u8_t* ula_frame_buffer_get(void) {
+  return self.frame_buffer;
 }
