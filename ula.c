@@ -50,7 +50,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
     /* 60 Hz */ { 262, 192, 33, 14, 23 }
   },
   /* ZX Spectrum 128K/+2 */ {
-    /* 50 Hz */ { 311, 192, 57, 14, 48 },
+    /* 50 Hz */ { 311, 192, 57 - OVERSCAN_TOP, 14, 48 - OVERSCAN_BOTTOM },
     /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* ZX Spectrum +2A/+2B/+3 */ {
@@ -58,7 +58,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
     /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* Pentagon */ {
-    /* 50 Hz */ { 320, 192, 49, 14, 65 },
+    /* 50 Hz */ { 320, 192, 49 - OVERSCAN_TOP, 14, 65 - OVERSCAN_TOP },
     /* 60 Hz */ { 320, 192, 49, 14, 65 }
   }
 };

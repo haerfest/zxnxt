@@ -258,7 +258,7 @@ static int slu_beam_advance(void) {
   }
 
   if (self.beam_row < OVERSCAN_TOP + FRAME_BUFFER_HEIGHT) {
-    return (self.beam_column >= OVERSCAN_LEFT);
+    return self.beam_column >= OVERSCAN_LEFT;
   }
 
   if (self.beam_row < OVERSCAN_TOP + FRAME_BUFFER_HEIGHT + OVERSCAN_BOTTOM + VERTICAL_RETRACE) {
