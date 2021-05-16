@@ -13,7 +13,6 @@
 
 /* Forward definitions for the various display modes. */
 static void ula_irq(void);
-static void ula_frame_complete(void);
 
 
 #define PALETTE_OFFSET_INK      0
@@ -27,17 +26,6 @@ typedef enum {
   E_ULA_DISPLAY_MODE_HI_COLOUR,
   E_ULA_DISPLAY_MODE_HI_RES
 } ula_display_mode_t;
-
-
-typedef enum {
-  E_ULA_DISPLAY_PHASE_TOP_BORDER,
-  E_ULA_DISPLAY_PHASE_LEFT_BORDER,
-  E_ULA_DISPLAY_PHASE_RIGHT_BORDER,
-  E_ULA_DISPLAY_PHASE_BOTTOM_BORDER,
-  E_ULA_DISPLAY_PHASE_HORIZONTAL_SYNC,
-  E_ULA_DISPLAY_PHASE_VERTICAL_SYNC,
-  E_ULA_DISPLAY_PHASE_CONTENT
-} ula_display_phase_t;
 
 
 /** See: https://wiki.specnext.dev/Reference_machines. */
@@ -78,27 +66,16 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
 
 
 typedef struct {
-  SDL_Renderer*              renderer;
-  SDL_Texture*               texture;
   u8_t*                      sram;
   const ula_display_spec_t*  display_spec;
   int                        did_display_spec_change;
-  u16_t                      display_offsets[192];
   u8_t*                      display_ram;
   u8_t*                      display_ram_odd;
-  u16_t                      display_offset;
-  u8_t                       display_byte;
-  u8_t                       display_pixel_mask;
   ula_display_timing_t       display_timing;
   int                        display_frequency;
   ula_display_mode_t         display_mode;
   ula_display_mode_t         display_mode_requested;
-  ula_display_phase_t        display_phase;
-  unsigned int               display_line;
-  unsigned int               display_column;  
-  u16_t                      attribute_offsets[192];
   u8_t*                      attribute_ram;
-  u16_t                      attribute_offset;
   u8_t                       attribute_byte;
   u8_t                       border_colour;
   u8_t                       speaker_state;
@@ -118,6 +95,8 @@ typedef struct {
   int                        do_contend;
   u32_t                      ticks_14mhz_after_irq;
   int                        is_timex_enabled;
+  int                        is_7mhz_tick;
+  int                        is_displaying_content;
 } self_t;
 
 
@@ -129,80 +108,16 @@ static self_t self;
 
 
 #define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES   - E_ULA_DISPLAY_MODE_SCREEN_0    + 1)
-#define N_DISPLAY_PHASES  (E_ULA_DISPLAY_PHASE_CONTENT - E_ULA_DISPLAY_PHASE_TOP_BORDER + 1)
 
-typedef void (*ula_display_mode_handler_t)(void);
 
-const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES][N_DISPLAY_PHASES] = {
-  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
-  {
-    ula_display_mode_screen_x_top_border,
-    ula_display_mode_screen_x_left_border,
-    ula_display_mode_screen_x_right_border,
-    ula_display_mode_screen_x_bottom_border,
-    ula_display_mode_screen_x_hsync,
-    ula_display_mode_screen_x_vsync,
-    ula_display_mode_screen_x_content
-  },
-  /* E_ULA_DISPLAY_MODE_SCREEN_1 */
-  {
-    ula_display_mode_screen_x_top_border,
-    ula_display_mode_screen_x_left_border,
-    ula_display_mode_screen_x_right_border,
-    ula_display_mode_screen_x_bottom_border,
-    ula_display_mode_screen_x_hsync,
-    ula_display_mode_screen_x_vsync,
-    ula_display_mode_screen_x_content
-  },
-  /* E_ULA_DISPLAY_MODE_HI_COLOUR
-   * TODO Not implemented yet */
-  {
-    ula_display_mode_screen_x_top_border,
-    ula_display_mode_screen_x_left_border,
-    ula_display_mode_screen_x_right_border,
-    ula_display_mode_screen_x_bottom_border,
-    ula_display_mode_screen_x_hsync,
-    ula_display_mode_screen_x_vsync,
-    ula_display_mode_screen_x_content
-  },
-  /* E_ULA_DISPLAY_MODE_HI_RES */
-  {
-    ula_display_mode_hi_res_top_border,
-    ula_display_mode_hi_res_left_border,
-    ula_display_mode_hi_res_right_border,
-    ula_display_mode_hi_res_bottom_border,
-    ula_display_mode_hi_res_hsync,
-    ula_display_mode_hi_res_vsync,
-    ula_display_mode_hi_res_content
-  }
+typedef void (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
+
+const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES] = {  
+  ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
+  ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_1 */
+  ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_HI_COLOUR (TODO) */
+  ula_display_mode_hi_res     /* E_ULA_DISPLAY_MODE_HI_RES */
 };
-
-
-static void ula_blit(void) {
-  SDL_Rect ula_source_rect = {
-    .x = 0,
-    .y = self.display_spec->top_border_lines - 32,
-    .w = WINDOW_WIDTH,
-    .h = WINDOW_HEIGHT / 2
-  };
-  void* pixels;
-  int   pitch;
-
-  if (SDL_LockTexture(self.texture, NULL, &pixels, &pitch) != 0) {
-    log_err("ula: SDL_LockTexture error: %s\n", SDL_GetError());
-    return;
-  }
-
-  memcpy(pixels, self.frame_buffer, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
-  SDL_UnlockTexture(self.texture);
-
-  if (SDL_RenderCopy(self.renderer, self.texture, &ula_source_rect, NULL) != 0) {
-    log_err("ula: SDL_RenderCopy error: %s\n", SDL_GetError());
-    return;
-  }
-
-  SDL_RenderPresent(self.renderer);
-}
 
 
 static void ula_display_reconfigure(void) {
@@ -255,15 +170,13 @@ static void ula_irq(void) {
 }
 
 
-static void ula_frame_complete(void) {
+void ula_did_complete_frame(void) {
   if ((++self.frame_counter & 15) == 0) {
     self.blink_state ^= 1;
   }
 
   /* Start drawing at the top again. */
   self.pixel = self.frame_buffer;
-
-  ula_blit();
 
   if (self.did_display_spec_change) {
     ula_display_reconfigure();
@@ -272,45 +185,18 @@ static void ula_frame_complete(void) {
 }
 
 
-u32_t ula_run(u32_t ticks_14mhz) {
-  u32_t tick;
+void ula_tick(u32_t beam_row, u32_t beam_column) {
+  self.ticks_14mhz_after_irq++;
 
-  if (self.display_mode == E_ULA_DISPLAY_MODE_HI_RES) {
-    /* This one consumes all the 14 MHz clock ticks. */
-    for (tick = 0; tick < ticks_14mhz; tick++) {
-      self.ticks_14mhz_after_irq++;
-      ula_display_handlers[self.display_mode][self.display_phase]();
-    }
-  } else {
+  if (self.display_mode != E_ULA_DISPLAY_MODE_HI_RES) {
     /* All other modes need a 7 MHz clock. */
-    const u32_t ticks_7mhz = ticks_14mhz / 2;
-
-    /* We may not consume all 14 Mhz ticks. */
-    ticks_14mhz = ticks_7mhz * 2;
-
-    for (tick = 0; tick < ticks_7mhz; tick++) {
-      self.ticks_14mhz_after_irq += 2;
-      ula_display_handlers[self.display_mode][self.display_phase]();
+    self.is_7mhz_tick = !self.is_7mhz_tick;
+    if (!self.is_7mhz_tick) {
+      return;
     }
   }
 
-  /* Return how many ticks we consumed. */
-  return ticks_14mhz;
-}
-
-
-static void ula_fill_tables(void) {
-  int line;
-
-  for (line = 0; line < 192; line++) {
-    const u8_t third         = line / 64;                /* Which third of the screen the line falls in: 0, 1 or 2. */
-    const u8_t line_rel      = line - third * 64;        /* Relative line within the third: 0 .. 63. */
-    const u8_t char_row      = line_rel / 8;             /* Which character row the line falls in: 0 .. 7. */
-    const u8_t char_row_line = line_rel - char_row * 8;  /* Which line within character row: 0 .. 7. */
-
-    self.display_offsets[line]   = third * 2048 + (char_row_line * 8 + char_row) * 32;
-    self.attribute_offsets[line] = (line / 8) * 32;
-  }
+  ula_display_handlers[self.display_mode](beam_row, beam_column);
 }
 
 
@@ -320,19 +206,15 @@ static void ula_set_display_mode(ula_display_mode_t mode) {
 }
 
 
-int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
+int ula_init(u8_t* sram) {
   self.frame_buffer = malloc(FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
   if (self.frame_buffer == NULL) {
     log_err("ula: out of memory\n");
     return -1;
   }
 
-  self.renderer                    = renderer;
-  self.texture                     = texture;
   self.sram                        = sram;
   self.screen_bank                 = E_ULA_SCREEN_BANK_5;
-  self.display_offset              = 0;
-  self.attribute_offset            = 0;
   self.display_timing              = E_ULA_DISPLAY_TIMING_ZX_48K;
   self.display_frequency           = 50;
   self.border_colour               = 0;
@@ -345,13 +227,9 @@ int ula_init(SDL_Renderer* renderer, SDL_Texture* texture, u8_t* sram) {
   self.audio_last_sample           = 0;
   self.timex_disable_ula_interrupt = 0;
   self.hi_res_ink_colour           = 0;
-  self.display_line                = 0;
-  self.display_offset              = 0;
-  self.attribute_offset            = 0;
   self.pixel                       = self.frame_buffer;
-  self.is_timex_enabled       = 0;
+  self.is_timex_enabled            = 0;
 
-  ula_fill_tables();
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
   ula_display_reconfigure();
 
@@ -393,7 +271,7 @@ u8_t ula_timex_read(u16_t address) {
          | self.display_mode;
   }
 
-  if (self.display_phase == E_ULA_DISPLAY_PHASE_CONTENT) {
+  if (self.is_displaying_content) {
     /* Implement floating bus behaviour. This fixes Arkanoid freezing at the
      * start of the first level and prevents flickering and slowdown in
      * Short Circuit.
@@ -523,7 +401,7 @@ void ula_contention_set(int do_contend) {
  * the first pixel in the top-left corner is being drawn.
  */
 static void ula_contend_48k(void) {
-  if (self.display_phase == E_ULA_DISPLAY_PHASE_CONTENT) {
+  if (self.is_displaying_content) {
     const u32_t delay[8] = {
       6, 5, 4, 3, 2, 1, 0, 0
     };

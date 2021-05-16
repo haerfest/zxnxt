@@ -18,7 +18,7 @@
  *   "       |        |         | 640x256 |   No  | 640x256 | 640x512
  * Layer 3,0 |        | 320x256 |         |   No  | 640x256 | 640x512
  * Layer 3,1 |        |         | 640x256 |   No  | 640x256 | 640x512
- * Layer 3,2 |        | 320x256 | 640x512 |   No  | 640x256 | 640x512
+ * Layer 3,2 |        | 320x256 | 640x256 |   No  | 640x256 | 640x512
  * Layer 3,3 |        |         | 640x256 |   No  | 640x256 | 640x512
  *
  * A full (scaled) TV frame for the layers with borders is 704x596 pixels,
@@ -31,11 +31,16 @@
  * rectangle and display that. Actually, we only draw at 704x298 and let SDL
  * take care of the vertical doubling when blitting.
  */
-#define FRAME_BUFFER_WIDTH           704
-#define FRAME_BUFFER_HEIGHT          312
+#define FRAME_BUFFER_WIDTH           640
+#define FRAME_BUFFER_HEIGHT          256
 
-#define WINDOW_WIDTH                 640
-#define WINDOW_HEIGHT                512
+#define OVERSCAN_TOP                 24
+#define OVERSCAN_BOTTOM              24
+#define OVERSCAN_LEFT                 0
+#define OVERSCAN_RIGHT               64
+
+#define WINDOW_WIDTH                 FRAME_BUFFER_WIDTH
+#define WINDOW_HEIGHT                (FRAME_BUFFER_HEIGHT * 2)
 
 #define FULLSCREEN_MIN_WIDTH         (2 * WINDOW_WIDTH)
 #define FULLSCREEN_MIN_HEIGHT        (2 * WINDOW_HEIGHT)

@@ -247,7 +247,7 @@ static int main_init(void) {
     goto exit_clock;
   }
 
-  if (ula_init(self.renderer, self.texture, sram) != 0) {
+  if (ula_init(sram) != 0) {
     goto exit_keyboard;
   }
 
@@ -259,7 +259,7 @@ static int main_init(void) {
     goto exit_layer2;
   }
 
-  if (slu_init() != 0) {
+  if (slu_init(self.renderer, self.texture) != 0) {
     goto exit_tilemap;
   }
 

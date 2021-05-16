@@ -2,6 +2,7 @@
 #define __SLU_H
 
 
+#include <SDL2/SDL.h>
 #include "defs.h"
 
 
@@ -17,7 +18,7 @@ typedef enum {
 } slu_layer_priority_t;
 
 
-int                  slu_init(void);
+int                  slu_init(SDL_Renderer* renderer, SDL_Texture* texture);
 void                 slu_finit(void);
 u32_t                slu_run(u32_t ticks_14mhz);
 void                 slu_layer_priority_set(slu_layer_priority_t priority);

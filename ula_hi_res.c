@@ -1,3 +1,9 @@
+static void ula_display_mode_hi_res(u32_t beam_row, u32_t beam_column) {
+}
+
+
+#if 0
+
 static void ula_display_mode_hi_res_plot(palette_entry_t colour) {
   const u16_t RGBA = colour.red << 12 | colour.green << 8 | colour.blue << 4;
   *self.pixel++ = RGBA;
@@ -126,3 +132,4 @@ static void ula_display_mode_hi_res_vsync(void) {
     }
   }
 }
+#endif
