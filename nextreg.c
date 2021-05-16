@@ -16,6 +16,7 @@
 #include "palette.h"
 #include "paging.h"
 #include "slu.h"
+#include "tilemap.h"
 #include "rom.h"
 #include "ula.h"
 
@@ -684,6 +685,22 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_SPECTRUM_MEMORY_MAPPING:
       nextreg_spectrum_memory_mapping_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_TILEMAP_CONTROL:
+      tilemap_tilemap_control_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_TILEMAP_DEFAULT_TILEMAP_ATTRIBUTE:
+      tilemap_default_tilemap_attribute_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_TILEMAP_TILEMAP_BASE_ADDRESS:
+      tilemap_tilemap_base_address_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_TILEMAP_TILE_DEFINITIONS_BASE_ADDRESS:
+      tilemap_tilemap_tile_definitions_address_write(value);
       break;
 
     default:

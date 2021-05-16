@@ -25,6 +25,7 @@
 #include "sdcard.h"
 #include "slu.h"
 #include "spi.h"
+#include "tilemap.h"
 #include "ula.h"
 #include "utils.h"
 
@@ -254,8 +255,12 @@ static int main_init(void) {
     goto exit_ula;
   }
 
-  if (slu_init() != 0) {
+  if (tilemap_init(sram) != 0) {
     goto exit_layer2;
+  }
+
+  if (slu_init() != 0) {
+    goto exit_tilemap;
   }
 
   if (cpu_init() != 0) {
@@ -268,6 +273,8 @@ static int main_init(void) {
 
 exit_slu:
   slu_finit();
+exit_tilemap:
+  tilemap_finit();
 exit_layer2:
   layer2_finit();
 exit_ula:
@@ -476,6 +483,7 @@ static void main_eventloop(void) {
 static void main_finit(void) {
   cpu_finit();
   slu_finit();
+  tilemap_finit();
   layer2_finit();
   ula_finit();
   keyboard_finit();
