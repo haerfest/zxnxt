@@ -1,4 +1,3 @@
-#include <SDL2/SDL.h>
 #include <time.h>
 #include "audio.h"
 #include "clock.h"
@@ -47,7 +46,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
     /* 60 Hz */ {   0,   0,  0,  0,  0 }
   },
   /* ZX Spectrum 48K */ {
-    /* 50 Hz */ { 312, 192, 56,  8, 56 },  /* Next seems to differ? */
+    /* 50 Hz */ { 312, 192, 56 - OVERSCAN_TOP,  8, 56 - OVERSCAN_BOTTOM },  /* Next seems to differ? */
     /* 60 Hz */ { 262, 192, 33, 14, 23 }
   },
   /* ZX Spectrum 128K/+2 */ {
@@ -55,7 +54,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
     /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* ZX Spectrum +2A/+2B/+3 */ {
-    /* 50 Hz */ { 311, 192, 56,  8, 56 },
+    /* 50 Hz */ { 311, 192, 56 - OVERSCAN_TOP,  8, 56 - OVERSCAN_BOTTOM },
     /* 60 Hz */ { 261, 192, 33, 14, 22 }
   },
   /* Pentagon */ {
@@ -81,7 +80,6 @@ typedef struct {
   u8_t                       speaker_state;
   palette_t                  palette;
   u16_t*                     frame_buffer;
-  u16_t*                     pixel;
   int                        clip_x1;
   int                        clip_x2;
   int                        clip_y1;
@@ -175,9 +173,6 @@ void ula_did_complete_frame(void) {
     self.blink_state ^= 1;
   }
 
-  /* Start drawing at the top again. */
-  self.pixel = self.frame_buffer;
-
   if (self.did_display_spec_change) {
     ula_display_reconfigure();
     self.did_display_spec_change = 0;
@@ -227,7 +222,6 @@ int ula_init(u8_t* sram) {
   self.audio_last_sample           = 0;
   self.timex_disable_ula_interrupt = 0;
   self.hi_res_ink_colour           = 0;
-  self.pixel                       = self.frame_buffer;
   self.is_timex_enabled            = 0;
 
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
@@ -464,6 +458,6 @@ void ula_contend(u8_t bank) {
 }
 
 
-u8_t* ula_frame_buffer_get(void) {
+u16_t* ula_frame_buffer_get(void) {
   return self.frame_buffer;
 }

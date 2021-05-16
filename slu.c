@@ -200,7 +200,7 @@ void slu_finit(void) {
 
 
 static void slu_blend_layers(void) {
-  const u8_t* ula_frame_buffer = ula_frame_buffer_get();
+  const u16_t* ula_frame_buffer = ula_frame_buffer_get();
 
   memcpy(self.blended_frame_buffer, ula_frame_buffer, FRAME_BUFFER_SIZE);
 }
@@ -221,7 +221,7 @@ static void slu_blit(void) {
     return;
   }
 
-  memcpy(pixels, self.blended_frame_buffer, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH * 2);
+  memcpy(pixels, self.blended_frame_buffer, FRAME_BUFFER_SIZE);
   SDL_UnlockTexture(self.texture);
 
   if (SDL_RenderCopy(self.renderer, self.texture, &source_rect, NULL) != 0) {
@@ -258,7 +258,7 @@ static int slu_beam_advance(void) {
   }
 
   if (self.beam_row < OVERSCAN_TOP + FRAME_BUFFER_HEIGHT) {
-    return 1;
+    return (self.beam_column >= OVERSCAN_LEFT);
   }
 
   if (self.beam_row < OVERSCAN_TOP + FRAME_BUFFER_HEIGHT + OVERSCAN_BOTTOM + VERTICAL_RETRACE) {
