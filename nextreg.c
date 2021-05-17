@@ -247,7 +247,7 @@ static u8_t nextreg_core_boot_read(void) {
 
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
-  ula_display_frequency_set((value & 0x04) >> 2);
+  /* Changing display frequency is not supported. */
 }
 
 
@@ -349,9 +349,7 @@ static void nextreg_cpu_speed_write(u8_t value) {
 
 
 static void nextreg_video_timing_write(u8_t value) {
-  if (config_is_active()) {
-    clock_video_timing_set(value & 0x03);
-  }
+  /* Changing 28 MHz clock timing is not supported. */
 }
 
 

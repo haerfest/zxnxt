@@ -521,7 +521,7 @@ static void main_finit(void) {
 
 
 u32_t main_next_host_sync_get(void) {
-  return (unsigned long) clock_28mhz_get() * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
+  return (unsigned long) CLOCK_28MHZ * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
 }
 
 
