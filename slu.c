@@ -233,49 +233,32 @@ static void slu_blit(void) {
 }
 
 
-static int slu_beam_advance(void) {
+static void slu_beam_advance(void) {
+  u16_t rows;
+  u16_t columns;
+
+  ula_display_size_get(&rows, &columns);
+
   /* Advance beam one pixel horizontally. */
-  self.beam_column++;
-
-  if (self.beam_column < OVERSCAN_LEFT) {
-    return 0;
+  if (++self.beam_column < columns) {
+    return;
   }
 
-  if (self.beam_column < OVERSCAN_LEFT + FRAME_BUFFER_WIDTH) {
-    return self.beam_row >= OVERSCAN_TOP && self.beam_row < OVERSCAN_TOP + FRAME_BUFFER_HEIGHT;
-  }
-
-  if (self.beam_column < OVERSCAN_LEFT + FRAME_BUFFER_WIDTH + OVERSCAN_RIGHT + HORIZONTAL_RETRACE) {
-    return 0;
-  }
-
-  /* Move beam to beginning of next line. */
-  self.beam_row++;
+  /* Advance beam to beginning of next line. */
   self.beam_column = 0;
-
-  if (self.beam_row < OVERSCAN_TOP) {
-    return 0;
+  if (++self.beam_row < rows) {
+    return;
   }
 
-  if (self.beam_row < OVERSCAN_TOP + FRAME_BUFFER_HEIGHT) {
-    return self.beam_column >= OVERSCAN_LEFT;
-  }
-
-  if (self.beam_row < OVERSCAN_TOP + FRAME_BUFFER_HEIGHT + OVERSCAN_BOTTOM + VERTICAL_RETRACE) {
-    return 0;
-  }
-
-  /* Return beam to top-left corner. */
+  /* Move beam to top left of display. */
   self.beam_row = 0;
 
-  /* Update display. */
+  /* Blend layers and update display. */
   slu_blend_layers();
   slu_blit();
 
   /* Notify layers that we completed a frame. */
   ula_did_complete_frame();
-
-  return 0;
 }
 
 
@@ -283,12 +266,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
   u32_t tick;
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
-    if (slu_beam_advance()) {
-      const u32_t beam_relative_row    = self.beam_row    - OVERSCAN_TOP;
-      const u32_t beam_relative_column = self.beam_column - OVERSCAN_LEFT;
-
-      ula_tick(beam_relative_row, beam_relative_column);
-    }
+    slu_beam_advance();
+    ula_tick(self.beam_row, self.beam_column);
   }
 
   /* TODO Deal with ULA using 7 MHz clock, not always consuming all ticks. */

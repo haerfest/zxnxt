@@ -1,26 +1,24 @@
 static void ula_display_mode_screen_x(u32_t beam_row, u32_t beam_column) {
-  /* The frame buffer is twice as wide as the normal ULA resolution. */
-  const u32_t     half_column      = beam_column / 2;
-  const int       in_top_border    = beam_row    <  self.display_spec->top_border_lines;
-  const int       in_bottom_border = beam_row    >= FRAME_BUFFER_HEIGHT - self.display_spec->bottom_border_lines;
-  const int       in_left_border   = half_column <  32;
-  const int       in_right_border  = half_column >= FRAME_BUFFER_WIDTH / 2 - 32;
-  u8_t            palette_index    = PALETTE_OFFSET_BORDER + self.border_colour;
+
+  const u32_t frame_buffer_row    = beam_row    - self.display_spec->row_border_top;
+  const u32_t frame_buffer_column = beam_column - self.display_spec->column_border_left;
+
+  u8_t            palette_index  = PALETTE_OFFSET_BORDER + self.border_colour;
   palette_entry_t colour;
   u16_t           rgba;
 
-  self.is_displaying_content = !(in_top_border || in_bottom_border || in_left_border || in_right_border);
-
-  /* TODO: the ULA IRQ is fired at a different beam location. */
-  if (beam_row == FRAME_BUFFER_HEIGHT - 1 && half_column == FRAME_BUFFER_WIDTH / 2 - 1) {
-    ula_irq();
-  }
+  self.is_displaying_content = \
+    beam_row    >= self.display_spec->row_content       &&
+    beam_row    <  self.display_spec->row_border_bottom &&
+    beam_column >= self.display_spec->column_content    &&
+    beam_column <  self.display_spec->column_border_right;
 
   if (self.is_displaying_content) {
-    const u32_t row             = beam_row    - self.display_spec->top_border_lines;
-    const u32_t column          = half_column - 32;
-    const int   in_clipped_area = row    >= self.clip_y1 && row    <= self.clip_y2 &&
-                                  column >= self.clip_x1 && column <= self.clip_x2;
+    const u32_t row             =  beam_row    - self.display_spec->row_content;
+    const u32_t column          = (beam_column - self.display_spec->column_content) / 2;  /* Half pixels. */
+    const int   in_clipped_area = \
+      row    >= self.clip_y1 && row    <= self.clip_y2 &&
+      column >= self.clip_x1 && column <= self.clip_x2;
 
     if (in_clipped_area) {
       const u8_t  mask             = 1 << (7 - (column & 0x07));
@@ -51,7 +49,7 @@ static void ula_display_mode_screen_x(u32_t beam_row, u32_t beam_column) {
   colour = palette_read_rgb(self.palette, palette_index);
   rgba   = colour.red << 12 | colour.green << 8 | colour.blue << 4;
 
-  /* For standard ULA we draw 2x1 pixels for every Spectrum pixel. */
-  self.frame_buffer[beam_row * FRAME_BUFFER_WIDTH + beam_column + 0] = rgba;
-  self.frame_buffer[beam_row * FRAME_BUFFER_WIDTH + beam_column + 1] = rgba;
+  /* For standard ULA we draw a normal pixel for every "half pixel". */
+  self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column + 0] = rgba;
+  self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column + 1] = rgba;
 }

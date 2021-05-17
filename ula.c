@@ -10,10 +10,6 @@
 #include "ula.h"
 
 
-/* Forward definitions for the various display modes. */
-static void ula_irq(void);
-
-
 #define PALETTE_OFFSET_INK      0
 #define PALETTE_OFFSET_PAPER   16
 #define PALETTE_OFFSET_BORDER  16
@@ -34,10 +30,11 @@ typedef enum {
  * under 60Hz, or if the higher 50Hz settings are too annoying due to high
  * speed. But all the relative timing relationships are broken, and programs
  * depending on timing will not display properly, just like with HDMI."
+ *
+ * Therefore zxnxt only implements VGA 50 Hz timing for the different machine
+ * types.
  */
-#define N_CLOCK_TIMINGS    2  /* 0=HDMI or 1=VGA respectively. */
-#define N_DISPLAY_TIMINGS  (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_INTERNAL_USE + 1)
-#define N_FREQUENCIES      2  /* 0=50 or 1=60 Hz respectively. */
+#define N_DISPLAY_TIMINGS  (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_ZX_48K + 1)
 
 
 /**
@@ -51,191 +48,156 @@ typedef enum {
  * tables below have been adjusted for this, such that (0, 0) is the first
  * pixel of the generated display, i.e. borders included.
  *
- * Note that X marks the spot of the vertical blank interrupt.
- *
- * HDMI, any machine, 50 Hz:
- *
- *     0                256      323      395      432
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   67   |   72   |   37   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  64  border                               |
- * 256 +---X------------- (at horizontal pos 4)    |
- *     |   8  vblank                               |
- * 264 +-----------------                          |
- *     |  48  border                               |
- * 312 +-------------------------------------------+
- *
- * HDMI, any machine, 60 Hz:
- *
- *     0                256      323      392      429
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   67   |   69   |   37   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  38  border                               |
- * 230 +-----------------                          |
- *     |  X 8  vblank     (at y=235 x=4)           |
- * 238 +-----------------                          |
- *     |  24  border                               |
- * 262 +-------------------------------------------+
- *
- * VGA, ZX 48K, 50 Hz:
- *
- *     0                256      320      416      448
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   64   |   96   |   32   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  56  border                               |
- * 248 X-----------------                          |
- *     |   8  vblank                               |
- * 256 +-----------------                          |
- *     |  56  border                               |
- * 312 +-------------------------------------------+
- *
- * VGA, ZX 48K, 60 Hz:
- *
- *     0                256      320      416      448
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   64   |   96   |   32   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  32  border                               |
- * 224 X-----------------                          |
- *     |   8  vblank                               |
- * 232 +-----------------                          |
- *     |  32  border                               |
- * 264 +-------------------------------------------+
- *
- * VGA, ZX 128K, 50 Hz:
- *
- *     0                256      320      416      456
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   64   |   96   |   40   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  56  border                               |
- * 248 +---X------------- (at horizontal pos 4)    |
- *     |   8  vblank                               |
- * 256 +-----------------                          |
- *     |  55  border                               |
- * 311 +-------------------------------------------+
- *
- * VGA, ZX 128K, 60 Hz:
- *
- *     0                256      320      416      456
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   64   |   96   |   40   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  32  border                               |
- * 224 +---X------------- (at horizontal pos 4)    |
- *     |   8  vblank                               |
- * 232 +-----------------                          |
- *     |  32  border                               |
- * 264 +-------------------------------------------+
- *
- * VGA, +3, 50 Hz:
- *
- *     0                256      320      416      456
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   64   |   96   |   40   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  56  border                               |
- * 248 +-X--------------- (at horizontal pos 2)    |
- *     |   8  vblank                               |
- * 256 +-----------------                          |
- *     |  55  border                               |
- * 311 +-------------------------------------------+
- *
- * VGA, +3, 60 Hz:
- *
- *     0                256      320      416      456
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   64   |   96   |   40   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  32  border                               |
- * 224 +-X--------------- (at horizontal pos 2)    |
- *     |   8  vblank                               |
- * 232 +-----------------                          |
- *     |  32  border                               |
- * 264 +-------------------------------------------+
- *
- * VGA, Pentagon, 50 Hz (there is no 60 Hz):
- *
- *     0                256      336      400      448
- *   0 +----------------+--------+--------+--------+
- *     |                |        |        |        |
- *     | 192  content   | border | hblank | border |
- *     |        256     |   80   |   64   |   48   |
- *     |                |        |        |        |
- * 192 +----------------+                          |
- *     |  48  border                               |
- * 240 +-----------------      X (y=239 x=323)     |
- *     |  16  vblank                               |
- * 256 +-----------------                          |
- *     |  64  border                               |
- * 320 +-------------------------------------------+
+ * Note that zxnxt only implements the exactly-28 MHz VGA 50 Hz timings, as
+ * that is how the machine is supposed to run.
  */
 typedef struct {
-  
+  unsigned int rows;                   /** Number of rows.                 */
+  unsigned int columns;                /** Number of columns.              */
+  unsigned int row_border_top;         /** Start row of top border.        */
+  unsigned int row_content;            /** Start row of content area.      */
+  unsigned int row_border_bottom;      /** Start row of bottom border.     */
+  unsigned int row_overscan_bottom;    /** Start row of bottom overscan.   */
+  unsigned int column_border_left;     /** Start column of left border.    */
+  unsigned int column_content;         /** Start column of content area.   */
+  unsigned int column_border_right;    /** Start column of right border.   */
+  unsigned int column_overscan_right;  /** Start column of right overscan. */
+  unsigned int row_irq;                /** Row where IRQ triggers.         */
+  unsigned int column_irq;             /** Column where IRQ triggers.      */
 } ula_display_spec_t;
 
 
-/**
- */
-static const ula_display_spec_t ula_display_spec[1 /* N_CLOCK_TIMINGS */][2 /* N_DISPLAY_TIMINGS */][1 /* N_FREQUENCIES */] = {
-  /* HDMI */
+const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
+  /**
+   * Note:
+   * - X marks the spot of the vertical blank interrupt.
+   * - Since the normal ULA display is measured in normal pixels and the
+   *   frame buffer is generated in "half pixel" (horizontally), we have
+   *   to multiply the columns by two.
+   *
+   * VGA, ZX 48K, 50 Hz:
+   *
+   *     0                256      320      416      448
+   *   0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |
+   *     |        256     |   64   |   96   |   32   |
+   * 192 +----------------+                          |
+   *     |  56  border                               |
+   * 248 X-----------------                          |
+   *     |   8  vblank                               |
+   * 256 +-----------------                          |
+   *     |  56  border                               |
+   * 312 +-------------------------------------------+
+   *
+   * Also note that the display is generated in "half pixel" units (see
+   * FRAME_BUFFER_{WIDTH,HEIGHT}), hence the macro.
+   */
   {
-    { 0, 0 },
-    { 312, 448, 56, 
+    .rows                  = 312,
+    .columns               = 448             * 2,
+    .row_border_top        = 56 - 32,
+    .row_content           = 56,
+    .row_border_bottom     = 56 + 192,
+    .row_overscan_bottom   = 56 + 192 + 32,
+    .column_border_left    = 0               * 2,
+    .column_content        = 32              * 2,
+    .column_border_right   = (32 + 256)      * 2,
+    .column_overscan_right = (32 + 256 + 32) * 2,
+    .row_irq               = 56 + 248,
+    .column_irq            = (32 + 0)        * 2,
   },
-  /* VGA */
-};
 
-  
-#if 0
-  /* Internal use. */ {
-    /* 50 Hz */ {   0,   0,  0,  0,  0 },
-    /* 60 Hz */ {   0,   0,  0,  0,  0 }
+  /**
+   * VGA, ZX 128K, 50 Hz:
+   *
+   *     0                256      320      416      456
+   *   0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |
+   *     |        256     |   64   |   96   |   40   |
+   * 192 +----------------+                          |
+   *     |  56  border                               |
+   * 248 +---X------------- (at horizontal pos 4)    |
+   *     |   8  vblank                               |
+   * 256 +-----------------                          |
+   *     |  55  border                               |
+   * 311 +-------------------------------------------+
+   */
+  {
+    .rows                  = 311,
+    .columns               = 456             * 2,
+    .row_border_top        = 55 - 32,
+    .row_content           = 55,
+    .row_border_bottom     = 55 + 192,
+    .row_overscan_bottom   = 55 + 192 + 32,
+    .column_border_left    = (40 - 32)       * 2,
+    .column_content        = 40              * 2,
+    .column_border_right   = (40 + 256)      * 2,
+    .column_overscan_right = (40 + 256 + 32) * 2,
+    .row_irq               = 55 + 248,
+    .column_irq            = (40 + 4)        * 2
   },
-  /* ZX Spectrum 48K */ {
-    /* 50 Hz */ { 312, 192, 56 - OVERSCAN_TOP,  8, 56 - OVERSCAN_BOTTOM },  /* Next seems to differ? */
-    /* 60 Hz */ { 262, 192, 33, 14, 23 }
+
+  /**
+   * VGA, +3, 50 Hz:
+   *
+   *     0                256      320      416      456
+   *   0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |
+   *     |        256     |   64   |   96   |   40   |
+   * 192 +----------------+                          |
+   *     |  56  border                               |
+   * 248 +-X--------------- (at horizontal pos 2)    |
+   *     |   8  vblank                               |
+   * 256 +-----------------                          |
+   *     |  55  border                               |
+   * 311 +-------------------------------------------+
+   */
+  {
+    .rows                  = 311,
+    .columns               = 456             * 2,
+    .row_border_top        = 55 - 32,
+    .row_content           = 55,
+    .row_border_bottom     = 55 + 192,
+    .row_overscan_bottom   = 55 + 192 + 32,
+    .column_border_left    = (40 - 32)       * 2,
+    .column_content        = 40              * 2,
+    .column_border_right   = (40 + 256)      * 2,
+    .column_overscan_right = (40 + 256 + 32) * 2,
+    .row_irq               = 55 + 248,
+    .column_irq            = (40 + 2)        * 2
   },
-  /* ZX Spectrum 128K/+2 */ {
-    /* 50 Hz */ { 311, 192, 57 - OVERSCAN_TOP, 14, 48 - OVERSCAN_BOTTOM },
-    /* 60 Hz */ { 261, 192, 33, 14, 22 }
-  },
-  /* ZX Spectrum +2A/+2B/+3 */ {
-    /* 50 Hz */ { 311, 192, 56 - OVERSCAN_TOP,  8, 56 - OVERSCAN_BOTTOM },
-    /* 60 Hz */ { 261, 192, 33, 14, 22 }
-  },
-  /* Pentagon */ {
-    /* 50 Hz */ { 320, 192, 49 - OVERSCAN_TOP, 14, 65 - OVERSCAN_TOP },
-    /* 60 Hz */ { 320, 192, 49, 14, 65 }
+
+  /**
+   *
+   * VGA, Pentagon, 50 Hz:
+   *
+   *     0                256      336      400      448
+   *   0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |
+   *     |        256     |   80   |   64   |   48   |
+   * 192 +----------------+                          |
+   *     |  48  border                               |
+   * 240 +-----------------      X (y=239 x=323)     |
+   *     |  16  vblank                               |
+   * 256 +-----------------                          |
+   *     |  64  border                               |
+   * 320 +-------------------------------------------+
+   */
+  {
+    .rows                  = 320,
+    .columns               = 448             * 2,
+    .row_border_top        = 64 - 32,
+    .row_content           = 64,
+    .row_border_bottom     = 64 + 192,
+    .row_overscan_bottom   = 64 + 192 + 32,
+    .column_border_left    = (48 - 32)       * 2,
+    .column_content        = 48              * 2,
+    .column_border_right   = (48 + 256)      * 2,
+    .column_overscan_right = (48 + 256 + 32) * 2,
+    .row_irq               = 64 + 239,
+    .column_irq            = (48 + 323)      * 2
   }
-#endif
+};
 
 
 typedef struct {
@@ -245,7 +207,6 @@ typedef struct {
   u8_t*                      display_ram;
   u8_t*                      display_ram_odd;
   ula_display_timing_t       display_timing;
-  int                        display_frequency;
   ula_display_mode_t         display_mode;
   ula_display_mode_t         display_mode_requested;
   u8_t*                      attribute_ram;
@@ -279,7 +240,7 @@ static self_t self;
 #include "ula_hi_res.c"
 
 
-#define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES   - E_ULA_DISPLAY_MODE_SCREEN_0    + 1)
+#define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES - E_ULA_DISPLAY_MODE_SCREEN_0 + 1)
 
 
 typedef void (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
@@ -306,7 +267,7 @@ static void ula_display_reconfigure(void) {
 
   /* Remember the requested mode in case we honor it in bank 5. */
   self.display_mode = self.display_mode_requested;
-  self.display_spec = &ula_display_spec[self.display_timing][self.display_frequency == 60];
+  self.display_spec = &ula_display_spec[self.display_timing];
 
   /* Use the effective mode, which depends on the actual bank. */
   switch (mode) {
@@ -357,12 +318,24 @@ void ula_did_complete_frame(void) {
 void ula_tick(u32_t beam_row, u32_t beam_column) {
   self.ticks_14mhz_after_irq++;
 
+  if (beam_row == self.display_spec->row_irq && beam_column == self.display_spec->column_irq) {
+    ula_irq();
+  }
+
   if (self.display_mode != E_ULA_DISPLAY_MODE_HI_RES) {
     /* All other modes need a 7 MHz clock. */
     self.is_7mhz_tick = !self.is_7mhz_tick;
     if (!self.is_7mhz_tick) {
       return;
     }
+  }
+
+  /* Nothing to draw when beam is outside visible area. */
+  if (beam_row    <  self.display_spec->row_border_top      ||
+      beam_row    >= self.display_spec->row_overscan_bottom ||
+      beam_column <  self.display_spec->column_border_left  ||
+      beam_column >= self.display_spec->column_overscan_right) {
+    return;
   }
 
   ula_display_handlers[self.display_mode](beam_row, beam_column);
@@ -385,7 +358,6 @@ int ula_init(u8_t* sram) {
   self.sram                        = sram;
   self.screen_bank                 = E_ULA_SCREEN_BANK_5;
   self.display_timing              = E_ULA_DISPLAY_TIMING_ZX_48K;
-  self.display_frequency           = 50;
   self.border_colour               = 0;
   self.speaker_state               = 0;
   self.palette                     = E_PALETTE_ULA_FIRST;
@@ -397,6 +369,7 @@ int ula_init(u8_t* sram) {
   self.timex_disable_ula_interrupt = 0;
   self.hi_res_ink_colour           = 0;
   self.is_timex_enabled            = 0;
+  self.is_7mhz_tick                = 1;
 
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
   ula_display_reconfigure();
@@ -486,7 +459,6 @@ ula_display_timing_t ula_display_timing_get(void) {
 
 
 void ula_display_timing_set(ula_display_timing_t timing) {
-#ifdef DEBUG
   const char* descriptions[] = {
     "internal use",
     "ZX Spectrum 48K",
@@ -497,22 +469,15 @@ void ula_display_timing_set(ula_display_timing_t timing) {
     "invalid (6)",
     "invalid (7)"
   };
-#endif
+
+  if (timing < E_ULA_DISPLAY_TIMING_ZX_48K || timing > E_ULA_DISPLAY_TIMING_PENTAGON) {
+    log_err("ula: refused to set display timing to %s\n", descriptions[timing]);
+    return;
+  }
 
   self.display_timing          = timing;
   self.did_display_spec_change = 1;
   log_dbg("ula: display timing set to %s\n", descriptions[timing]);
-}
-
-
-void ula_display_frequency_set(int is_60hz) {
-  const int display_frequency = is_60hz ? 60 : 50;
-
-  if (display_frequency != self.display_frequency) {
-    self.display_frequency       = display_frequency;
-    self.did_display_spec_change = 1;
-    log_dbg("ula: display frequency set to %d Hz\n", self.display_frequency);
-  }
 }
 
 
@@ -634,4 +599,15 @@ void ula_contend(u8_t bank) {
 
 u16_t* ula_frame_buffer_get(void) {
   return self.frame_buffer;
+}
+
+
+void ula_display_size_get(u16_t* rows, u16_t* columns) {
+  if (rows) {
+    *rows = self.display_spec->rows;
+  }
+
+  if (columns) {
+    *columns = self.display_spec->columns;
+  }
 }
