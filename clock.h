@@ -5,6 +5,14 @@
 #include "defs.h"
 
 
+/**
+ * https://wiki.specnext.dev/Refresh_Rates
+ *
+ * "The video mode chosen should always be VGA 0 or RGB at 50Hz. This option of
+ * increasing steps VGA 1-6 are for monitors that cannot sync to 50Hz only. All
+ * relative timing in the machine is kept the same but the real time speed is
+ * higher so programs run faster and sound is higher pitch."
+ */
 typedef enum {
   E_CLOCK_VIDEO_TIMING_VGA_BASE = 0,
   E_CLOCK_VIDEO_TIMING_VGA_SETTING_1,
@@ -18,7 +26,7 @@ typedef enum {
 
 
 typedef enum {
-  E_CLOCK_CPU_SPEED_3MHZ = 0,  /* 3.5 or 3.5469 MHz */
+  E_CLOCK_CPU_SPEED_3MHZ = 0,  /* 3.5 MHz */
   E_CLOCK_CPU_SPEED_7MHZ,
   E_CLOCK_CPU_SPEED_14MHZ,
   E_CLOCK_CPU_SPEED_28MHZ

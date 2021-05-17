@@ -5,12 +5,17 @@
 #include "defs.h"
 
 
+/**
+ * https://wiki.specnext.dev/Refresh_Rates:
+ *
+ * "With VGA or RGB 50 Hz, 1T = 1/3.5MHz."
+ */
 typedef enum {
   E_ULA_DISPLAY_TIMING_INTERNAL_USE = 0,
-  E_ULA_DISPLAY_TIMING_ZX_48K,
-  E_ULA_DISPLAY_TIMING_ZX_128K,
+  E_ULA_DISPLAY_TIMING_ZX_48K,     /* 224T * 312 = 69888T per frame = 50.08Hz */
+  E_ULA_DISPLAY_TIMING_ZX_128K,    /* 228T * 311 = 70908T per frame = 49.36Hz */
   E_ULA_DISPLAY_TIMING_ZX_PLUS_2A,
-  E_ULA_DISPLAY_TIMING_PENTAGON
+  E_ULA_DISPLAY_TIMING_PENTAGON    /* 224T * 320 = 71680T per frame = 48.83Hz */
 } ula_display_timing_t;
 
 

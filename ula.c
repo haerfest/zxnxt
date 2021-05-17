@@ -37,6 +37,14 @@ typedef struct {
 } ula_display_spec_t;
 
 
+/**
+ * https://wiki.specnext.dev/Refresh_Rates
+ *
+ * "The 60Hz VGA timing should only be used if the monitor can't do anything
+ * under 60Hz, or if the higher 50Hz settings are too annoying due to high
+ * speed. But all the relative timing relationships are broken, and programs
+ * depending on timing will not display properly, just like with HDMI."
+ */
 #define N_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_INTERNAL_USE + 1)
 #define N_FREQUENCIES  2
 
