@@ -27,16 +27,6 @@ typedef enum {
 } ula_display_mode_t;
 
 
-/** See: https://wiki.specnext.dev/Reference_machines. */
-typedef struct {
-  unsigned int total_lines;
-  unsigned int display_lines;
-  unsigned int bottom_border_lines;
-  unsigned int blanking_period_lines;
-  unsigned int top_border_lines;
-} ula_display_spec_t;
-
-
 /**
  * https://wiki.specnext.dev/Refresh_Rates
  *
@@ -45,10 +35,186 @@ typedef struct {
  * speed. But all the relative timing relationships are broken, and programs
  * depending on timing will not display properly, just like with HDMI."
  */
-#define N_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_INTERNAL_USE + 1)
-#define N_FREQUENCIES  2
+#define N_CLOCK_TIMINGS    2  /* 0=HDMI or 1=VGA respectively. */
+#define N_DISPLAY_TIMINGS  (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_INTERNAL_USE + 1)
+#define N_FREQUENCIES      2  /* 0=50 or 1=60 Hz respectively. */
 
-static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
+
+/**
+ * https://wiki.specnext.dev/Reference_machines.
+ *
+ * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/blob/master/cores/zxnext/src/video/zxula_timing.vhd
+ * (commit 2f13cb6e573af3d14dbd1c4b5918516af5c7c66f)
+ *
+ * Note that in the VHDL code above, pixel (0, 0) is the first pixel of the
+ * 256x192 content area, i.e. the top and left borders are not included. The
+ * tables below have been adjusted for this, such that (0, 0) is the first
+ * pixel of the generated display, i.e. borders included.
+ *
+ * Note that X marks the spot of the vertical blank interrupt.
+ *
+ * HDMI, any machine, 50 Hz:
+ *
+ *     0                256      323      395      432
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   67   |   72   |   37   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  64  border                               |
+ * 256 +---X------------- (at horizontal pos 4)    |
+ *     |   8  vblank                               |
+ * 264 +-----------------                          |
+ *     |  48  border                               |
+ * 312 +-------------------------------------------+
+ *
+ * HDMI, any machine, 60 Hz:
+ *
+ *     0                256      323      392      429
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   67   |   69   |   37   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  38  border                               |
+ * 230 +-----------------                          |
+ *     |  X 8  vblank     (at y=235 x=4)           |
+ * 238 +-----------------                          |
+ *     |  24  border                               |
+ * 262 +-------------------------------------------+
+ *
+ * VGA, ZX 48K, 50 Hz:
+ *
+ *     0                256      320      416      448
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   64   |   96   |   32   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  56  border                               |
+ * 248 X-----------------                          |
+ *     |   8  vblank                               |
+ * 256 +-----------------                          |
+ *     |  56  border                               |
+ * 312 +-------------------------------------------+
+ *
+ * VGA, ZX 48K, 60 Hz:
+ *
+ *     0                256      320      416      448
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   64   |   96   |   32   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  32  border                               |
+ * 224 X-----------------                          |
+ *     |   8  vblank                               |
+ * 232 +-----------------                          |
+ *     |  32  border                               |
+ * 264 +-------------------------------------------+
+ *
+ * VGA, ZX 128K, 50 Hz:
+ *
+ *     0                256      320      416      456
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   64   |   96   |   40   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  56  border                               |
+ * 248 +---X------------- (at horizontal pos 4)    |
+ *     |   8  vblank                               |
+ * 256 +-----------------                          |
+ *     |  55  border                               |
+ * 311 +-------------------------------------------+
+ *
+ * VGA, ZX 128K, 60 Hz:
+ *
+ *     0                256      320      416      456
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   64   |   96   |   40   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  32  border                               |
+ * 224 +---X------------- (at horizontal pos 4)    |
+ *     |   8  vblank                               |
+ * 232 +-----------------                          |
+ *     |  32  border                               |
+ * 264 +-------------------------------------------+
+ *
+ * VGA, +3, 50 Hz:
+ *
+ *     0                256      320      416      456
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   64   |   96   |   40   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  56  border                               |
+ * 248 +-X--------------- (at horizontal pos 2)    |
+ *     |   8  vblank                               |
+ * 256 +-----------------                          |
+ *     |  55  border                               |
+ * 311 +-------------------------------------------+
+ *
+ * VGA, +3, 60 Hz:
+ *
+ *     0                256      320      416      456
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   64   |   96   |   40   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  32  border                               |
+ * 224 +-X--------------- (at horizontal pos 2)    |
+ *     |   8  vblank                               |
+ * 232 +-----------------                          |
+ *     |  32  border                               |
+ * 264 +-------------------------------------------+
+ *
+ * VGA, Pentagon, 50 Hz (there is no 60 Hz):
+ *
+ *     0                256      336      400      448
+ *   0 +----------------+--------+--------+--------+
+ *     |                |        |        |        |
+ *     | 192  content   | border | hblank | border |
+ *     |        256     |   80   |   64   |   48   |
+ *     |                |        |        |        |
+ * 192 +----------------+                          |
+ *     |  48  border                               |
+ * 240 +-----------------      X (y=239 x=323)     |
+ *     |  16  vblank                               |
+ * 256 +-----------------                          |
+ *     |  64  border                               |
+ * 320 +-------------------------------------------+
+ */
+typedef struct {
+  
+} ula_display_spec_t;
+
+
+/**
+ */
+static const ula_display_spec_t ula_display_spec[1 /* N_CLOCK_TIMINGS */][2 /* N_DISPLAY_TIMINGS */][1 /* N_FREQUENCIES */] = {
+  /* HDMI */
+  {
+    { 0, 0 },
+    { 312, 448, 56, 
+  },
+  /* VGA */
+};
+
+  
+#if 0
   /* Internal use. */ {
     /* 50 Hz */ {   0,   0,  0,  0,  0 },
     /* 60 Hz */ {   0,   0,  0,  0,  0 }
@@ -69,7 +235,7 @@ static const ula_display_spec_t ula_display_spec[N_TIMINGS][N_FREQUENCIES] = {
     /* 50 Hz */ { 320, 192, 49 - OVERSCAN_TOP, 14, 65 - OVERSCAN_TOP },
     /* 60 Hz */ { 320, 192, 49, 14, 65 }
   }
-};
+#endif
 
 
 typedef struct {
