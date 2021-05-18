@@ -214,7 +214,7 @@ static self_t self;
 #define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES - E_ULA_DISPLAY_MODE_SCREEN_0 + 1)
 
 
-typedef void (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
+typedef u8_t (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
 
 const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES] = {  
   ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
@@ -287,18 +287,16 @@ void ula_did_complete_frame(void) {
 
 
 void ula_tick(u32_t beam_row, u32_t beam_column) {
+  u32_t           visible_row;
+  u32_t           visible_column;
+  u8_t            palette_index;
+  palette_entry_t colour;
+  u16_t           rgba;
+
   self.ticks_14mhz_after_irq++;
 
   if (beam_row == self.display_spec->row_irq && beam_column == self.display_spec->column_irq) {
     ula_irq();
-  }
-
-  if (self.display_mode != E_ULA_DISPLAY_MODE_HI_RES) {
-    /* All other modes need a 7 MHz clock. */
-    self.is_7mhz_tick = !self.is_7mhz_tick;
-    if (!self.is_7mhz_tick) {
-      return;
-    }
   }
 
   /* Nothing to draw when beam is outside visible area. */
@@ -309,7 +307,36 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
     return;
   }
 
-  ula_display_handlers[self.display_mode](beam_row - self.display_spec->row_border_top, beam_column - self.display_spec->column_border_left);
+  visible_row    = beam_row    - self.display_spec->row_border_top;
+  visible_column = beam_column - self.display_spec->column_border_left;
+
+  /* Border is the same for all ULA modes. */
+  if (visible_row    <  32
+   || visible_row    >= 32 + 192   
+   || visible_column <  32 * 2
+   || visible_column >= (32 + 256) * 2) {
+      palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
+  } else {
+    const u32_t content_row    = visible_row - 32;
+    const u32_t content_column = visible_column - 32 * 2;
+
+    /* Honour the clipping area. */
+    if (content_row    < self.clip_y1
+     || content_row    > self.clip_y2
+     || content_column < self.clip_x1
+     || content_column > self.clip_x2) {
+      /* TODO: Mark as transparent? */
+      palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
+    } else {
+      /* Leave the pixel colour up to the specialized ULA mode handlers. */
+      palette_index = ula_display_handlers[self.display_mode](content_row, content_column);
+    }
+  }
+
+  colour = palette_read_rgb(self.palette, palette_index);
+  rgba   = colour.red << 12 | colour.green << 8 | colour.blue << 4;
+
+  self.frame_buffer[visible_row * FRAME_BUFFER_WIDTH + visible_column] = rgba;
 }
 
 
