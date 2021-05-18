@@ -310,13 +310,13 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
   visible_row    = beam_row    - self.display_spec->row_border_top;
   visible_column = beam_column - self.display_spec->column_border_left;
 
-  /* Border is the same for all ULA modes. */
-  if (visible_row    < 32
-   || visible_row    > 32 + 192 - 1
-   || visible_column < 32 * 2
-   || visible_column > (32 + 256 - 1) * 2) {
-      palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
-  } else {
+  /* Need to know this for floating bus support. */
+  self.is_displaying_content = !(visible_row    < 32           ||
+                                 visible_row    > 32 + 192 - 1 ||
+                                 visible_column < 32 * 2       ||
+                                 visible_column > (32 + 256 - 1) * 2);
+
+  if (self.is_displaying_content) {
     const u32_t content_row    = visible_row    - 32;
     const u32_t content_column = visible_column - 32 * 2;
 
@@ -331,6 +331,9 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
 
     /* Leave the pixel colour up to the specialized ULA mode handlers. */
     palette_index = ula_display_handlers[self.display_mode](content_row, content_column);
+  } else {
+    /* Border is the same for all ULA modes. */
+    palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
   }
 
   colour = palette_read_rgb(self.palette, palette_index);
