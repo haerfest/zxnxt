@@ -701,6 +701,14 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       tilemap_tilemap_tile_definitions_address_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_TILEMAP_TRANSPARENCY_INDEX:
+      tilemap_transparency_index_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_ULA_CONTROL:
+      ula_control_write(value);
+      break;
+
     default:
       log_wrn("nextreg: unimplemented write of $%02X to Next register $%02X\n", value, reg);
       break;

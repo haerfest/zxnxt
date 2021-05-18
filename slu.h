@@ -7,14 +7,14 @@
 
 
 typedef enum {
-  E_SLU_LAYER_PRIORITY_SLU = 0,
-  E_SLU_LAYER_PRIORITY_LSU,
-  E_SLU_LAYER_PRIORITY_SUL,
-  E_SLU_LAYER_PRIORITY_LUS,
-  E_SLU_LAYER_PRIORITY_USL,
-  E_SLU_LAYER_PRIORITY_ULS,
-  E_SLU_LAYER_PRIORITY_BLEND,
-  E_SLU_LAYER_PRIORITY_BLEND_5
+  E_SLU_LAYER_PRIORITY_SLU = 0,  /** Sprites over Layer 2 over ULA.                                    */
+  E_SLU_LAYER_PRIORITY_LSU,      /** Layer 2 over Sprites over ULA.                                    */
+  E_SLU_LAYER_PRIORITY_SUL,      /** Sprites over ULA over Layer 2.                                    */
+  E_SLU_LAYER_PRIORITY_LUS,      /** Layer 2 over ULA over Sprites.                                    */
+  E_SLU_LAYER_PRIORITY_USL,      /** ULA over Sprites over Layer 2.                                    */
+  E_SLU_LAYER_PRIORITY_ULS,      /** ULA over Layer 2 over Sprites.                                    */
+  E_SLU_LAYER_PRIORITY_BLEND,    /** Sprites over (Layer 2 + ULA combined), colours clamped to 7.      */
+  E_SLU_LAYER_PRIORITY_BLEND_5   /** Sprites over (Layer 2 + ULA combined), colours clamped to (0, 7). */
 } slu_layer_priority_t;
 
 

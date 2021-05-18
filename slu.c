@@ -200,7 +200,9 @@ void slu_finit(void) {
 
 
 static void slu_blend_layers(void) {
-  const u16_t* ula_frame_buffer = ula_frame_buffer_get();
+  const u16_t* ula_frame_buffer     = ula_frame_buffer_get();
+  const u16_t* tilemap_frame_buffer = tilemap_frame_buffer_get();
+
 
   memcpy(self.blended_frame_buffer, ula_frame_buffer, FRAME_BUFFER_SIZE);
 }
@@ -257,8 +259,8 @@ static void slu_beam_advance(void) {
   slu_blend_layers();
   slu_blit();
 
-  /* Notify layers that we completed a frame. */
-  ula_did_complete_frame();
+  /* Notify the ULA that we completed a frame. */
+  ula_did_complete_frame();  
 }
 
 
@@ -267,7 +269,9 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
     slu_beam_advance();
+
     ula_tick(self.beam_row, self.beam_column);
+    tilemap_tick(self.beam_row, self.beam_column);
   }
 
   /* TODO Deal with ULA using 7 MHz clock, not always consuming all ticks. */
