@@ -311,13 +311,13 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
   visible_column = beam_column - self.display_spec->column_border_left;
 
   /* Border is the same for all ULA modes. */
-  if (visible_row    <  32
-   || visible_row    >= 32 + 192   
-   || visible_column <  32 * 2
-   || visible_column >= (32 + 256) * 2) {
+  if (visible_row    < 32
+   || visible_row    > 32 + 192 - 1
+   || visible_column < 32 * 2
+   || visible_column > (32 + 256 - 1) * 2) {
       palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
   } else {
-    const u32_t content_row    = visible_row - 32;
+    const u32_t content_row    = visible_row    - 32;
     const u32_t content_column = visible_column - 32 * 2;
 
     /* Honour the clipping area. */
@@ -326,11 +326,11 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
      || content_column < self.clip_x1
      || content_column > self.clip_x2) {
       /* TODO: Mark as transparent? */
-      palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
-    } else {
-      /* Leave the pixel colour up to the specialized ULA mode handlers. */
-      palette_index = ula_display_handlers[self.display_mode](content_row, content_column);
+      return;
     }
+
+    /* Leave the pixel colour up to the specialized ULA mode handlers. */
+    palette_index = ula_display_handlers[self.display_mode](content_row, content_column);
   }
 
   colour = palette_read_rgb(self.palette, palette_index);
