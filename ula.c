@@ -55,13 +55,7 @@ typedef struct {
   unsigned int rows;                   /** Number of rows.                 */
   unsigned int columns;                /** Number of columns.              */
   unsigned int row_border_top;         /** Start row of top border.        */
-  unsigned int row_content;            /** Start row of content area.      */
-  unsigned int row_border_bottom;      /** Start row of bottom border.     */
-  unsigned int row_overscan_bottom;    /** Start row of bottom overscan.   */
   unsigned int column_border_left;     /** Start column of left border.    */
-  unsigned int column_content;         /** Start column of content area.   */
-  unsigned int column_border_right;    /** Start column of right border.   */
-  unsigned int column_overscan_right;  /** Start column of right overscan. */
   unsigned int row_irq;                /** Row where IRQ triggers.         */
   unsigned int column_irq;             /** Column where IRQ triggers.      */
 } ula_display_spec_t;
@@ -93,18 +87,12 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
    * FRAME_BUFFER_{WIDTH,HEIGHT}), hence the macro.
    */
   {
-    .rows                  = 312,
-    .columns               = 448             * 2,
-    .row_border_top        = 56 - 32,
-    .row_content           = 56,
-    .row_border_bottom     = 56 + 192,
-    .row_overscan_bottom   = 56 + 192 + 32,
-    .column_border_left    = 0               * 2,
-    .column_content        = 32              * 2,
-    .column_border_right   = (32 + 256)      * 2,
-    .column_overscan_right = (32 + 256 + 32) * 2,
-    .row_irq               = 56 + 248,
-    .column_irq            = (32 + 0)        * 2,
+    .rows               = 312,
+    .columns            = 448       * 2,
+    .row_border_top     = 56 - 32,
+    .column_border_left = 0         * 2,
+    .row_irq            = 56 + 248,
+    .column_irq         = (32 + 0)  * 2,
   },
 
   /**
@@ -123,18 +111,12 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
    * 311 +-------------------------------------------+
    */
   {
-    .rows                  = 311,
-    .columns               = 456             * 2,
-    .row_border_top        = 55 - 32,
-    .row_content           = 55,
-    .row_border_bottom     = 55 + 192,
-    .row_overscan_bottom   = 55 + 192 + 32,
-    .column_border_left    = (40 - 32)       * 2,
-    .column_content        = 40              * 2,
-    .column_border_right   = (40 + 256)      * 2,
-    .column_overscan_right = (40 + 256 + 32) * 2,
-    .row_irq               = 55 + 248,
-    .column_irq            = (40 + 4)        * 2
+    .rows               = 311,
+    .columns            = 456       * 2,
+    .row_border_top     = 55 - 32,
+    .column_border_left = (40 - 32) * 2,
+    .row_irq            = 55 + 248,
+    .column_irq         = (40 + 4)  * 2
   },
 
   /**
@@ -153,18 +135,12 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
    * 311 +-------------------------------------------+
    */
   {
-    .rows                  = 311,
-    .columns               = 456             * 2,
-    .row_border_top        = 55 - 32,
-    .row_content           = 55,
-    .row_border_bottom     = 55 + 192,
-    .row_overscan_bottom   = 55 + 192 + 32,
-    .column_border_left    = (40 - 32)       * 2,
-    .column_content        = 40              * 2,
-    .column_border_right   = (40 + 256)      * 2,
-    .column_overscan_right = (40 + 256 + 32) * 2,
-    .row_irq               = 55 + 248,
-    .column_irq            = (40 + 2)        * 2
+    .rows               = 311,
+    .columns            = 456       * 2,
+    .row_border_top     = 55 - 32,
+    .column_border_left = (40 - 32) * 2,
+    .row_irq            = 55 + 248,
+    .column_irq         = (40 + 2)  * 2
   },
 
   /**
@@ -184,18 +160,12 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
    * 320 +-------------------------------------------+
    */
   {
-    .rows                  = 320,
-    .columns               = 448             * 2,
-    .row_border_top        = 64 - 32,
-    .row_content           = 64,
-    .row_border_bottom     = 64 + 192,
-    .row_overscan_bottom   = 64 + 192 + 32,
-    .column_border_left    = (48 - 32)       * 2,
-    .column_content        = 48              * 2,
-    .column_border_right   = (48 + 256)      * 2,
-    .column_overscan_right = (48 + 256 + 32) * 2,
-    .row_irq               = 64 + 239,
-    .column_irq            = (48 + 323)      * 2
+    .rows               = 320,
+    .columns            = 448        * 2,
+    .row_border_top     = 64 - 32,
+    .column_border_left = (48 - 32)  * 2,
+    .row_irq            = 64 + 239,
+    .column_irq         = (48 + 323) * 2
   }
 };
 
@@ -230,6 +200,7 @@ typedef struct {
   int                        is_timex_enabled;
   int                        is_7mhz_tick;
   int                        is_displaying_content;
+  int                        is_enabled;
 } self_t;
 
 
@@ -331,14 +302,14 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
   }
 
   /* Nothing to draw when beam is outside visible area. */
-  if (beam_row    <  self.display_spec->row_border_top      ||
-      beam_row    >= self.display_spec->row_overscan_bottom ||
-      beam_column <  self.display_spec->column_border_left  ||
-      beam_column >= self.display_spec->column_overscan_right) {
+  if (beam_row    <  self.display_spec->row_border_top
+   || beam_row    >= self.display_spec->row_border_top + 32 + 192 + 32
+   || beam_column <  self.display_spec->column_border_left
+   || beam_column >= self.display_spec->column_border_left + (32 + 256 + 32) * 2) {
     return;
   }
 
-  ula_display_handlers[self.display_mode](beam_row, beam_column);
+  ula_display_handlers[self.display_mode](beam_row - self.display_spec->row_border_top, beam_column - self.display_spec->column_border_left);
 }
 
 
@@ -370,6 +341,7 @@ int ula_init(u8_t* sram) {
   self.hi_res_ink_colour           = 0;
   self.is_timex_enabled            = 0;
   self.is_7mhz_tick                = 1;
+  self.is_enabled                  = 1;
 
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
   ula_display_reconfigure();
@@ -610,4 +582,9 @@ void ula_display_size_get(u16_t* rows, u16_t* columns) {
   if (columns) {
     *columns = self.display_spec->columns;
   }
+}
+
+
+void ula_control_write(u8_t value) {
+  self.is_enabled = !(value & 0x80);
 }

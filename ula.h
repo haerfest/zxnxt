@@ -34,16 +34,17 @@ void                 ula_timex_write(u16_t address, u8_t value);
 ula_display_timing_t ula_display_timing_get(void);
 void                 ula_display_timing_set(ula_display_timing_t timing);
 void                 ula_palette_set(int use_second);
-void                 ula_tick(u32_t beam_row, u32_t beam_column);
 void                 ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2);
 void                 ula_screen_bank_set(ula_screen_bank_t bank);
 ula_screen_bank_t    ula_screen_bank_get(void);
 int                  ula_contention_get(void);
 void                 ula_contention_set(int do_contend);
 void                 ula_contend(u8_t bank);
+void                 ula_control_write(u8_t value);
 void                 ula_did_complete_frame(void);
-u16_t*               ula_frame_buffer_get(void);
 void                 ula_display_size_get(u16_t* rows, u16_t* columns);
+void                 ula_tick(u32_t beam_row, u32_t beam_column);
+u16_t*               ula_frame_buffer_get(void);
 
 
 #endif  /* __ULA_H */

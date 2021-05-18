@@ -1,21 +1,16 @@
 static void ula_display_mode_hi_res(u32_t beam_row, u32_t beam_column) {
 
-  const u32_t frame_buffer_row    = beam_row    - self.display_spec->row_border_top;
-  const u32_t frame_buffer_column = beam_column - self.display_spec->column_border_left;
-
-  u8_t            palette_index  = PALETTE_OFFSET_BORDER + self.border_colour;
+  u8_t            palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
   palette_entry_t colour;
   u16_t           rgba;
 
   self.is_displaying_content = \
-    beam_row    >= self.display_spec->row_content       &&
-    beam_row    <  self.display_spec->row_border_bottom &&
-    beam_column >= self.display_spec->column_content    &&
-    beam_column <  self.display_spec->column_border_right;
+    beam_row    >= 32     && beam_row    <  32 + 192   &&
+    beam_column >= 32 * 2 && beam_column < (32 + 256) * 2;
 
   if (self.is_displaying_content) {
-    const u32_t row             = beam_row    - self.display_spec->row_content;
-    const u32_t column          = beam_column - self.display_spec->column_content;
+    const u32_t row             = beam_row    - 32;
+    const u32_t column          = beam_column - 32 * 2;
     const int   in_clipped_area = \
       row    >= self.clip_y1 && row    <= self.clip_y2 &&
       column >= self.clip_x1 && column <= self.clip_x2;
@@ -37,5 +32,5 @@ static void ula_display_mode_hi_res(u32_t beam_row, u32_t beam_column) {
   colour = palette_read_rgb(self.palette, palette_index);
   rgba   = colour.red << 12 | colour.green << 8 | colour.blue << 4;
 
-  self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgba;
+  self.frame_buffer[beam_row * FRAME_BUFFER_WIDTH + beam_column] = rgba;
 }
