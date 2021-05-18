@@ -17,8 +17,8 @@ static void ula_display_mode_screen_x(u32_t beam_row, u32_t beam_column) {
     const u32_t row             =  beam_row    - self.display_spec->row_content;
     const u32_t column          = (beam_column - self.display_spec->column_content) / 2;  /* Half pixels. */
     const int   in_clipped_area = \
-      row    >= self.clip_y1 && row    <= self.clip_y2 &&
-      column >= self.clip_x1 && column <= self.clip_x2;
+      row    >= self.clip_y1     && row    <= self.clip_y2 &&
+      column >= self.clip_x1 / 2 && column <= self.clip_x2 / 2;
 
     if (in_clipped_area) {
       const u8_t  mask             = 1 << (7 - (column & 0x07));

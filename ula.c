@@ -215,8 +215,8 @@ typedef struct {
   u8_t                       speaker_state;
   palette_t                  palette;
   u16_t*                     frame_buffer;
-  int                        clip_x1;
-  int                        clip_x2;
+  int                        clip_x1;  /** In half-pixels. */
+  int                        clip_x2;  /** In half-pixels. */
   int                        clip_y1;
   int                        clip_y2;
   uint64_t                   frame_counter;
@@ -487,12 +487,12 @@ void ula_palette_set(int use_second) {
 
 
 void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
-  self.clip_x1 = x1;
-  self.clip_x2 = x2;
+  self.clip_x1 = x1 * 2;
+  self.clip_x2 = x2 * 2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
 
-  log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", self.clip_x1, self.clip_x2, self.clip_y1, self.clip_y2);
+  log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", x1, x2, y1, y1);
 }
 
 
