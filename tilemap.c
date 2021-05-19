@@ -18,6 +18,8 @@ typedef struct {
   int       use_512_tiles;
   int       force_tilemap_over_ula;
   palette_t palette;
+  u8_t      offset_y;
+  u16_t     offset_x;
 } tilemap_t;
 
 
@@ -79,6 +81,9 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
     return;
   }
 
+  row    += self.offset_y;
+  column += self.offset_x;
+
   // assume 80x32, not default attribute
 
   u8_t  map_row    = row    / 8;
@@ -107,4 +112,19 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
   palette_entry_t colour = palette_read_rgb(self.palette, palette_offset | palette_index);
   *rgba                  = colour.red << 12 | colour.green << 8 | colour.blue << 4;
   *is_transparent        = 0;
+}
+
+
+void tilemap_offset_x_msb_write(u8_t value) {
+  self.offset_x = ((value << 8) | (self.offset_x & 0x00FF)) % (self.use_80x32 ? 640 : 320);
+}
+
+
+void tilemap_offset_x_lsb_write(u8_t value) {
+  self.offset_x = ((self.offset_x & 0xFF00) | value) % (self.use_80x32 ? 640 : 320);
+}
+
+
+void tilemap_offset_y_write(u8_t value) {
+  self.offset_y = value;
 }

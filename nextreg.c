@@ -707,6 +707,18 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       ula_control_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_OFFSET_X_MSB:
+      tilemap_offset_x_msb_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_OFFSET_X_LSB:
+      tilemap_offset_x_msb_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_OFFSET_Y:
+      tilemap_offset_y_write(value);
+      break;
+
     default:
       log_wrn("nextreg: unimplemented write of $%02X to Next register $%02X\n", value, reg);
       break;
