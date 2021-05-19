@@ -275,8 +275,10 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
     tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_transparent, &tilemap_rgba);
 
-    if (ula_is_transparent) {
+    if (ula_is_transparent && tilemap_is_transparent) {
       rgba = self.fallback_colour;
+    } else if (ula_is_transparent) {
+      rgba = tilemap_rgba;
     } else {
       rgba = ula_rgba;
     }

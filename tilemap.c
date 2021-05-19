@@ -73,5 +73,6 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
     return;
   }
 
-  *is_transparent = 1;
+  *rgba           = 0xF000;
+  *is_transparent = 0;
 }
