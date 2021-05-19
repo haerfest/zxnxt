@@ -23,6 +23,7 @@ void                 slu_finit(void);
 u32_t                slu_run(u32_t ticks_14mhz);
 void                 slu_layer_priority_set(slu_layer_priority_t priority);
 slu_layer_priority_t slu_layer_priority_get(void);
+void                 slu_transparency_fallback_colour_write(u8_t value);
 
 
 #endif  /* __SLU_H */

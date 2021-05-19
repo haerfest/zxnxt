@@ -52,7 +52,6 @@ typedef struct {
   palette_t                palette_selected;
   u8_t                     palette_index;
   int                      palette_index_9bit_is_first_write;
-  u8_t                     fallback_colour;
   int                      ula_next_mode;
   u8_t                     ula_clip_index;
   u8_t                     ula_clip[4];  /* Elements: x1, x2, y1, y2. */
@@ -83,7 +82,6 @@ static void nextreg_reset_soft(void) {
   self.palette_sprites                   = E_PALETTE_SPRITES_FIRST;
   self.palette_layer2                    = E_PALETTE_LAYER2_FIRST;
   self.palette_ula                       = E_PALETTE_ULA_FIRST;
-  self.fallback_colour                   = 0xE3;
   self.ula_next_mode                     = 0;
   self.ula_clip_index                    = 0;
   self.ula_clip[0]                       = 0;
@@ -647,7 +645,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_FALLBACK_COLOUR:
-      self.fallback_colour = value;
+      slu_transparency_fallback_colour_write(value);
       break;
 
     case E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL:
@@ -777,9 +775,6 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_PALETTE_VALUE_9BITS:
       return nextreg_palette_value_9bits_read();
-
-    case E_NEXTREG_REGISTER_FALLBACK_COLOUR:
-      return self.fallback_colour;
 
     case E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT1_CONTROL:

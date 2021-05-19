@@ -12,8 +12,7 @@ void   tilemap_default_tilemap_attribute_write(u8_t value);
 void   tilemap_tilemap_base_address_write(u8_t value);
 void   tilemap_tilemap_tile_definitions_address_write(u8_t value);
 void   tilemap_transparency_index_write(u8_t value);
-void   tilemap_tick(u32_t beam_row, u32_t beam_column);
-u16_t* tilemap_frame_buffer_get(void);
+void   tilemap_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba);
 
 
 #endif  /* __TILEMAP_H */

@@ -164,11 +164,12 @@
 typedef struct {
   SDL_Renderer*        renderer;
   SDL_Texture*         texture;
-  u16_t*               blended_frame_buffer;
+  u16_t*               frame_buffer;
   slu_layer_priority_t layer_priority;
   u32_t                beam_row;
   u32_t                beam_column;
   int                  is_beam_visible;
+  u16_t                fallback_colour;
 } self_t;
 
 
@@ -178,8 +179,8 @@ static self_t self;
 int slu_init(SDL_Renderer* renderer, SDL_Texture* texture) {
   memset(&self, 0, sizeof(self));
 
-  self.blended_frame_buffer = malloc(FRAME_BUFFER_SIZE);
-  if (self.blended_frame_buffer == NULL) {
+  self.frame_buffer = malloc(FRAME_BUFFER_SIZE);
+  if (self.frame_buffer == NULL) {
     log_err("slu: out of memory\n");
     return -1;
   }
@@ -192,19 +193,10 @@ int slu_init(SDL_Renderer* renderer, SDL_Texture* texture) {
 
 
 void slu_finit(void) {
-  if (self.blended_frame_buffer != NULL) {
-    free(self.blended_frame_buffer);
-    self.blended_frame_buffer = NULL;
+  if (self.frame_buffer != NULL) {
+    free(self.frame_buffer);
+    self.frame_buffer = NULL;
   }
-}
-
-
-static void slu_blend_layers(void) {
-  const u16_t* ula_frame_buffer     = ula_frame_buffer_get();
-  const u16_t* tilemap_frame_buffer = tilemap_frame_buffer_get();
-
-
-  memcpy(self.blended_frame_buffer, ula_frame_buffer, FRAME_BUFFER_SIZE);
 }
 
 
@@ -223,7 +215,7 @@ static void slu_blit(void) {
     return;
   }
 
-  memcpy(pixels, self.blended_frame_buffer, FRAME_BUFFER_SIZE);
+  memcpy(pixels, self.frame_buffer, FRAME_BUFFER_SIZE);
   SDL_UnlockTexture(self.texture);
 
   if (SDL_RenderCopy(self.renderer, self.texture, &source_rect, NULL) != 0) {
@@ -255,8 +247,7 @@ static void slu_beam_advance(void) {
   /* Move beam to top left of display. */
   self.beam_row = 0;
 
-  /* Blend layers and update display. */
-  slu_blend_layers();
+  /* Update display. */
   slu_blit();
 
   /* Notify the ULA that we completed a frame. */
@@ -266,12 +257,31 @@ static void slu_beam_advance(void) {
 
 u32_t slu_run(u32_t ticks_14mhz) {
   u32_t tick;
+  u32_t frame_buffer_row;
+  u32_t frame_buffer_column;
+  int   ula_is_transparent;
+  u16_t ula_rgba;
+  int   tilemap_is_transparent;
+  u16_t tilemap_rgba;
+  u16_t rgba;
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
     slu_beam_advance();
 
-    ula_tick(self.beam_row, self.beam_column);
-    tilemap_tick(self.beam_row, self.beam_column);
+    if (!ula_tick(self.beam_row, self.beam_column, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
+      /* Beam is outside frame buffer. */
+      continue;
+    }
+
+    tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_transparent, &tilemap_rgba);
+
+    if (ula_is_transparent) {
+      rgba = self.fallback_colour;
+    } else {
+      rgba = ula_rgba;
+    }
+
+    self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgba;
   }
 
   /* TODO Deal with ULA using 7 MHz clock, not always consuming all ticks. */
@@ -286,4 +296,9 @@ void slu_layer_priority_set(slu_layer_priority_t priority) {
 
 slu_layer_priority_t slu_layer_priority_get(void) {
   return self.layer_priority;
+}
+
+
+void slu_transparency_fallback_colour_write(u8_t value) {
+  self.fallback_colour = (value >> 5) << 12 | ((value & 0x1C) >> 2) << 8 | (value & 0x03) << 4;
 }

@@ -43,8 +43,7 @@ void                 ula_contend(u8_t bank);
 void                 ula_control_write(u8_t value);
 void                 ula_did_complete_frame(void);
 void                 ula_display_size_get(u16_t* rows, u16_t* columns);
-void                 ula_tick(u32_t beam_row, u32_t beam_column);
-u16_t*               ula_frame_buffer_get(void);
+int                  ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column);
 
 
 #endif  /* __ULA_H */

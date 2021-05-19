@@ -184,7 +184,6 @@ typedef struct {
   u8_t                       border_colour;
   u8_t                       speaker_state;
   palette_t                  palette;
-  u16_t*                     frame_buffer;
   int                        clip_x1;  /** In half-pixels. */
   int                        clip_x2;  /** In half-pixels. */
   int                        clip_y1;
@@ -286,12 +285,17 @@ void ula_did_complete_frame(void) {
 }
 
 
-void ula_tick(u32_t beam_row, u32_t beam_column) {
-  u32_t           visible_row;
-  u32_t           visible_column;
+/**
+ * Given the CRT's beam position, returns a flag indicating whether it falls
+ * within the visible frame buffer. If so, also returns the frame buffer
+ * position so we can align the other layers.
+ *
+ * Returns the ULA pixel colour for the frame buffer position, if any, and
+ * whether it is transparent or not.
+ */
+int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
   u8_t            palette_index;
   palette_entry_t colour;
-  u16_t           rgba;
 
   self.ticks_14mhz_after_irq++;
 
@@ -304,29 +308,34 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
    || beam_row    >= self.display_spec->row_border_top + 32 + 192 + 32
    || beam_column <  self.display_spec->column_border_left
    || beam_column >= self.display_spec->column_border_left + (32 + 256 + 32) * 2) {
-    return;
+    return 0;
   }
 
-  visible_row    = beam_row    - self.display_spec->row_border_top;
-  visible_column = beam_column - self.display_spec->column_border_left;
+  *frame_buffer_row    = beam_row    - self.display_spec->row_border_top;
+  *frame_buffer_column = beam_column - self.display_spec->column_border_left;
+
+  if (!self.is_enabled) {
+    *is_transparent = 1;
+    return 1;
+  }
 
   /* Need to know this for floating bus support. */
-  self.is_displaying_content = !(visible_row    < 32           ||
-                                 visible_row    > 32 + 192 - 1 ||
-                                 visible_column < 32 * 2       ||
-                                 visible_column > (32 + 256 - 1) * 2);
+  self.is_displaying_content = !(*frame_buffer_row    < 32           ||
+                                 *frame_buffer_row    > 32 + 192 - 1 ||
+                                 *frame_buffer_column < 32 * 2       ||
+                                 *frame_buffer_column > (32 + 256 - 1) * 2);
 
   if (self.is_displaying_content) {
-    const u32_t content_row    = visible_row    - 32;
-    const u32_t content_column = visible_column - 32 * 2;
+    const u32_t content_row    = *frame_buffer_row    - 32;
+    const u32_t content_column = *frame_buffer_column - 32 * 2;
 
     /* Honour the clipping area. */
     if (content_row    < self.clip_y1
      || content_row    > self.clip_y2
      || content_column < self.clip_x1
      || content_column > self.clip_x2) {
-      /* TODO: Mark as transparent? */
-      return;
+      *is_transparent = 1;
+      return 1;
     }
 
     /* Leave the pixel colour up to the specialized ULA mode handlers. */
@@ -336,10 +345,11 @@ void ula_tick(u32_t beam_row, u32_t beam_column) {
     palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
   }
 
-  colour = palette_read_rgb(self.palette, palette_index);
-  rgba   = colour.red << 12 | colour.green << 8 | colour.blue << 4;
+  colour          = palette_read_rgb(self.palette, palette_index);
+  *rgba           = colour.red << 12 | colour.green << 8 | colour.blue << 4;
+  *is_transparent = 0;
 
-  self.frame_buffer[visible_row * FRAME_BUFFER_WIDTH + visible_column] = rgba;
+  return 1;
 }
 
 
@@ -350,12 +360,6 @@ static void ula_set_display_mode(ula_display_mode_t mode) {
 
 
 int ula_init(u8_t* sram) {
-  self.frame_buffer = malloc(FRAME_BUFFER_SIZE);
-  if (self.frame_buffer == NULL) {
-    log_err("ula: out of memory\n");
-    return -1;
-  }
-
   self.sram                        = sram;
   self.screen_bank                 = E_ULA_SCREEN_BANK_5;
   self.display_timing              = E_ULA_DISPLAY_TIMING_ZX_48K;
@@ -596,11 +600,6 @@ void ula_contend(u8_t bank) {
     default:
       break;
   }
-}
-
-
-u16_t* ula_frame_buffer_get(void) {
-  return self.frame_buffer;
 }
 
 

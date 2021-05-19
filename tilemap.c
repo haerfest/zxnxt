@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include <string.h>
 #include "log.h"
 #include "tilemap.h"
@@ -6,7 +5,6 @@
 
 typedef struct {
   u8_t*  sram;
-  u16_t* frame_buffer;
   u8_t   default_attribute;
   u16_t  definitions_base_address;
   u16_t  tilemap_base_address;
@@ -26,12 +24,6 @@ static tilemap_t self;
 int tilemap_init(u8_t* sram) {
   memset(&self, 0, sizeof(self));
 
-  self.frame_buffer = malloc(FRAME_BUFFER_SIZE);
-  if (self.frame_buffer == NULL) {
-    log_err("tilemap: out of memory\n");
-    return -1;
-  }
-
   self.sram                     = sram;
   self.definitions_base_address = 0x4C00;
   self.tilemap_base_address     = 0x6C00;
@@ -42,10 +34,6 @@ int tilemap_init(u8_t* sram) {
 
 
 void tilemap_finit(void) {
-  if (self.frame_buffer != NULL) {
-    free(self.frame_buffer);
-    self.frame_buffer = NULL;
-  }
 }
 
 
@@ -79,11 +67,11 @@ void tilemap_transparency_index_write(u8_t value) {
 }
 
 
-void tilemap_tick(u32_t beam_row, u32_t beam_column) {
-  self.frame_buffer[beam_row * FRAME_BUFFER_WIDTH + beam_column] = 0xFF0000;
-}
+void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
+  if (!self.is_enabled) {
+    *is_transparent = 1;
+    return;
+  }
 
-
-u16_t* tilemap_frame_buffer_get(void) {
-  return self.frame_buffer;
+  *is_transparent = 1;
 }
