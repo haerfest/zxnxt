@@ -1,5 +1,6 @@
 #include "ay.h"
 #include "divmmc.h"
+#include "dma.h"
 #include "nextreg.h"
 #include "dac.h"
 #include "defs.h"
@@ -202,6 +203,10 @@ void io_write(u16_t address, u8_t value) {
   }
 
   switch (address & 0x00FF) {
+    case 0x6B:
+      dma_write(value);
+      break;
+
     case 0x00E3:
       divmmc_control_write(address, value);
       return;

@@ -7,6 +7,7 @@
 #include "config.h"
 #include "cpu.h"
 #include "dac.h"
+#include "dma.h"
 #include "defs.h"
 #include "divmmc.h"
 #include "i2c.h"
@@ -207,8 +208,12 @@ static int main_init(void) {
 
   sram = memory_sram();
 
-  if (bootrom_init(sram) != 0) {
+  if (dma_init(sram) != 0) {
     goto exit_memory;
+  }
+
+  if (bootrom_init(sram) != 0) {
+    goto exit_dma;
   }
 
   if (config_init(sram) != 0) {
@@ -299,6 +304,8 @@ exit_config:
   config_finit();
 exit_bootrom:
   bootrom_finit();
+exit_dma:
+  dma_finit();
 exit_memory:
   memory_finit();
 exit_dac:
@@ -496,6 +503,7 @@ static void main_finit(void) {
   altrom_finit();
   config_finit();
   bootrom_finit();
+  dma_finit();
   memory_finit();
   dac_finit();
   io_finit();
