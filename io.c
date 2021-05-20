@@ -203,8 +203,9 @@ void io_write(u16_t address, u8_t value) {
   }
 
   switch (address & 0x00FF) {
+    case 0x0B:
     case 0x6B:
-      dma_write(value);
+      dma_write(address, value);
       break;
 
     case 0x00E3:
