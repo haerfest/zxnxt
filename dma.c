@@ -178,7 +178,7 @@ static void dma_group_4_write(u8_t value, int is_first_write) {
     }
   }
 
-  if (((self.group_value[4]    & 0x78) == 0x00) &&
+  if (((self.group_value[4]    & 0x1C) == 0x00) &&
       ((self.interrupt_control & 0x18) == 0x00)) {
     self.group = NO_GROUP;
   }
@@ -240,12 +240,14 @@ void dma_write(u16_t address, u8_t value) {
   if (self.group == NO_GROUP) {
       self.group = dma_decode_group(value);
       if (self.group != NO_GROUP) {
+        log_dbg("dma: write $%02X to group %d\n", value, self.group);
         self.group_value[self.group] = value;
         handlers[self.group](value, 1);
       }
       return;
   }
 
+  log_dbg("dma: write $%02X to group %d\n", value, self.group);
   handlers[self.group](value, 0);
 }
 
