@@ -474,6 +474,7 @@ static void main_eventloop(void) {
   while (self.task != E_MAIN_TASK_QUIT) {
 
     while (self.task == E_MAIN_TASK_NONE) {
+      dma_run();
       cpu_step();
     }
 

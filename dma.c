@@ -1,6 +1,9 @@
 #include <strings.h>
+#include "clock.h"
 #include "defs.h"
+#include "io.h"
 #include "log.h"
+#include "memory.h"
 
 
 /**
@@ -39,12 +42,10 @@ typedef struct {
   u8_t* sram;
   u8_t  group;
   u8_t  group_value[N_GROUPS];
-  u16_t port_a_starting_address;
-  u16_t port_b_starting_address;
-  u16_t port_a_starting_address_internal;
-  u16_t port_b_starting_address_internal;
-  u8_t  port_a_variable_timing;
-  u8_t  port_b_variable_timing;
+  u16_t a_starting_address;
+  u16_t b_starting_address;
+  u8_t  a_variable_timing;
+  u8_t  b_variable_timing;
   u16_t block_length;
   u8_t  interrupt_control;
   u8_t  pulse_control;
@@ -53,6 +54,17 @@ typedef struct {
   u8_t  mask_byte;
   u8_t  match_byte;
   u8_t  zxn_prescalar;
+  int   is_enabled;
+  u16_t n_transferred;
+  
+  u16_t src_address;
+  u16_t dst_address;
+  int   is_src_io;
+  int   is_dst_io;
+  int   src_address_delta;
+  int   dst_address_delta;
+  u8_t  src_cycle_length;
+  u8_t  dst_cycle_length;
 } dma_t;
 
 
@@ -71,6 +83,67 @@ int dma_init(u8_t* sram) {
 
 
 void dma_finit(void) {
+}
+
+
+static int dma_get_address_delta(int group) {
+  switch ((self.group_value[group] & 0x30) >> 4) {
+    case 0:
+      return -1;
+
+    case 1:
+      return +1;
+
+    default:
+      break;
+  }
+
+  return 0;
+}
+
+
+static void dma_load(void) {
+  const int   is_a_io         = self.group_value[1] & 0x80;
+  const int   is_b_io         = self.group_value[2] & 0x80;
+  const int   a_address_delta = dma_get_address_delta(1);
+  const int   b_address_delta = dma_get_address_delta(2);
+  const u8_t  a_cycle_length  = self.a_variable_timing & 0x03;
+  const u8_t  b_cycle_length  = self.b_variable_timing & 0x03;
+  const int   is_a_to_b       = self.group_value[0] & 0x04;
+
+  if (is_a_to_b) {
+    /* A -> B */
+    self.src_address       = self.a_starting_address;
+    self.dst_address       = self.b_starting_address;
+    self.is_src_io         = is_a_io;
+    self.is_dst_io         = is_b_io;
+    self.src_address_delta = a_address_delta;
+    self.dst_address_delta = b_address_delta;
+    self.src_cycle_length  = a_cycle_length;
+    self.dst_cycle_length  = b_cycle_length;
+  } else {
+    /* B -> A */
+    self.src_address       = self.b_starting_address;
+    self.dst_address       = self.a_starting_address;
+    self.is_src_io         = is_b_io;
+    self.is_dst_io         = is_a_io;
+    self.src_address_delta = b_address_delta;
+    self.dst_address_delta = a_address_delta;
+    self.src_cycle_length  = b_cycle_length;
+    self.dst_cycle_length  = a_cycle_length;
+  }
+
+  self.n_transferred = 0;
+
+  log_dbg("dma: ready to transfer %u bytes %s from $%04X (%s, %d) to $%04X (%s, %d)\n",
+          self.block_length,
+          is_a_to_b ? "A->B" : "B->A",
+          self.src_address,
+          self.is_src_io ? "IO" : "memory",
+          self.src_address_delta,
+          self.dst_address,
+          self.is_dst_io ? "IO" : "memory",
+          self.dst_address_delta);
 }
 
 
@@ -116,19 +189,19 @@ static u8_t dma_decode_group(u8_t value) {
 static void dma_group_0_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
     if (self.group_value[0] & 0x08) {
-      self.port_a_starting_address &= 0xF0;
-      self.port_a_starting_address |= value;
-      self.group_value[0]          &= ~0x08;
+      self.a_starting_address &= 0xFF00;
+      self.a_starting_address |= value;
+      self.group_value[0]     &= ~0x08;
     } else if (self.group_value[0] & 0x10) {
-      self.port_a_starting_address &= 0x0F;
-      self.port_a_starting_address |= value << 8;
-      self.group_value[0]          &= ~0x10;
+      self.a_starting_address &= 0x00FF;
+      self.a_starting_address |= value << 8;
+      self.group_value[0]     &= ~0x10;
     } else if (self.group_value[0] & 0x20) {
-      self.block_length &= 0xF0;
+      self.block_length &= 0xFF00;
       self.block_length |= value;
       self.group_value[0] &= ~0x20;
     } else if (self.group_value[0] & 0x40) {
-      self.block_length   &= 0x0F;
+      self.block_length   &= 0x00FF;
       self.block_length   |= value << 8;
       self.group_value[0] &= ~0x40;
     }
@@ -143,8 +216,8 @@ static void dma_group_0_write(u8_t value, int is_first_write) {
 static void dma_group_1_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
     if (self.group_value[1] & 0x40) {
-      self.port_a_variable_timing = value;
-      self.group_value[1]        &= ~0x40;
+      self.a_variable_timing = value;
+      self.group_value[1]   &= ~0x40;
     }
   }
 
@@ -157,11 +230,11 @@ static void dma_group_1_write(u8_t value, int is_first_write) {
 static void dma_group_2_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
     if (self.group_value[2] & 0x40) {
-      self.port_b_variable_timing = value;
-      self.group_value[2]        &= ~0x40;
-    } else if (self.port_b_variable_timing & 0x20) {
-      self.zxn_prescalar           = value;
-      self.port_b_variable_timing &= ~0x20;
+      self.b_variable_timing = value;
+      self.group_value[2]   &= ~0x40;
+    } else if (self.b_variable_timing & 0x20) {
+      self.zxn_prescalar      = value;
+      self.b_variable_timing &= ~0x20;
     }
   }
 
@@ -191,13 +264,13 @@ static void dma_group_3_write(u8_t value, int is_first_write) {
 static void dma_group_4_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
     if (self.group_value[4] & 0x04) {
-      self.port_b_starting_address &= 0xF0;
-      self.port_b_starting_address |= value;
-      self.group_value[4]          &= ~0x04;
+      self.b_starting_address &= 0xFF00;
+      self.b_starting_address |= value;
+      self.group_value[4]     &= ~0x04;
     } else if (self.group_value[4] & 0x08) {
-      self.port_b_starting_address &= 0x0F;
-      self.port_b_starting_address |= value << 8;
-      self.group_value[4]          &= ~0x08;
+      self.b_starting_address &= 0x00FF;
+      self.b_starting_address |= value << 8;
+      self.group_value[4]     &= ~0x08;
     } else if (self.group_value[4] & 0x10) {
       self.interrupt_control = value;
       self.group_value[4]   &= ~0x10;
@@ -226,6 +299,9 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
   if (is_first_write) {
     switch (value) {
       case E_DMA_CMD_RESET:
+        self.is_enabled = 0;
+        break;
+
       case E_DMA_CMD_RESET_PORT_A_TIMING:
       case E_DMA_CMD_RESET_PORT_B_TIMING:
       case E_DMA_CMD_CONTINUE:
@@ -237,13 +313,18 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
       case E_DMA_CMD_REINITIALISE_STATUS_BYTE:
       case E_DMA_CMD_INITIATE_READ_SEQUENCE:
       case E_DMA_CMD_FORCE_READY:
+        break;
+
       case E_DMA_CMD_ENABLE_DMA:
+        self.is_enabled = 1;
+        break;
+
       case E_DMA_CMD_DISABLE_DMA:
+        self.is_enabled = 0;
         break;
 
       case E_DMA_CMD_LOAD:
-        self.port_a_starting_address_internal = self.port_a_starting_address;
-        self.port_b_starting_address_internal = self.port_b_starting_address;
+        dma_load();
         break;
 
       case E_DMA_CMD_READ_MASK_FOLLOWS:
@@ -265,7 +346,7 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
 
 
 void dma_write(u16_t address, u8_t value) {
-  if ((address & 0x0F) == 0x0B) {
+  if ((address & 0x00FF) != 0x6B) {
     log_dbg("dma: Z80 DMA at port $%04X not implemented\n", address);
     return;
   }
@@ -299,4 +380,31 @@ u8_t dma_read(u16_t address) {
   log_dbg("dma: unimplemented DMA read from $%04X\n", address);
 
   return 0xFF;
+}
+
+
+void dma_run(void) {
+  if (!self.is_enabled) {
+    return;
+  }
+
+  /**
+   * TODO Byte and burst transfers.
+   * TODO Auto restart on end of block.
+   */
+  while (self.n_transferred < self.block_length) {
+    const u8_t byte = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
+    self.src_address += self.src_address_delta;
+    clock_run(self.src_cycle_length);
+
+    if (self.is_dst_io) {
+      io_write(self.dst_address, byte);
+    } else {
+      memory_write(self.dst_address, byte);
+    }
+    self.dst_address += self.dst_address_delta;
+    clock_run(self.dst_cycle_length);
+
+    self.n_transferred++;
+  }
 }
