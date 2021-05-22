@@ -3,8 +3,33 @@
 #include "log.h"
 
 
+/**
+ * Note: implements zxnDMA only, not Z80 DMA.
+ */
+
+
 #define NO_GROUP  0xFF
 #define N_GROUPS  7
+
+
+typedef enum {
+  E_DMA_CMD_RESET                        = 0xC3,
+  E_DMA_CMD_RESET_PORT_A_TIMING          = 0xC7,
+  E_DMA_CMD_RESET_PORT_B_TIMING          = 0xCB,
+  E_DMA_CMD_LOAD                         = 0xCF,
+  E_DMA_CMD_CONTINUE                     = 0xD3,
+  E_DMA_CMD_DISABLE_INTERRUPTS           = 0xAF,
+  E_DMA_CMD_ENABLE_INTERRUPTS            = 0xAB,
+  E_DMA_CMD_RESET_AND_DISABLE_INTERRUPTS = 0xA3,
+  E_DMA_CMD_ENABLE_AFTER_RTI             = 0xB7,
+  E_DMA_CMD_READ_STATUS_BYTE             = 0xBF,
+  E_DMA_CMD_REINITIALISE_STATUS_BYTE     = 0x8B,
+  E_DMA_CMD_INITIATE_READ_SEQUENCE       = 0xA7,
+  E_DMA_CMD_FORCE_READY                  = 0xB3,
+  E_DMA_CMD_ENABLE_DMA                   = 0x87,
+  E_DMA_CMD_DISABLE_DMA                  = 0x83,
+  E_DMA_CMD_READ_MASK_FOLLOWS            = 0xBB
+} dma_cmd_t;
 
 
 typedef void (*dma_decode_handler_t)(u8_t value, int is_first_write);
@@ -16,6 +41,8 @@ typedef struct {
   u8_t  group_value[N_GROUPS];
   u16_t port_a_starting_address;
   u16_t port_b_starting_address;
+  u16_t port_a_starting_address_internal;
+  u16_t port_b_starting_address_internal;
   u8_t  port_a_variable_timing;
   u8_t  port_b_variable_timing;
   u16_t block_length;
@@ -25,6 +52,7 @@ typedef struct {
   u8_t  read_mask;
   u8_t  mask_byte;
   u8_t  match_byte;
+  u8_t  zxn_prescalar;
 } dma_t;
 
 
@@ -34,8 +62,9 @@ static dma_t self;
 int dma_init(u8_t* sram) {
   memset(&self, 0, sizeof(self));
 
-  self.sram  = sram;
-  self.group = NO_GROUP;
+  self.sram      = sram;
+  self.group     = NO_GROUP;
+  self.read_mask = 0x7F;
 
   return 0;
 }
@@ -89,18 +118,18 @@ static void dma_group_0_write(u8_t value, int is_first_write) {
     if (self.group_value[0] & 0x08) {
       self.port_a_starting_address &= 0xF0;
       self.port_a_starting_address |= value;
-      self.group_value[0] &= ~0x08;
+      self.group_value[0]          &= ~0x08;
     } else if (self.group_value[0] & 0x10) {
       self.port_a_starting_address &= 0x0F;
       self.port_a_starting_address |= value << 8;
-      self.group_value[0] &= ~0x10;
+      self.group_value[0]          &= ~0x10;
     } else if (self.group_value[0] & 0x20) {
       self.block_length &= 0xF0;
       self.block_length |= value;
       self.group_value[0] &= ~0x20;
     } else if (self.group_value[0] & 0x40) {
-      self.block_length &= 0x0F;
-      self.block_length |= value << 8;
+      self.block_length   &= 0x0F;
+      self.block_length   |= value << 8;
       self.group_value[0] &= ~0x40;
     }
   }
@@ -115,7 +144,7 @@ static void dma_group_1_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
     if (self.group_value[1] & 0x40) {
       self.port_a_variable_timing = value;
-      self.group_value[1] &= ~0x40;
+      self.group_value[1]        &= ~0x40;
     }
   }
 
@@ -129,7 +158,10 @@ static void dma_group_2_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
     if (self.group_value[2] & 0x40) {
       self.port_b_variable_timing = value;
-      self.group_value[2] &= ~0x40;
+      self.group_value[2]        &= ~0x40;
+    } else if (self.port_b_variable_timing & 0x20) {
+      self.zxn_prescalar           = value;
+      self.port_b_variable_timing &= ~0x20;
     }
   }
 
@@ -142,10 +174,10 @@ static void dma_group_2_write(u8_t value, int is_first_write) {
 static void dma_group_3_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
     if (self.group_value[3] & 0x08) {
-      self.mask_byte = value;
+      self.mask_byte       = value;
       self.group_value[3] &= ~0x08;
     } else if (self.group_value[3] & 0x10) {
-      self.match_byte = value;
+      self.match_byte      = value;
       self.group_value[3] &= ~0x10;
     }
   }
@@ -161,19 +193,19 @@ static void dma_group_4_write(u8_t value, int is_first_write) {
     if (self.group_value[4] & 0x04) {
       self.port_b_starting_address &= 0xF0;
       self.port_b_starting_address |= value;
-      self.group_value[4] &= ~0x04;
+      self.group_value[4]          &= ~0x04;
     } else if (self.group_value[4] & 0x08) {
       self.port_b_starting_address &= 0x0F;
       self.port_b_starting_address |= value << 8;
-      self.group_value[4] &= ~0x08;
+      self.group_value[4]          &= ~0x08;
     } else if (self.group_value[4] & 0x10) {
       self.interrupt_control = value;
-      self.group_value[4] &= ~0x10;
+      self.group_value[4]   &= ~0x10;
     } else if (self.interrupt_control & 0x08) {
-      self.pulse_control = value;
+      self.pulse_control      = value;
       self.interrupt_control &= ~0x08;
     } else if (self.interrupt_control & 0x10) {
-      self.interrupt_vector = value;
+      self.interrupt_vector   = value;
       self.interrupt_control &= ~0x10;
     }
   }
@@ -193,31 +225,37 @@ static void dma_group_5_write(u8_t value, int is_first_write) {
 static void dma_group_6_write(u8_t value, int is_first_write) {
   if (is_first_write) {
     switch (value) {
-      case 0xC3:
-      case 0xC7:
-      case 0xCB:
-      case 0xCF:
-      case 0xD3:
-      case 0xAF:
-      case 0xAB:
-      case 0xA3:
-      case 0xB7:
-      case 0xBF:
-      case 0x8B:
-      case 0xA7:
-      case 0xB3:
-      case 0x87:
-      case 0x83:
-        self.group = NO_GROUP;
+      case E_DMA_CMD_RESET:
+      case E_DMA_CMD_RESET_PORT_A_TIMING:
+      case E_DMA_CMD_RESET_PORT_B_TIMING:
+      case E_DMA_CMD_CONTINUE:
+      case E_DMA_CMD_DISABLE_INTERRUPTS:
+      case E_DMA_CMD_ENABLE_INTERRUPTS:
+      case E_DMA_CMD_RESET_AND_DISABLE_INTERRUPTS:
+      case E_DMA_CMD_ENABLE_AFTER_RTI:
+      case E_DMA_CMD_READ_STATUS_BYTE:
+      case E_DMA_CMD_REINITIALISE_STATUS_BYTE:
+      case E_DMA_CMD_INITIATE_READ_SEQUENCE:
+      case E_DMA_CMD_FORCE_READY:
+      case E_DMA_CMD_ENABLE_DMA:
+      case E_DMA_CMD_DISABLE_DMA:
         break;
 
-      case 0xBB:
-        /* Read mask will follow. */
+      case E_DMA_CMD_LOAD:
+        self.port_a_starting_address_internal = self.port_a_starting_address;
+        self.port_b_starting_address_internal = self.port_b_starting_address;
+        break;
+
+      case E_DMA_CMD_READ_MASK_FOLLOWS:
         break;
 
       default:
-        self.group = NO_GROUP;
+        log_dbg("dma: unknown command $%02X received\n", value);
         break;
+    }
+
+    if (value != E_DMA_CMD_READ_MASK_FOLLOWS) {
+      self.group = NO_GROUP;
     }
   } else {
     self.read_mask = value;
@@ -227,6 +265,11 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
 
 
 void dma_write(u16_t address, u8_t value) {
+  if ((address & 0x0F) == 0x0B) {
+    log_dbg("dma: Z80 DMA at port $%04X not implemented\n", address);
+    return;
+  }
+
   dma_decode_handler_t handlers[N_GROUPS] = {
     dma_group_0_write,
     dma_group_1_write,

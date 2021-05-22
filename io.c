@@ -91,6 +91,10 @@ u8_t io_read(u16_t address) {
   }
 
   switch (address & 0x00FF) {
+    case 0x0B:
+    case 0x6B:
+      return dma_read(address);
+
     case 0x1F:
       return kempston_read(address);
 
