@@ -51,6 +51,16 @@ void tilemap_tilemap_control_write(u8_t value) {
   self.force_tilemap_over_ula = value & 0x01;
 
   self.palette = (value & 0x10) ? E_PALETTE_TILEMAP_SECOND : E_PALETTE_TILEMAP_FIRST;
+
+  log_dbg("tilemap: set control to $%02X => %s, %dx32, %s attr, %s mode, %d tiles, %s, palette %d\n",
+          value,
+          self.is_enabled             ? "on"       : "off",
+          self.use_80x32              ? 80         : 40,
+          self.use_default_attribute  ? "default"  : "map",
+          self.use_text_mode          ? "text"     : "tile",
+          self.use_512_tiles          ? 512        : 256,
+          self.force_tilemap_over_ula ? "tile>ula" : "ula>tile",
+          self.palette                ? 2          : 1);
 }
 
 
@@ -74,6 +84,26 @@ void tilemap_transparency_index_write(u8_t value) {
 }
 
 
+static u16_t tilemap_map_offset_get(u32_t row, u32_t column) {
+  const u8_t  map_row    = row    / 8;
+  const u8_t  map_column = column / (self.use_80x32 ? 8 : 16);
+
+  return self.tilemap_base_address + (map_row * (self.use_80x32 ? 80 : 40) + map_column) * (self.use_default_attribute ? 1 : 2);
+}
+
+
+static u8_t tilemap_attribute_get(u32_t row, u32_t column) {
+  u16_t map_offset;
+
+  if (self.use_default_attribute) {
+    return self.default_attribute;
+  }
+  
+  map_offset = tilemap_map_offset_get(row, column);
+  return self.bank5[map_offset + 1];
+}
+
+
 void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
 
   if (!self.is_enabled) {
@@ -84,20 +114,16 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
   row    += self.offset_y;
   column += self.offset_x;
 
-  // assume 80x32, not default attribute
-
-  u8_t  map_row    = row    / 8;
-  u8_t  map_column = column / 8;
-  u16_t map_offset = self.tilemap_base_address + (map_row * 80 + map_column) * 2;
-  u8_t  tile       = self.bank5[map_offset + 0];
-  u8_t  attribute  = self.bank5[map_offset + 1];
+  u16_t map_offset = tilemap_map_offset_get(row, column);
+  u8_t  tile       = self.bank5[map_offset];
+  u8_t  attribute  = tilemap_attribute_get(row, column);
 
   if (self.use_512_tiles) {
     tile |= (attribute & 0x01) << 8;
   }
 
   u8_t  def_row        = row    % 8;
-  u8_t  def_column     = column % 8;
+  u8_t  def_column     = (column / (self.use_80x32 ? 1 : 2)) % 8;
   u16_t def_offset     = self.use_text_mode
     ? (self.definitions_base_address + (tile *  8 + def_row))
     : (self.definitions_base_address + (tile * 32 + def_row * 4 + def_column / 2));
@@ -127,4 +153,21 @@ void tilemap_offset_x_lsb_write(u8_t value) {
 
 void tilemap_offset_y_write(u8_t value) {
   self.offset_y = value;
+}
+
+
+int tilemap_priority_over_ula_get(u32_t row, u32_t column) {
+  if (!self.is_enabled) {
+    return 0;
+  }
+  
+  if (self.force_tilemap_over_ula) {
+    return 1;
+  }
+
+  if (self.use_512_tiles) {
+    return 0;
+  }
+
+  return tilemap_attribute_get(row, column) ^ 0x01;
 }

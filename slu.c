@@ -275,12 +275,18 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
     tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_transparent, &tilemap_rgba);
 
-    if (ula_is_transparent && tilemap_is_transparent) {
-      rgba = self.fallback_colour;
-    } else if (ula_is_transparent) {
-      rgba = tilemap_rgba;
-    } else {
+    /* The ULA and the tilemap occupy the same layer. */
+    rgba = self.fallback_colour;
+    if (tilemap_priority_over_ula_get()) {
+      if (!tilemap_is_transparent) {
+        rgba = tilemap_rgba;
+      } else if (!ula_is_transparent) {
+        rgba = ula_rgba;
+      }
+    } else if (!ula_is_transparent) {
       rgba = ula_rgba;
+    } else if (!tilemap_is_transparent) {
+      rgba = tilemap_rgba;
     }
 
     self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgba;

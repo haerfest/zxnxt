@@ -16,6 +16,7 @@ void   tilemap_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_
 void   tilemap_offset_x_msb_write(u8_t value);
 void   tilemap_offset_x_lsb_write(u8_t value);
 void   tilemap_offset_y_write(u8_t value);
+int    tilemap_priority_over_ula_get(u32_t row, u32_t column);
 
 
 #endif  /* __TILEMAP_H */
