@@ -131,9 +131,6 @@ u8_t io_read(u16_t address) {
     case 0x113B:
       return i2c_sda_read(address);
 
-    case 0x123B:
-      return layer2_read(address);
-
     case 0x1FFD:
       return paging_spectrum_plus_3_paging_read();
 
@@ -256,7 +253,7 @@ void io_write(u16_t address, u8_t value) {
       return;
 
     case 0x123B:
-      layer2_write(address, value);
+      layer2_access_write(value);
       return;
 
     case 0x1FFD:

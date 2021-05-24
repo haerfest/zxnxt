@@ -70,8 +70,6 @@ static nextreg_t self;
 
 
 static void nextreg_cpu_speed_write(u8_t value);
-static void nextreg_layer2_active_ram_bank_write(u8_t value);
-static void nextreg_layer2_shadow_ram_bank_write(u8_t value);
 
 
 static void nextreg_reset_soft(void) {
@@ -104,8 +102,7 @@ static void nextreg_reset_soft(void) {
   altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
 
   nextreg_cpu_speed_write(E_CLOCK_CPU_SPEED_3MHZ);
-  nextreg_layer2_active_ram_bank_write(8);
-  nextreg_layer2_shadow_ram_bank_write(11);
+  layer2_reset();
 }
 
 
@@ -528,26 +525,6 @@ static void nextreg_internal_port_decoding_3_write(u8_t value) {
 }
 
 
-u8_t nextreg_layer2_active_ram_bank_read(void) {
-  return layer2_bank_active_get();
-}
-
-
-static void nextreg_layer2_active_ram_bank_write(u8_t value) {
-  layer2_bank_active_set(value & 0x7F);
-}
-
-
-u8_t nextreg_layer2_shadow_ram_bank_read(void) {
-  return layer2_bank_shadow_get();
-}
-
-
-static void nextreg_layer2_shadow_ram_bank_write(u8_t value) {
-  layer2_bank_shadow_set(value & 0x7F);
-}
-
-
 static u8_t nextreg_sprite_layers_system_read(void) {
   /* TODO: Implement other bits in this register. */
   return slu_layer_priority_get() << 2;
@@ -609,11 +586,15 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
-      nextreg_layer2_active_ram_bank_write(value);
+      layer2_active_bank_write(value);
       break;
 
     case E_NEXTREG_REGISTER_LAYER2_SHADOW_RAM_BANK:
-      nextreg_layer2_shadow_ram_bank_write(value);
+      layer2_shadow_bank_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LAYER2_CONTROL:
+      layer2_control_write(value);
       break;
 
     case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
@@ -760,12 +741,6 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING:
       return nextreg_peripheral_4_setting_read();
-
-    case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
-      return nextreg_layer2_active_ram_bank_read();
-
-    case E_NEXTREG_REGISTER_LAYER2_SHADOW_RAM_BANK:
-      return nextreg_layer2_shadow_ram_bank_read();
 
     case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
       return nextreg_sprite_layers_system_read();
