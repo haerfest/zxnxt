@@ -277,7 +277,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
     /* The ULA and the tilemap occupy the same layer. */
     rgba = self.fallback_colour;
-    if (tilemap_priority_over_ula_get()) {
+    if (tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)) {
       if (!tilemap_is_transparent) {
         rgba = tilemap_rgba;
       } else if (!ula_is_transparent) {
