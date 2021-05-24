@@ -113,7 +113,6 @@ static u8_t tilemap_attribute_get(u32_t row, u32_t column) {
 
 
 void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
-
   if (!self.is_enabled) {
     *is_transparent = 1;
     return;

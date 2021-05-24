@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <string.h>
 #include "defs.h"
+#include "layer2.h"
 #include "log.h"
 #include "slu.h"
 #include "tilemap.h"
@@ -263,6 +264,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
   u16_t ula_rgba;
   int   tilemap_is_transparent;
   u16_t tilemap_rgba;
+  int   layer2_is_transparent;
+  u16_t layer2_rgba;
   u16_t rgba;
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
@@ -274,21 +277,34 @@ u32_t slu_run(u32_t ticks_14mhz) {
     }
 
     tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_transparent, &tilemap_rgba);
+    layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_is_transparent,  &layer2_rgba);
 
-    /* The ULA and the tilemap occupy the same layer. */
+    /* The default, when no layer specifies a colour. */
     rgba = self.fallback_colour;
-    if (tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)) {
-      if (!tilemap_is_transparent) {
-        rgba = tilemap_rgba;
-      } else if (!ula_is_transparent) {
-        rgba = ula_rgba;
-      }
-    } else if (!ula_is_transparent) {
-      rgba = ula_rgba;
-    } else if (!tilemap_is_transparent) {
-      rgba = tilemap_rgba;
-    }
 
+    switch (self.layer_priority)
+    {
+      case E_SLU_LAYER_PRIORITY_SLU:
+        if (!layer2_is_transparent) {
+          rgba = layer2_rgba;
+        } else if (tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)) {
+          if (!tilemap_is_transparent) {
+            rgba = tilemap_rgba;
+          } else if (!ula_is_transparent) {
+            rgba = ula_rgba;
+          }
+        } else if (!ula_is_transparent) {
+          rgba = ula_rgba;
+        } else if (!tilemap_is_transparent) {
+          rgba = tilemap_rgba;
+        }
+        break;
+
+      default:
+        log_dbg("slu: unimplemented layer priority %d\n", self.layer_priority);
+        break;
+    }
+    
     self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgba;
   }
 

@@ -3,6 +3,7 @@
 #include "config.h"
 #include "defs.h"
 #include "divmmc.h"
+#include "layer2.h"
 #include "log.h"
 #include "mf.h"
 #include "mmu.h"
@@ -82,36 +83,72 @@ void memory_finit(void) {
  * 48k-64k:
  *   1. mmu
  */
+static reader_t pick_reader(int page) {
+  if (page > 1) {
+    /* Addresses 0x4000 - 0xFFFF. */
+    return mmu_read;
+  }
+
+  /* Addresses 0x0000 - 0x3FFF. */
+  if (bootrom_is_active()) {
+    return bootrom_read;
+  }
+  if (config_is_active()) {
+    return config_read;
+  }
+  if (mf_is_active()) {
+    return (page == 0) ? mf_rom_read  : mf_ram_read;
+  }
+  if (divmmc_is_active()) {
+    return (page == 0) ? divmmc_rom_read  : divmmc_ram_read;
+  }
+  if (layer2_is_readable()) {
+    return layer2_read;
+  }
+  if (mmu_page_get(page) != MMU_ROM_PAGE) {
+    return mmu_read;
+  }
+
+  return altrom_is_active_on_read() ? altrom_read  : rom_read;
+}
+
+
+static writer_t pick_writer(int page) {
+  if (page > 1) {
+    /* Addresses 0x4000 - 0xFFFF. */
+    return mmu_write;
+  }
+
+  /* Addresses 0x0000 - 0x3FFF. */
+  if (bootrom_is_active()) {
+    return bootrom_write;
+  }
+  if (config_is_active()) {
+    return config_write;
+  }
+  if (mf_is_active()) {
+    return (page == 0) ? mf_rom_write  : mf_ram_write;
+  }
+  if (divmmc_is_active()) {
+    return (page == 0) ? divmmc_rom_write  : divmmc_ram_write;
+  }
+  if (layer2_is_writable()) {
+    return layer2_write;
+  }
+  if (mmu_page_get(page) != MMU_ROM_PAGE) {
+    return mmu_write;
+  }
+
+  return altrom_is_active_on_write() ? altrom_write  : rom_write;
+}
+
+
 void memory_refresh_accessors(int page, int n_pages) {
   int i;
 
   for (i = page; i < page + n_pages; i++) {
-    if (i < 2) {
-      /* Addresses 0x0000 - 0x3FFF. */
-      if (bootrom_is_active()) {
-        self.readers[i] = bootrom_read;
-        self.writers[i] = bootrom_write;
-      } else if (config_is_active()) {
-        self.readers[i] = config_read;
-        self.writers[i] = config_write;
-      } else if (mf_is_active()) {
-        self.readers[i] = (i == 0) ? mf_rom_read  : mf_ram_read;
-        self.writers[i] = (i == 0) ? mf_rom_write : mf_ram_write;
-      } else if (divmmc_is_active()) {
-        self.readers[i] = (i == 0) ? divmmc_rom_read  : divmmc_ram_read;
-        self.writers[i] = (i == 0) ? divmmc_rom_write : divmmc_ram_write;
-      } else if (mmu_page_get(i) != MMU_ROM_PAGE) {
-        self.readers[i] = mmu_read;
-        self.writers[i] = mmu_write;
-      } else {
-        self.readers[i] = altrom_is_active_on_read()  ? altrom_read  : rom_read;
-        self.writers[i] = altrom_is_active_on_write() ? altrom_write : rom_write;
-      }
-    } else {
-      /* Addresses 0x4000 - 0xFFFF. */
-      self.readers[i] = mmu_read;
-      self.writers[i] = mmu_write;
-    }
+    self.readers[i] = pick_reader(i);
+    self.writers[i] = pick_writer(i);
   }
 
   log_dbg("memory: refreshed accessors for pages %u to %u\n", page, page + n_pages - 1);
