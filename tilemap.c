@@ -5,6 +5,14 @@
 #include "tilemap.h"
 
 
+/**
+ * TODO:
+ * - tile rotation
+ * - tile mirroring
+ * - clipping window
+ */
+
+
 typedef struct {
   u8_t*     bank5;
   u8_t      default_attribute;
