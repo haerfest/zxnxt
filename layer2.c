@@ -2,17 +2,28 @@
 #include "defs.h"
 #include "layer2.h"
 #include "log.h"
+#include "memory.h"
+#include "palette.h"
+
+
+typedef enum {
+  E_RESOLUTION_256X192 = 0,
+  E_RESOLUTION_320x256,
+  E_RESOLUTION_640X256
+} resolution_t;
 
 
 typedef struct {
-  u8_t* sram;
-  u8_t  access;
-  u8_t  control;
-  u8_t  active_bank;
-  u8_t  shadow_bank;
-  int   is_visible;
-  int   is_readable;
-  int   is_writable;
+  u8_t*        ram;
+  u8_t         access;
+  u8_t         control;
+  u8_t         active_bank;
+  u8_t         shadow_bank;
+  int          is_visible;
+  int          is_readable;
+  int          is_writable;
+  resolution_t resolution;
+  u8_t         palette_offset;
 } self_t;
 
 
@@ -22,7 +33,7 @@ static self_t self;
 int layer2_init(u8_t* sram) {
   memset(&self, 0, sizeof(self));
 
-  self.sram = sram;
+  self.ram = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM];
 
   layer2_reset();
 
@@ -52,6 +63,8 @@ void layer2_access_write(u8_t value) {
 
 void layer2_control_write(u8_t value) {
   log_dbg("layer2: control write $%02X\n", value);
+  self.resolution     = (value & 0x30) >> 4;
+  self.palette_offset = value & 0x0F;
 }
 
 
@@ -72,13 +85,31 @@ void layer2_shadow_bank_write(u8_t bank) {
 
 
 void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
+  palette_entry_t colour;
+  u8_t            palette_index;
+
+  *is_transparent = 1;
+
   if (!self.is_visible) {
-    *is_transparent = 1;
     return;
   }
 
-  /* TODO Return colour! */
-  *is_transparent = 1;
+  switch (self.resolution) {
+    case E_RESOLUTION_256X192:
+      if (row < 32 || row >= 32 + 192 || column < 32 * 2 || column >= (32 + 256) * 2) {
+        /* Border. */
+        return;
+      }
+      palette_index   = self.ram[self.active_bank * 16 * 1024 + (row - 32) * 256 + (column - 32 * 2) / 2];
+      colour          = palette_read_rgb(E_PALETTE_LAYER2_FIRST, (self.palette_offset << 4) + palette_index);
+      *rgba           = colour.red << 12 | colour.green << 8 | colour.blue << 4;
+      *is_transparent = 0;
+      break;
+
+    default:
+      log_dbg("layer2: resolution #%d not implemented yet\n", self.resolution);
+      break;
+  }
 }
 
 
