@@ -13,6 +13,14 @@ typedef enum {
 } resolution_t;
 
 
+typedef enum {
+  E_MAPPING_FIRST_16K = 0,
+  E_MAPPING_SECOND_16K,
+  E_MAPPING_THIRD_16K,
+  E_MAPPING_FIRST_48K
+} mapping_t;
+
+
 typedef struct {
   u8_t*        ram;
   u8_t         access;
@@ -22,8 +30,11 @@ typedef struct {
   int          is_visible;
   int          is_readable;
   int          is_writable;
+  int          do_map_shadow;
+  mapping_t    mapping;
   resolution_t resolution;
   u8_t         palette_offset;
+  u8_t         bank_offset;
 } self_t;
 
 
@@ -46,7 +57,8 @@ void layer2_finit(void) {
 
 
 void layer2_reset(void) {
-  layer2_access_write(0);
+  layer2_access_write(0x00);
+  layer2_access_write(0x10);
   layer2_active_bank_write(8);
   layer2_shadow_bank_write(11);
 }
@@ -55,9 +67,22 @@ void layer2_reset(void) {
 void layer2_access_write(u8_t value) {
   log_dbg("layer2: access write $%02X\n", value);
 
-  self.is_readable = value & 0x04;
-  self.is_visible  = value & 0x02;
-  self.is_writable = value & 0x01;
+  if (value & 0x10)
+  {
+    self.bank_offset = value & 0x07;
+  }
+  else
+  {
+    self.mapping       = value >> 6;
+    self.do_map_shadow = value & 0x08;
+    self.is_readable   = value & 0x04;
+    self.is_visible    = value & 0x02;
+    self.is_writable   = value & 0x01;
+
+    if (self.mapping == E_MAPPING_FIRST_48K) {
+      log_dbg("layer2: first 48K mapping not yet implemented\n");
+    }
+  }
 }
 
 
@@ -123,10 +148,28 @@ int layer2_is_writable(void) {
 }
 
 
+static u32_t layer2_translate(u16_t address) {
+  const u8_t bank = (self.do_map_shadow ? self.shadow_bank : self.active_bank) + self.bank_offset;
+
+  switch (self.mapping) {
+    case E_MAPPING_FIRST_16K:
+    case E_MAPPING_FIRST_48K:
+      return bank * 16 * 1024 + address;
+
+    case E_MAPPING_SECOND_16K:
+      return (bank + 1) * 16 * 1024 + address;
+
+    case E_MAPPING_THIRD_16K:
+      return (bank + 2) * 16 * 1024 + address;
+  }
+}
+
+
 u8_t layer2_read(u16_t address) {
-  return 0xFF;
+  return self.ram[layer2_translate(address)];
 }
 
 
 void layer2_write(u16_t address, u8_t value) {
+  self.ram[layer2_translate(address)] = value;
 }

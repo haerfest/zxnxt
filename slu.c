@@ -282,9 +282,11 @@ u32_t slu_run(u32_t ticks_14mhz) {
     /* The default, when no layer specifies a colour. */
     rgba = self.fallback_colour;
 
+    /* TODO: Implement sprite layer. */
     switch (self.layer_priority)
     {
       case E_SLU_LAYER_PRIORITY_SLU:
+      case E_SLU_LAYER_PRIORITY_LSU:
         if (!layer2_is_transparent) {
           rgba = layer2_rgba;
         } else if (tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)) {
@@ -299,7 +301,23 @@ u32_t slu_run(u32_t ticks_14mhz) {
           rgba = tilemap_rgba;
         }
         break;
-
+        
+      case E_SLU_LAYER_PRIORITY_SUL:
+        if (tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)) {
+          if (!tilemap_is_transparent) {
+            rgba = tilemap_rgba;
+          } else if (!ula_is_transparent) {
+            rgba = ula_rgba;
+          }
+        } else if (!ula_is_transparent) {
+          rgba = ula_rgba;
+        } else if (!tilemap_is_transparent) {
+          rgba = tilemap_rgba;
+        } else if (!layer2_is_transparent) {
+          rgba = layer2_rgba;
+        }
+        break;
+          
       default:
         log_dbg("slu: unimplemented layer priority %d\n", self.layer_priority);
         break;
