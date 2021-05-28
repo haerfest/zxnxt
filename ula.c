@@ -621,6 +621,6 @@ void ula_control_write(u8_t value) {
 }
 
 
-void ula_transparency_index_set(u8_t value) {
+void ula_transparency_index_write(u8_t value) {
   self.transparency_index = value;
 }
