@@ -18,19 +18,18 @@ typedef enum {
 
 
 typedef struct {
-  u8_t red;
-  u8_t green;
-  u8_t blue;
-  u8_t is_layer2_priority;
+  u16_t rgba;
+  u8_t  is_layer2_priority;
 } palette_entry_t;
 
 
 int  palette_init(void);
 void palette_finit(void);
 
-palette_entry_t palette_read_rgb(palette_t palette, u8_t index);
+u16_t           palette_read_rgba(palette_t palette, u8_t index);
 palette_entry_t palette_read(palette_t palette, u8_t index);
 void            palette_write(palette_t palette, u8_t index, palette_entry_t entry);
+int             palette_is_msb_equal(palette_t palette, u8_t index1, u8_t index2);
 
 
 #endif  /* __PALETTE_H */

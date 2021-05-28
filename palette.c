@@ -33,23 +33,33 @@ void palette_finit(void) {
  */
 
 
-palette_entry_t palette_read_rgb(palette_t palette, u8_t index) {
-  return self.palette[palette][index];
+u16_t palette_read_rgba(palette_t palette, u8_t index) {
+  return self.palette[palette][index].rgba;
 }
 
 
 palette_entry_t palette_read(palette_t palette, u8_t index) {
-  palette_entry_t entry = self.palette[palette][index];
-  entry.red   >>= 1;
-  entry.green >>= 1;
-  entry.blue  >>= 1;
-  return entry;
+  return self.palette[palette][index];
 }
 
 
 void palette_write(palette_t palette, u8_t index, palette_entry_t entry) {
-  entry.red   <<= 1;
-  entry.green <<= 1;
-  entry.blue  <<= 1;
   self.palette[palette][index] = entry;
 }
+
+
+/**
+ * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
+ *
+ * > Note: This value is 8-bit, so the transparency colour is compared against
+ * >       the MSB bits of the final 9-bit colour only.
+ */
+int palette_is_msb_equal(palette_t palette, u8_t index1, u8_t index2) {
+  const u16_t a = self.palette[palette][index1].rgba;
+  const u16_t b = self.palette[palette][index2].rgba;
+
+  /* Compare red, green, and blue, ignoring LSB of blue. */
+  return (a & 0xFFE0) == (b & 0xFFE0);
+}
+
+

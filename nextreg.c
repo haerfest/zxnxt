@@ -454,17 +454,25 @@ static void nextreg_palette_index_write(u8_t value) {
 
 
 static u8_t nextreg_palette_value_8bits_read(void) {
-  const palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
+  const u16_t rgba = palette_read_rgba(self.palette_selected, self.palette_index);
 
-  return entry.red << 5 | entry.green << 2 | entry.blue >> 1;
+  /**
+   * Convert RRR0GGG0BBB00000
+   *      to 00000000RRRGGGBB.
+   */
+  return (rgba & 0xE000) >> 8 | (rgba & 0x0E00) >> 7 | (rgba & 0x00E0) >> 6;
 }
 
 
 static void nextreg_palette_value_8bits_write(u8_t value) {
+  /**
+   * An 8-bit value is specified as 00000000RRRGGGBB
+   *       which we store as 16-bit RRR0GGG0BBB00000.
+   *
+   * We extend the LSB of blue (BB => BBB).
+   */
   const palette_entry_t entry = {
-    .red                = (value & 0xE0) >> 5,
-    .green              = (value & 0x1C) >> 2,
-    .blue               = (value & 0x03) << 1 | ((value & 0x03) != 0),
+    .rgba               = (value & 0xE0) << 8 | (value & 0x1C) << 7 | (value & 0x03) << 6 | ((value & 0x03) != 0) << 5,
     .is_layer2_priority = 0
   };
   palette_write(self.palette_selected, self.palette_index, entry);
@@ -478,22 +486,27 @@ static void nextreg_palette_value_8bits_write(u8_t value) {
 static u8_t nextreg_palette_value_9bits_read(void) {
   const palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
 
-  return entry.is_layer2_priority << 7 | (entry.blue & 0x01);
+  return entry.is_layer2_priority << 7 | (entry.rgba & 0x0020) >> 5;
 }
 
 
 static void nextreg_palette_value_9bits_write(u8_t value) {
   if (self.palette_index_9bit_is_first_write) {
+    /**
+     * An 8-bit value is specified as 00000000RRRGGGBB
+     *       which we store as 16-bit RRR0GGG0BB000000.
+     *
+     * We do not extend the LSB of blue, since its value will follow in the
+     * second write.
+     */
     const palette_entry_t entry = {
-      .red                = (value & 0xE0) >> 5,
-      .green              = (value & 0x1C) >> 2,
-      .blue               = (value & 0x03) << 1,
+      .rgba               = (value & 0xE0) << 8 | (value & 0x1C) << 7 | (value & 0x03) << 6 | ((value & 0x03) != 0) << 5,
       .is_layer2_priority = 0
     };
     palette_write(self.palette_selected, self.palette_index, entry);
   } else {
     palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
-    entry.blue              |= value & 0x01;
+    entry.rgba              |= (value & 0x01) << 5;
     entry.is_layer2_priority = value >> 7;
     palette_write(self.palette_selected, self.palette_index, entry);
 
@@ -626,9 +639,9 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       nextreg_palette_value_9bits_write(value);
       break;
 
-    case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR:
-      ula_transparency_colour_set(value);
-      layer2_transparency_colour_set(value);
+    case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_INDEX:
+      ula_transparency_index_set(value);
+      layer2_transparency_index_set(value);
       break;
 
     case E_NEXTREG_REGISTER_FALLBACK_COLOUR:

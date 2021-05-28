@@ -142,9 +142,8 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
     
   u8_t  palette_offset = attribute & (self.use_text_mode ? 0xFE : 0xF0);
 
-  palette_entry_t colour = palette_read_rgb(self.palette, palette_offset | palette_index);
-  *rgba                  = colour.red << 12 | colour.green << 8 | colour.blue << 4;
-  *is_transparent        = 0;
+  *rgba           = palette_read_rgba(self.palette, palette_offset | palette_index);
+  *is_transparent = 0;
 }
 
 

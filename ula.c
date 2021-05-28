@@ -200,7 +200,7 @@ typedef struct {
   int                        is_7mhz_tick;
   int                        is_displaying_content;
   int                        is_enabled;
-  u8_t                       transparency_colour;
+  u8_t                       transparency_index;
 } self_t;
 
 
@@ -287,21 +287,6 @@ void ula_did_complete_frame(void) {
 
 
 /**
- * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
- *
- * > Note: This value is 8-bit, so the transparency colour is compared against
- * >       the MSB bits of the final 9-bit colour only.
- */
-static int ula_is_transparent(u16_t rgba) {
-  const palette_entry_t colour       = palette_read_rgb(self.palette, self.transparency_colour);
-  const u16_t           transparency = colour.red << (12 - 1) | colour.green << (8 - 1) | colour.blue << (4 - 1);
-
-  /* Ignore low bit. */
-  return (rgba >> 1) == transparency;
-}
-
-
-/**
  * Given the CRT's beam position, returns a flag indicating whether it falls
  * within the visible frame buffer. If so, also returns the frame buffer
  * position so we can align the other layers.
@@ -310,8 +295,10 @@ static int ula_is_transparent(u16_t rgba) {
  * whether it is transparent or not.
  */
 int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
-  u8_t            palette_index;
-  palette_entry_t colour;
+  u8_t palette_index;
+
+  /* Assume nothings to draw. */
+  *is_transparent = 1;
 
   self.ticks_14mhz_after_irq++;
 
@@ -331,7 +318,6 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
   *frame_buffer_column = beam_column - self.display_spec->column_border_left;
 
   if (!self.is_enabled) {
-    *is_transparent = 1;
     return 1;
   }
 
@@ -350,7 +336,6 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
      || content_row    > self.clip_y2
      || content_column < self.clip_x1
      || content_column > self.clip_x2) {
-      *is_transparent = 1;
       return 1;
     }
 
@@ -361,9 +346,10 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
     palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
   }
 
-  colour          = palette_read_rgb(self.palette, palette_index);
-  *rgba           = colour.red << 12 | colour.green << 8 | colour.blue << 4;
-  *is_transparent = ula_is_transparent(*rgba);
+  if (!palette_is_msb_equal(self.palette, palette_index, self.transparency_index)) {
+    *rgba           = palette_read_rgba(self.palette, palette_index);
+    *is_transparent = 0;
+  }
 
   return 1;
 }
@@ -635,6 +621,6 @@ void ula_control_write(u8_t value) {
 }
 
 
-void ula_transparency_colour_set(u8_t value) {
-  self.transparency_colour = value;
+void ula_transparency_index_set(u8_t value) {
+  self.transparency_index = value;
 }
