@@ -82,6 +82,8 @@ void layer2_access_write(u8_t value) {
     if (self.mapping == E_MAPPING_FIRST_48K) {
       log_dbg("layer2: first 48K mapping not yet implemented\n");
     }
+
+    memory_refresh_accessors(0, 2);
   }
 }
 
