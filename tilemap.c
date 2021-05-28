@@ -45,6 +45,10 @@ int tilemap_init(u8_t* sram) {
   self.definitions_base_address = 0x0C00;
   self.tilemap_base_address     = 0x2C00;
   self.transparency_index       = 0x0F;
+  self.clip_x1                  = 0;
+  self.clip_x2                  = 159;
+  self.clip_y1                  = 0;
+  self.clip_y2                  = 255;
 
   return 0;
 }
@@ -124,10 +128,10 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
   }
 
   /* Honour the clipping area. */
-  if (row    < self.clip_y1
-   || row    > self.clip_y2
-   || column < self.clip_x1 * (self.use_80x32 ? 4 : 2)
-   || column > self.clip_x2 * (self.use_80x32 ? 4 : 2)) {
+  if (row        < self.clip_y1
+   || row        > self.clip_y2
+   || column / 4 < self.clip_x1
+   || column / 4 > self.clip_x2) {
     return;
   }
 
@@ -202,5 +206,5 @@ void tilemap_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_y1 = y1;
   self.clip_y2 = y2;
 
-  log_dbg("tilemap: clipping window set to %d <= x <= %d and %d <= y <= %d\n", x1, x2, y1, y2);
+  log_dbg("tilemap: clipping window set to %d <= x <= %d and %d <= y <= %d\n", self.clip_x1, self.clip_x2, self.clip_y1, self.clip_y2);
 }
