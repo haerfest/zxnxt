@@ -491,11 +491,8 @@ static void nextreg_palette_control_write(u8_t value) {
   self.ula_next_mode                  = value & 0x01;
 
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
+  ula_next_mode_enable(self.ula_next_mode);
   layer2_palette_set(self.palette_layer2 == E_PALETTE_LAYER2_SECOND);
-
-  if (self.ula_next_mode) {
-    log_wrn("nextreg: ULANext mode not implemented\n");
-  }
 }
 
 
@@ -783,6 +780,10 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_OFFSET_Y:
       tilemap_offset_y_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT:
+      ula_attribute_byte_format_write(value);
       break;
 
     default:

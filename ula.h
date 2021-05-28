@@ -45,6 +45,8 @@ void                 ula_did_complete_frame(void);
 void                 ula_display_size_get(u16_t* rows, u16_t* columns);
 int                  ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column);
 void                 ula_transparency_index_write(u8_t value);
+void                 ula_attribute_byte_format_write(u8_t value);
+void                 ula_next_mode_enable(int do_enable);
 
 
 #endif  /* __ULA_H */

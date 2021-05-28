@@ -39,6 +39,7 @@ typedef enum {
   E_NEXTREG_REGISTER_OFFSET_Y                              = 0X31,
   E_NEXTREG_REGISTER_PALETTE_INDEX                         = 0x40,
   E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS                   = 0x41,
+  E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT         = 0x42,
   E_NEXTREG_REGISTER_PALETTE_CONTROL                       = 0x43,
   E_NEXTREG_REGISTER_PALETTE_VALUE_9BITS                   = 0x44,
   E_NEXTREG_REGISTER_FALLBACK_COLOUR                       = 0x4A,

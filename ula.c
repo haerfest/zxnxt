@@ -10,11 +10,6 @@
 #include "ula.h"
 
 
-#define PALETTE_OFFSET_INK      0
-#define PALETTE_OFFSET_PAPER   16
-#define PALETTE_OFFSET_BORDER  16
-
-
 typedef enum {
   E_ULA_DISPLAY_MODE_SCREEN_0,
   E_ULA_DISPLAY_MODE_SCREEN_1,
@@ -201,6 +196,9 @@ typedef struct {
   int                        is_displaying_content;
   int                        is_enabled;
   u8_t                       transparency_index;
+  u8_t                       ula_next_mask_ink;
+  u8_t                       ula_next_mask_paper;
+  int                        is_ula_next_mode;
 } self_t;
 
 
@@ -214,7 +212,7 @@ static self_t self;
 #define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES - E_ULA_DISPLAY_MODE_SCREEN_0 + 1)
 
 
-typedef u8_t (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
+typedef int (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column, u8_t* palette_index);
 
 const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES] = {  
   ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
@@ -340,10 +338,18 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
     }
 
     /* Leave the pixel colour up to the specialized ULA mode handlers. */
-    palette_index = ula_display_handlers[self.display_mode](content_row, content_column);
+    if (!ula_display_handlers[self.display_mode](content_row, content_column, &palette_index)) {
+      return 1;
+    }
+  } else if (self.is_ula_next_mode) {
+    if (self.ula_next_mask_paper == 0) {
+      /* No backround mask, border color is fallback color. */
+      return 1;
+    }
+    palette_index = 128 + self.border_colour;
   } else {
     /* Border is the same for all ULA modes. */
-    palette_index = PALETTE_OFFSET_BORDER + self.border_colour;
+    palette_index = 16 + self.border_colour;
   }
 
   if (!palette_is_msb_equal(self.palette, palette_index, self.transparency_index)) {
@@ -378,6 +384,9 @@ int ula_init(u8_t* sram) {
   self.is_timex_enabled            = 0;
   self.is_7mhz_tick                = 1;
   self.is_enabled                  = 1;
+  self.is_ula_next_mode            = 0;
+  self.ula_next_mask_ink           = 7;
+  self.ula_next_mask_paper         = ~7;
 
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
   ula_display_reconfigure();
@@ -623,4 +632,34 @@ void ula_control_write(u8_t value) {
 
 void ula_transparency_index_write(u8_t value) {
   self.transparency_index = value;
+}
+
+
+void ula_attribute_byte_format_write(u8_t value) {
+  switch (value) {
+    case 0:
+    case 1:
+    case 3:
+    case 7:
+    case 15:
+    case 31:
+    case 63:
+    case 127:
+    case 255:
+      self.ula_next_mask_ink   = value;
+      self.ula_next_mask_paper = ~value;
+      break;
+
+    default:
+      self.ula_next_mask_ink   = value;
+      self.ula_next_mask_paper = 0;
+      break;      
+  }
+}
+
+
+void ula_next_mode_enable(int do_enable) {
+  self.is_ula_next_mode = do_enable;
+
+  log_dbg("ula: ULANext mode %s\n", do_enable ? "enabled" : "disabled");
 }
