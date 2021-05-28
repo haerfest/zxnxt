@@ -187,3 +187,7 @@ void layer2_palette_set(int use_second) {
 void layer2_transparency_index_write(u8_t value) {
   self.transparency_index = value;
 }
+
+
+void layer2_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
+}
