@@ -200,6 +200,7 @@ typedef struct {
   int                        is_7mhz_tick;
   int                        is_displaying_content;
   int                        is_enabled;
+  u8_t                       transparency_colour;
 } self_t;
 
 
@@ -286,6 +287,21 @@ void ula_did_complete_frame(void) {
 
 
 /**
+ * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
+ *
+ * > Note: This value is 8-bit, so the transparency colour is compared against
+ * >       the MSB bits of the final 9-bit colour only.
+ */
+static int ula_is_transparent(u16_t rgba) {
+  const palette_entry_t colour       = palette_read_rgb(self.palette, self.transparency_colour);
+  const u16_t           transparency = colour.red << (12 - 1) | colour.green << (8 - 1) | colour.blue << (4 - 1);
+
+  /* Ignore low bit. */
+  return (rgba >> 1) == transparency;
+}
+
+
+/**
  * Given the CRT's beam position, returns a flag indicating whether it falls
  * within the visible frame buffer. If so, also returns the frame buffer
  * position so we can align the other layers.
@@ -347,7 +363,7 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
 
   colour          = palette_read_rgb(self.palette, palette_index);
   *rgba           = colour.red << 12 | colour.green << 8 | colour.blue << 4;
-  *is_transparent = 0;
+  *is_transparent = ula_is_transparent(*rgba);
 
   return 1;
 }
@@ -616,4 +632,9 @@ void ula_display_size_get(u16_t* rows, u16_t* columns) {
 
 void ula_control_write(u8_t value) {
   self.is_enabled = !(value & 0x80);
+}
+
+
+void ula_transparency_colour_set(u8_t value) {
+  self.transparency_colour = value;
 }

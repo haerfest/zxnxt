@@ -36,6 +36,7 @@ typedef struct {
   resolution_t resolution;
   palette_t    palette;
   u8_t         palette_offset;
+  u8_t         transparency_colour;
 } self_t;
 
 
@@ -112,6 +113,21 @@ void layer2_shadow_bank_write(u8_t bank) {
 }
 
 
+/**
+ * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
+ *
+ * > Note: This value is 8-bit, so the transparency colour is compared against
+ * >       the MSB bits of the final 9-bit colour only.
+ */
+static int layer2_is_transparent(u16_t rgba) {
+  const palette_entry_t colour       = palette_read_rgb(self.palette, self.transparency_colour);
+  const u16_t           transparency = colour.red << (12 - 1) | colour.green << (8 - 1) | colour.blue << (4 - 1);
+
+  /* Ignore low bit. */
+  return (rgba >> 1) == transparency;
+}
+
+
 void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
   palette_entry_t colour;
   u8_t            palette_index;
@@ -131,7 +147,7 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
       palette_index   = self.ram[self.active_bank * 16 * 1024 + (row - 32) * 256 + (column - 32 * 2) / 2];
       colour          = palette_read_rgb(self.palette, (self.palette_offset << 4) + palette_index);
       *rgba           = colour.red << 12 | colour.green << 8 | colour.blue << 4;
-      *is_transparent = 0;
+      *is_transparent = layer2_is_transparent(*rgba);
       break;
 
     default:
@@ -180,4 +196,9 @@ void layer2_write(u16_t address, u8_t value) {
 
 void layer2_palette_set(int use_second) {
   self.palette = use_second ? E_PALETTE_LAYER2_SECOND : E_PALETTE_LAYER2_FIRST;
+}
+
+
+void layer2_transparency_colour_set(u8_t value) {
+  self.transparency_colour = value;
 }
