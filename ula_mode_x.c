@@ -22,7 +22,7 @@ static int ula_display_mode_screen_x(u32_t row, u32_t column, u8_t* palette_inde
     }
 
     ink    = 0   + attribute_byte & self.ula_next_mask_ink;
-    paper  = 127 + attribute_byte & self.ula_next_mask_paper;
+    paper  = 128 + attribute_byte & self.ula_next_mask_paper;
     blink  = 0;
     bright = 0;
   } else {
