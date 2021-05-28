@@ -28,6 +28,10 @@ typedef struct {
   palette_t palette;
   u8_t      offset_y;
   u16_t     offset_x;
+  int       clip_x1;  /** In half-pixels. */
+  int       clip_x2;  /** In half-pixels. */
+  int       clip_y1;
+  int       clip_y2;
 } tilemap_t;
 
 
@@ -119,6 +123,14 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
     return;
   }
 
+  /* Honour the clipping area. */
+  if (row    < self.clip_y1
+   || row    > self.clip_y2
+   || column < self.clip_x1
+   || column > self.clip_x2) {
+    return;
+  }
+
   row    += self.offset_y;
   column += self.offset_x;
 
@@ -181,4 +193,14 @@ int tilemap_priority_over_ula_get(u32_t row, u32_t column) {
   }
 
   return tilemap_attribute_get(row, column) ^ 0x01;
+}
+
+
+void tilemap_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
+  self.clip_x1 = x1 * 2;
+  self.clip_x2 = x2 * 2;
+  self.clip_y1 = y1;
+  self.clip_y2 = y2;
+
+  log_dbg("tilemap: clipping window set to %d <= x <= %d and %d <= y <= %d\n", x1, x2, y1, y1);
 }

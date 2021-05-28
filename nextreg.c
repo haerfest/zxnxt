@@ -42,6 +42,12 @@ typedef enum {
 
 
 typedef struct {
+  u8_t index;
+  u8_t values[4];  /* x1, x2, y1, y2. */
+} clip_t;
+
+
+typedef struct {
   u8_t                     registers[256];
   u8_t                     selected_register;
   int                      is_hard_reset;
@@ -53,8 +59,10 @@ typedef struct {
   u8_t                     palette_index;
   int                      palette_index_9bit_is_first_write;
   int                      ula_next_mode;
-  u8_t                     ula_clip_index;
-  u8_t                     ula_clip[4];  /* Elements: x1, x2, y1, y2. */
+  clip_t                   ula_clip;
+  clip_t                   tilemap_clip;
+  clip_t                   sprites_clip;
+  clip_t                   layer2_clip;
   int                      altrom_soft_reset_enable;
   int                      altrom_soft_reset_during_writes;
   u8_t                     altrom_soft_reset_lock;
@@ -81,14 +89,26 @@ static void nextreg_reset_soft(void) {
   self.palette_layer2                    = E_PALETTE_LAYER2_FIRST;
   self.palette_ula                       = E_PALETTE_ULA_FIRST;
   self.ula_next_mode                     = 0;
-  self.ula_clip_index                    = 0;
-  self.ula_clip[0]                       = 0;
-  self.ula_clip[1]                       = 255;
-  self.ula_clip[2]                       = 0;
-  self.ula_clip[3]                       = 191;
   self.is_hotkey_cpu_speed_enabled       = 1;
 
-  ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
+  self.tilemap_clip.index     = 0;
+  self.tilemap_clip.values[0] = 0;
+  self.tilemap_clip.values[1] = 159;
+  self.tilemap_clip.values[2] = 0;
+  self.tilemap_clip.values[3] = 255;
+
+  self.ula_clip.index         = 0;
+  self.ula_clip.values[0]     = 0;
+  self.ula_clip.values[1]     = 255;
+  self.ula_clip.values[2]     = 0;
+  self.ula_clip.values[3]     = 191;
+
+  self.sprites_clip = self.ula_clip;
+  self.layer2_clip  = self.ula_clip;
+
+  tilemap_clip_set(self.tilemap_clip.values[0], self.tilemap_clip.values[1], self.tilemap_clip.values[2], self.tilemap_clip.values[3]);
+
+  ula_clip_set(self.ula_clip.values[0], self.ula_clip.values[1], self.ula_clip.values[2], self.ula_clip.values[3]);
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
   ula_contention_set(1);
 
@@ -392,29 +412,63 @@ static void nextreg_alternate_rom_write(u8_t value) {
 
 
 static u8_t nextreg_clip_window_ula_read(void) {
-  return self.ula_clip[self.ula_clip_index];
+  return self.ula_clip.values[self.ula_clip.index];
 }
 
 
 static void nextreg_clip_window_ula_write(u8_t value) {
-  self.ula_clip[self.ula_clip_index] = value;
+  self.ula_clip.values[self.ula_clip.index] = value;
 
-  if (++self.ula_clip_index == 4) {
-    self.ula_clip_index = 0;
-    ula_clip_set(self.ula_clip[0], self.ula_clip[1], self.ula_clip[2], self.ula_clip[3]);
+  if (++self.ula_clip.index == 4) {
+    self.ula_clip.index = 0;
+    ula_clip_set(self.ula_clip.values[0], self.ula_clip.values[1], self.ula_clip.values[2], self.ula_clip.values[3]);
+  }
+}
+
+
+static void nextreg_clip_window_tilemap_write(u8_t value) {
+  self.tilemap_clip.values[self.tilemap_clip.index] = value;
+
+  if (++self.tilemap_clip.index == 4) {
+    self.tilemap_clip.index = 0;
+    tilemap_clip_set(self.tilemap_clip.values[0], self.tilemap_clip.values[1], self.tilemap_clip.values[2], self.tilemap_clip.values[3]);
+  }
+}
+
+
+static void nextreg_clip_window_sprites_write(u8_t value) {
+  self.sprites_clip.values[self.sprites_clip.index] = value;
+
+  if (++self.sprites_clip.index == 4) {
+    self.sprites_clip.index = 0;
+    /* TODO: sprites_clip_set(self.sprites_clip.values[0], self.sprites_clip.values[1], self.sprites_clip.values[2], self.sprites_clip.values[3]); */
+  }
+}
+
+
+static void nextreg_clip_window_layer2_write(u8_t value) {
+  self.layer2_clip.values[self.layer2_clip.index] = value;
+
+  if (++self.layer2_clip.index == 4) {
+    self.layer2_clip.index = 0;
+    layer2_clip_set(self.layer2_clip.values[0], self.layer2_clip.values[1], self.layer2_clip.values[2], self.layer2_clip.values[3]);
   }
 }
 
 
 static u8_t nextreg_clip_window_control_read(void) {
-  return self.ula_clip_index << 4;
+  return self.tilemap_clip.index << 6
+       | self.ula_clip.index     << 4
+       | self.sprites_clip.index << 2
+       | self.layer2_clip.index;
 }
 
 
 static void nextreg_clip_window_control_write(u8_t value) {
-  if (value & 0x04) {
-    self.ula_clip_index = 0;
-  }
+  if (value & 0x08) self.tilemap_clip.index = 0;
+  if (value & 0x04) self.ula_clip.index     = 0;
+  if (value & 0x02) self.sprites_clip.index = 0;
+  if (value & 0x01) self.layer2_clip.index  = 0;
 }
 
 
@@ -617,6 +671,18 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_ULA:
       nextreg_clip_window_ula_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_CLIP_WINDOW_TILEMAP:
+      nextreg_clip_window_tilemap_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_CLIP_WINDOW_SPRITES:
+      nextreg_clip_window_sprites_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_CLIP_WINDOW_LAYER2:
+      nextreg_clip_window_layer2_write(value);
       break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_CONTROL:
