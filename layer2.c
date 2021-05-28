@@ -32,9 +32,10 @@ typedef struct {
   int          is_writable;
   int          do_map_shadow;
   mapping_t    mapping;
-  resolution_t resolution;
-  u8_t         palette_offset;
   u8_t         bank_offset;
+  resolution_t resolution;
+  palette_t    palette;
+  u8_t         palette_offset;
 } self_t;
 
 
@@ -128,7 +129,7 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
         return;
       }
       palette_index   = self.ram[self.active_bank * 16 * 1024 + (row - 32) * 256 + (column - 32 * 2) / 2];
-      colour          = palette_read_rgb(E_PALETTE_LAYER2_FIRST, (self.palette_offset << 4) + palette_index);
+      colour          = palette_read_rgb(self.palette, (self.palette_offset << 4) + palette_index);
       *rgba           = colour.red << 12 | colour.green << 8 | colour.blue << 4;
       *is_transparent = 0;
       break;
@@ -174,4 +175,9 @@ u8_t layer2_read(u16_t address) {
 
 void layer2_write(u16_t address, u8_t value) {
   self.ram[layer2_translate(address)] = value;
+}
+
+
+void layer2_palette_set(int use_second) {
+  self.palette = use_second ? E_PALETTE_LAYER2_SECOND : E_PALETTE_LAYER2_FIRST;
 }

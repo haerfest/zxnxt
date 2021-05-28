@@ -437,6 +437,7 @@ static void nextreg_palette_control_write(u8_t value) {
   self.ula_next_mode                  = value & 0x01;
 
   ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
+  layer2_palette_set(self.palette_layer2 == E_PALETTE_LAYER2_SECOND);
 
   if (self.ula_next_mode) {
     log_wrn("nextreg: ULANext mode not implemented\n");
