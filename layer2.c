@@ -36,7 +36,7 @@ typedef struct {
   resolution_t resolution;
   palette_t    palette;
   u8_t         palette_offset;
-  u8_t         transparency_index;
+  u16_t        transparency_rgba;
 } self_t;
 
 
@@ -114,7 +114,8 @@ void layer2_shadow_bank_write(u8_t bank) {
 
 
 void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int* is_priority) {
-  u8_t palette_index;
+  u8_t            palette_index;
+  palette_entry_t entry;
 
   *is_transparent = 1;
 
@@ -128,13 +129,12 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
         /* Border. */
         return;
       }
-      palette_index   = self.ram[self.active_bank * 16 * 1024 + (row - 32) * 256 + (column - 32 * 2) / 2];
-      if (!palette_is_msb_equal(self.palette, palette_index, self.transparency_index)) {
-        const palette_entry_t entry = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
-        *rgba           = entry.rgba;
-        *is_priority    = entry.is_layer2_priority;
-        *is_transparent = 0;
-      }
+      palette_index = self.ram[self.active_bank * 16 * 1024 + (row - 32) * 256 + (column - 32 * 2) / 2];
+      entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
+
+      *rgba           = entry.rgba;
+      *is_priority    = entry.is_layer2_priority;
+      *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
       break;
 
     default:
@@ -186,8 +186,8 @@ void layer2_palette_set(int use_second) {
 }
 
 
-void layer2_transparency_index_write(u8_t value) {
-  self.transparency_index = value;
+void layer2_transparency_colour_write(u8_t rgb) {
+  self.transparency_rgba = PALETTE_UNPACK(rgb);
 }
 
 

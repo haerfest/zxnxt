@@ -684,9 +684,9 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       nextreg_palette_value_9bits_write(value);
       break;
 
-    case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_INDEX:
-      ula_transparency_index_write(value);
-      layer2_transparency_index_write(value);
+    case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR:
+      ula_transparency_colour_write(value);
+      layer2_transparency_colour_write(value);
       break;
 
     case E_NEXTREG_REGISTER_FALLBACK_COLOUR:

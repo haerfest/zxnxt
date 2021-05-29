@@ -18,7 +18,7 @@ int  layer2_is_writable(void);
 u8_t layer2_read(u16_t address);
 void layer2_write(u16_t address, u8_t value);
 void layer2_palette_set(int use_second);
-void layer2_transparency_index_write(u8_t value);
+void layer2_transparency_colour_write(u8_t rgb);
 void layer2_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2);
 
 

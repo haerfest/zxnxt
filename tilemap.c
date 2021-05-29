@@ -97,6 +97,8 @@ void tilemap_tilemap_tile_definitions_address_write(u8_t value) {
 
 void tilemap_transparency_index_write(u8_t value) {
   self.transparency_index = value;
+
+  log_dbg("tilemap: transparency index set to %d\n", value);
 }
 
 
