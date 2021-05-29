@@ -121,9 +121,8 @@ static u8_t tilemap_attribute_get(u32_t row, u32_t column) {
 
 
 void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
-  *is_transparent = 1;
-
   if (!self.is_enabled) {
+    *is_transparent = 1;
     return;
   }
 
@@ -132,6 +131,7 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
    || row        > self.clip_y2
    || column / 4 < self.clip_x1
    || column / 4 > self.clip_x2) {
+    *is_transparent = 1;
     return;
   }
 
@@ -161,10 +161,20 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
 
   palette_index |= palette_offset;
 
-  if (!palette_is_msb_equal(self.palette, palette_index, self.transparency_index)) {
-    *rgba           = palette_read_rgba(self.palette, palette_index);
-    *is_transparent = 0;
-  }
+  /**
+   * According to the VHDL, a check against the transparency colour is only
+   * performed when using text mode.
+   *
+   * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/zxnext.vhd
+   *
+   * > tm_transparent <= '1'
+   * >   when (tm_pixel_en_2 = '0') or
+   * >        (tm_pixel_textmode_2 = '1' and tm_rgb_2(8 downto 1) = transparent_rgb_2) or
+   * >        (tm_en_2 = '0')
+   * >   else '0';
+   */
+  *rgba           = palette_read_rgba(self.palette, palette_index);
+  *is_transparent = self.use_text_mode && palette_is_msb_equal(self.palette, palette_index, self.transparency_index);
 }
 
 
