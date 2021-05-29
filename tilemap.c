@@ -75,13 +75,15 @@ void tilemap_tilemap_control_write(u8_t value) {
           self.use_default_attribute  ? "default"  : "map",
           self.use_text_mode          ? "text"     : "tile",
           self.use_512_tiles          ? 512        : 256,
-          self.force_tilemap_over_ula ? "tile>ula" : "ula>tile",
+          self.force_tilemap_over_ula ? "tile>ula" : "!tile>ula",
           self.palette                ? 2          : 1);
 }
 
 
 void tilemap_default_tilemap_attribute_write(u8_t value) {
   self.default_attribute = value;
+
+  log_dbg("tilemap: default attribute set to $%02X\n", value);
 }
 
 
@@ -197,18 +199,21 @@ void tilemap_offset_y_write(u8_t value) {
 
 int tilemap_priority_over_ula_get(u32_t row, u32_t column) {
   if (!self.is_enabled) {
+    /* Tilemap not active, so certainly not on top of ULA. */
     return 0;
   }
   
-  if (self.force_tilemap_over_ula) {
-    return 1;
-  }
-
-  if (self.use_512_tiles) {
+  if (!self.force_tilemap_over_ula) {
+    /* Tilemap not forced on top of ULA. */
     return 0;
   }
 
-  return tilemap_attribute_get(row, column) ^ 0x01;
+  /**
+   * Tilemap forced on top of ULA but may be overruled by the LSB attribute
+   * bit when not used as the MSB of the tile number in case of 512 tiles.
+   */
+
+  return !self.use_512_tiles && (tilemap_attribute_get(row, column) ^ 0x01);
 }
 
 
