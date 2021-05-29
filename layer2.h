@@ -12,7 +12,7 @@ void layer2_access_write(u8_t value);
 void layer2_control_write(u8_t value);
 void layer2_active_bank_write(u8_t bank);
 void layer2_shadow_bank_write(u8_t bank);
-void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba);
+void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int* is_priority);
 int  layer2_is_readable(void);
 int  layer2_is_writable(void);
 u8_t layer2_read(u16_t address);

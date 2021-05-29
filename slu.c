@@ -269,6 +269,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
   u16_t ula_tilemap_rgba;
   int   layer2_is_transparent;
   u16_t layer2_rgba;
+  int   layer2_is_priority;
   u16_t rgba;
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
@@ -280,7 +281,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
     }
 
     tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_transparent, &tilemap_rgba);
-    layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_is_transparent,  &layer2_rgba);
+    layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_is_transparent,  &layer2_rgba, &layer2_is_priority);
 
     /* Mix ULA and tilemap. */
     ula_tilemap_is_transparent = ula_is_transparent && tilemap_is_transparent;
@@ -306,7 +307,9 @@ u32_t slu_run(u32_t ticks_14mhz) {
         break;
         
       case E_SLU_LAYER_PRIORITY_SUL:
-        if (!ula_tilemap_is_transparent) {
+        if (layer2_is_priority) {
+          rgba = layer2_rgba;
+        } else if (!ula_tilemap_is_transparent) {
           rgba = ula_tilemap_rgba;
         } else if (!layer2_is_transparent) {
           rgba = layer2_rgba;

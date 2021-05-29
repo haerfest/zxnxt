@@ -113,7 +113,7 @@ void layer2_shadow_bank_write(u8_t bank) {
 }
 
 
-void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
+void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int* is_priority) {
   u8_t palette_index;
 
   *is_transparent = 1;
@@ -130,7 +130,9 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
       }
       palette_index   = self.ram[self.active_bank * 16 * 1024 + (row - 32) * 256 + (column - 32 * 2) / 2];
       if (!palette_is_msb_equal(self.palette, palette_index, self.transparency_index)) {
-        *rgba           = palette_read_rgba(self.palette, (self.palette_offset << 4) + palette_index);
+        const palette_entry_t entry = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
+        *rgba           = entry.rgba;
+        *is_priority    = entry.is_layer2_priority;
         *is_transparent = 0;
       }
       break;
