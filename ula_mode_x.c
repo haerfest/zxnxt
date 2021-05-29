@@ -27,15 +27,15 @@ static int ula_display_mode_screen_x(u32_t row, u32_t column, u8_t* palette_inde
     blink  = 0;
     bright = 0;
   } else {
-    ink    = 0  + attribute_byte & 0x07;
-    paper  = 16 + (attribute_byte >> 3) & 0x07;
-    blink  = attribute_byte & 0x80;
     bright = (attribute_byte & 0x40) >> 3;
+    ink    = 0  + bright + (attribute_byte & 0x07);
+    paper  = 16 + bright + ((attribute_byte >> 3) & 0x07);
+    blink  = attribute_byte & 0x80;
   }
 
-  *palette_index = bright + (is_foreground
-                             ? (blink && self.blink_state) ? paper : ink
-                             : (blink && self.blink_state) ? ink : paper);
+  *palette_index = is_foreground
+    ? ((blink && self.blink_state) ? paper : ink)
+    : ((blink && self.blink_state) ? ink : paper);
 
   return 1;
 }
