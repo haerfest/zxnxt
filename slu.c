@@ -3,6 +3,7 @@
 #include "defs.h"
 #include "layer2.h"
 #include "log.h"
+#include "palette.h"
 #include "slu.h"
 #include "tilemap.h"
 #include "ula.h"
@@ -332,7 +333,22 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
 
 void slu_layer_priority_set(slu_layer_priority_t priority) {
-  self.layer_priority = priority;
+#ifdef DEBUG
+  const char* descriptions[] = {
+    "SLU",
+    "LSU",
+    "SUL",
+    "LUS",
+    "USL",
+    "ULS",
+    "BLEND",
+    "BLEND_5"
+  };
+#endif
+
+  self.layer_priority = priority & 0x07;
+
+  log_dbg("slu: layer priority set to %s\n", descriptions[self.layer_priority]);
 }
 
 
@@ -342,5 +358,5 @@ slu_layer_priority_t slu_layer_priority_get(void) {
 
 
 void slu_transparency_fallback_colour_write(u8_t value) {
-  self.fallback_colour = (value >> 5) << 12 | ((value & 0x1C) >> 2) << 8 | (value & 0x03) << 4;
+  self.fallback_colour = PALETTE_UNPACK(value);
 }
