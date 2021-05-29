@@ -299,6 +299,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
     {
       case E_SLU_LAYER_PRIORITY_SLU:
       case E_SLU_LAYER_PRIORITY_LSU:
+      case E_SLU_LAYER_PRIORITY_LUS:
+        /* Layer 2 over ULA. */
         if (!layer2_is_transparent) {
           rgba = layer2_rgba;
         } else if (!ula_tilemap_is_transparent) {
@@ -307,6 +309,9 @@ u32_t slu_run(u32_t ticks_14mhz) {
         break;
         
       case E_SLU_LAYER_PRIORITY_SUL:
+      case E_SLU_LAYER_PRIORITY_USL:
+      case E_SLU_LAYER_PRIORITY_ULS:
+        /* ULA over Layer 2. */
         if (layer2_is_priority) {
           rgba = layer2_rgba;
         } else if (!ula_tilemap_is_transparent) {
@@ -315,7 +320,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
           rgba = layer2_rgba;
         }
         break;
-          
+
       default:
         log_dbg("slu: unimplemented layer priority %d\n", self.layer_priority);
         break;
