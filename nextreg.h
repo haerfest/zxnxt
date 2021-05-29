@@ -34,6 +34,8 @@ typedef enum {
   E_NEXTREG_REGISTER_CLIP_WINDOW_ULA                       = 0x1A,
   E_NEXTREG_REGISTER_CLIP_WINDOW_TILEMAP                   = 0x1B,
   E_NEXTREG_REGISTER_CLIP_WINDOW_CONTROL                   = 0x1C,
+  E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_MSB                 = 0x1E,
+  E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_LSB                 = 0x1F,
   E_NEXTREG_REGISTER_OFFSET_X_MSB                          = 0X2F,
   E_NEXTREG_REGISTER_OFFSET_X_LSB                          = 0X30,
   E_NEXTREG_REGISTER_OFFSET_Y                              = 0X31,

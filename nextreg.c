@@ -585,12 +585,13 @@ void nextreg_sprite_layers_system_write(u8_t value) {
 
 
 void nextreg_data_write(u16_t address, u8_t value) {
-  log_dbg("nextreg: write of $%02X to $%04X (register $%02X)\n", value, address, self.selected_register);
   nextreg_write_internal(self.selected_register, value);
 }
 
 
 void nextreg_write_internal(u8_t reg, u8_t value) {
+  log_dbg("nextreg: write of $%02X to Next register $%02X\n", value, self.selected_register);
+
   switch (reg) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
       nextreg_config_mapping_write(value);
@@ -779,12 +780,13 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
 
 u8_t nextreg_data_read(u16_t address) {
-  log_dbg("nextreg: read from $%04X\n", address);
   return nextreg_read_internal(self.selected_register);
 }
 
 
 u8_t nextreg_read_internal(u8_t reg) {
+  log_dbg("nextreg: read from Next register $%02X\n", reg);
+
   switch (reg) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
       return MACHINE_ID;
@@ -841,7 +843,14 @@ u8_t nextreg_read_internal(u8_t reg) {
     case E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL:
       return mmu_page_get(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL);
 
+    case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_MSB:
+      return (slu_active_video_line_get() >> 8) & 0x01;
+
+    case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_LSB:
+      return slu_active_video_line_get() & 0xFF;
+ 
     default:
+      log_wrn("nextreg: unimplemented read from Next register $%02X\n", reg);
       break;
   }
 

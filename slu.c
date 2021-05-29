@@ -334,6 +334,11 @@ u32_t slu_run(u32_t ticks_14mhz) {
 }
 
 
+u32_t slu_active_video_line_get(void) {
+  return self.beam_row;
+}
+
+
 void slu_layer_priority_set(slu_layer_priority_t priority) {
 #ifdef DEBUG
   const char* descriptions[] = {
