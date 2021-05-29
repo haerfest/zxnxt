@@ -627,6 +627,8 @@ void ula_display_size_get(u16_t* rows, u16_t* columns) {
 
 void ula_control_write(u8_t value) {
   self.is_enabled = !(value & 0x80);
+
+  log_dbg("ula: control set to $%02X\n", value);
 }
 
 

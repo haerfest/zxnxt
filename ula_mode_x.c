@@ -22,8 +22,8 @@ static int ula_display_mode_screen_x(u32_t row, u32_t column, u8_t* palette_inde
     }
 
     /* TODO: shift paper palette index to the right! */
-    ink    = 0   + attribute_byte & self.ula_next_mask_ink;
-    paper  = 128 + attribute_byte & self.ula_next_mask_paper;
+    ink    = 0   + (attribute_byte & self.ula_next_mask_ink);
+    paper  = 128 + (attribute_byte & self.ula_next_mask_paper);
     blink  = 0;
     bright = 0;
   } else {
