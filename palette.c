@@ -58,8 +58,9 @@ int palette_is_msb_equal(palette_t palette, u8_t index1, u8_t index2) {
   const u16_t a = self.palette[palette][index1].rgba;
   const u16_t b = self.palette[palette][index2].rgba;
 
-  /* Compare red, green, and blue, ignoring LSB of blue. */
-  return (a & 0xFFE0) == (b & 0xFFE0);
+  /* Compare RRR0GGG0BBb00000, where the 'b' is the LSB blue bit which must
+   *    mask 1110111011000000  be ignored. */
+  return (a & 0xEEC0) == (b & 0xEEC0);
 }
 
 
