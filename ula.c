@@ -295,9 +295,6 @@ void ula_did_complete_frame(void) {
 int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
   u8_t palette_index;
 
-  /* Assume nothings to draw. */
-  *is_transparent = 1;
-
   self.ticks_14mhz_after_irq++;
 
   if (beam_row == self.display_spec->row_irq && beam_column == self.display_spec->column_irq) {
@@ -309,6 +306,7 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
    || beam_row    >= self.display_spec->row_border_top + 32 + 192 + 32
    || beam_column <  self.display_spec->column_border_left
    || beam_column >= self.display_spec->column_border_left + (32 + 256 + 32) * 2) {
+    *is_transparent = 1;
     return 0;
   }
 
@@ -316,6 +314,7 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
   *frame_buffer_column = beam_column - self.display_spec->column_border_left;
 
   if (!self.is_enabled) {
+    *is_transparent = 1;
     return 1;
   }
 
@@ -334,16 +333,19 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
      || content_row    > self.clip_y2
      || content_column < self.clip_x1
      || content_column > self.clip_x2) {
+      *is_transparent = 1;
       return 1;
     }
 
     /* Leave the pixel colour up to the specialized ULA mode handlers. */
     if (!ula_display_handlers[self.display_mode](content_row, content_column, &palette_index)) {
+      *is_transparent = 1;
       return 1;
     }
   } else if (self.is_ula_next_mode) {
     if (self.ula_next_mask_paper == 0) {
-      /* No backround mask, border color is fallback color. */
+      /* No background mask, border color is fallback color. */
+      *is_transparent = 1;
       return 1;
     }
     palette_index = 128 + self.border_colour;
@@ -352,10 +354,8 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
     palette_index = 16 + self.border_colour;
   }
 
-  if (!palette_is_msb_equal(self.palette, palette_index, self.transparency_index)) {
-    *rgba           = palette_read_rgba(self.palette, palette_index);
-    *is_transparent = 0;
-  }
+  *rgba           = palette_read_rgba(self.palette, palette_index);
+  *is_transparent = palette_is_msb_equal(self.palette, palette_index, self.transparency_index);
 
   return 1;
 }

@@ -17,7 +17,7 @@ static int ula_display_mode_screen_x(u32_t row, u32_t column, u8_t* palette_inde
 
   if (self.is_ula_next_mode) {
     if (!is_foreground && self.ula_next_mask_paper == 0) {
-      /* No backround mask, background color is fallback color. */
+      /* No background mask, background color is fallback color. */
       return 0;
     }
 
