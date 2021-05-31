@@ -13,6 +13,7 @@ typedef enum {
 } spi_device_t;
 
 
+#ifdef DEBUG
 static const char* spi_device_names[] = {
   "no device",
   "first SD card",
@@ -21,6 +22,7 @@ static const char* spi_device_names[] = {
   "second Raspberry Pi",
   "FPGA flash"
 };
+#endif
 
 
 typedef struct {
