@@ -24,7 +24,7 @@ typedef struct {
   int       use_default_attribute;
   int       use_text_mode;
   int       use_512_tiles;
-  int       force_tilemap_over_ula;
+  int       tilemap_over_ula;
   palette_t palette;
   u8_t      offset_y;
   u16_t     offset_x;
@@ -59,12 +59,12 @@ void tilemap_finit(void) {
 
 
 void tilemap_tilemap_control_write(u8_t value) {
-  self.is_enabled             = value & 0x80;
-  self.use_80x32              = value & 0x40;
-  self.use_default_attribute  = value & 0x20;
-  self.use_text_mode          = value & 0x08;
-  self.use_512_tiles          = value & 0x02;
-  self.force_tilemap_over_ula = value & 0x01;
+  self.is_enabled            = value & 0x80;
+  self.use_80x32             = value & 0x40;
+  self.use_default_attribute = value & 0x20;
+  self.use_text_mode         = value & 0x08;
+  self.use_512_tiles         = value & 0x02;
+  self.tilemap_over_ula      = value & 0x01;
 
   self.palette = (value & 0x10) ? E_PALETTE_TILEMAP_SECOND : E_PALETTE_TILEMAP_FIRST;
 
@@ -75,7 +75,7 @@ void tilemap_tilemap_control_write(u8_t value) {
           self.use_default_attribute  ? "default"  : "map",
           self.use_text_mode          ? "text"     : "tile",
           self.use_512_tiles          ? 512        : 256,
-          self.force_tilemap_over_ula ? "tile>ula" : "!tile>ula",
+          self.tilemap_over_ula       ? "tile>ula" : "!tile>ula",
           self.palette                ? 2          : 1);
 }
 
@@ -198,17 +198,19 @@ int tilemap_priority_over_ula_get(u32_t row, u32_t column) {
     return 0;
   }
   
-  if (!self.force_tilemap_over_ula) {
-    /* Tilemap not forced on top of ULA. */
+  if (self.tilemap_over_ula) {
+    return 1;
+  }
+
+  if (self.use_512_tiles) {
     return 0;
   }
 
-  /**
-   * Tilemap forced on top of ULA but may be overruled by the LSB attribute
-   * bit when not used as the MSB of the tile number in case of 512 tiles.
-   */
+  if ((tilemap_attribute_get(row, column) & 0x01) == 0) {
+    return 1;
+  }
 
-  return !self.use_512_tiles && (tilemap_attribute_get(row, column) ^ 0x01);
+  return 0;
 }
 
 
