@@ -139,31 +139,22 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
     return;
   }
 
-  row    += self.offset_y;
-  column += self.offset_x;
+  row    = (row    + self.offset_y) % FRAME_BUFFER_HEIGHT;
+  column = (column + self.offset_x) % FRAME_BUFFER_WIDTH;
 
-  u16_t map_offset = tilemap_map_offset_get(row, column);
-  u8_t  tile       = self.bank5[map_offset];
-  u8_t  attribute  = tilemap_attribute_get(row, column);
-
-  if (self.use_512_tiles) {
-    tile |= (attribute & 0x01) << 8;
-  }
-
-  u8_t  def_row        = row    % 8;
-  u8_t  def_column     = (column / (self.use_80x32 ? 1 : 2)) % 8;
-  u16_t def_offset     = self.use_text_mode
+  const u16_t map_offset     = tilemap_map_offset_get(row, column);
+  const u8_t  attribute      = tilemap_attribute_get(row, column);
+  const u8_t  tile           = self.bank5[map_offset] | (self.use_512_tiles ? (attribute & 0x01) << 8 : 0);
+  const u8_t  def_row        = row    % 8;
+  const u8_t  def_column     = (column / (self.use_80x32 ? 1 : 2)) % 8;
+  const u16_t def_offset     = self.use_text_mode
     ? (self.definitions_base_address + (tile *  8 + def_row))
     : (self.definitions_base_address + (tile * 32 + def_row * 4 + def_column / 2));
-  u8_t  pattern        = self.bank5[def_offset];
-
-  u8_t  palette_index  = self.use_text_mode
-    ? ((pattern & (0x80 >> def_column)) ? 1 : 0)
-    : ((def_column & 0x01) ? (pattern & 0x0F) : (pattern >> 4));
-    
-  u8_t  palette_offset = attribute & (self.use_text_mode ? 0xFE : 0xF0);
-
-  palette_index |= palette_offset;
+  const u8_t  pattern        = self.bank5[def_offset];
+  const u8_t  palette_offset = attribute & (self.use_text_mode ? 0xFE : 0xF0);
+  const u8_t  palette_index  = palette_offset | (self.use_text_mode
+                                                 ? ((pattern & (0x80 >> def_column)) ? 1 : 0)
+                                                 : ((def_column & 0x01) ? (pattern & 0x0F) : (pattern >> 4)));
 
   /**
    * According to the VHDL, a check against the transparency colour is only
@@ -183,12 +174,16 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
 
 
 void tilemap_offset_x_msb_write(u8_t value) {
-  self.offset_x = ((value << 8) | (self.offset_x & 0x00FF)) % (self.use_80x32 ? 640 : 320);
+  self.offset_x = (value << 8) | (self.offset_x & 0x00FF);
+
+  log_dbg("tilemap: offset_x MSB set to $%02X => offset_x = $%04X\n", value, self.offset_x);
 }
 
 
 void tilemap_offset_x_lsb_write(u8_t value) {
-  self.offset_x = ((self.offset_x & 0xFF00) | value) % (self.use_80x32 ? 640 : 320);
+  self.offset_x = (self.offset_x & 0xFF00) | value;
+
+  log_dbg("tilemap: offset_x LSB set to $%02X => offset_x = $%04X\n", value, self.offset_x);
 }
 
 

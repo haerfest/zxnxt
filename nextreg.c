@@ -758,7 +758,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_OFFSET_X_LSB:
-      tilemap_offset_x_msb_write(value);
+      tilemap_offset_x_lsb_write(value);
       break;
 
     case E_NEXTREG_REGISTER_OFFSET_Y:
