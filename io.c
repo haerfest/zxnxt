@@ -201,7 +201,7 @@ void io_write(u16_t address, u8_t value) {
     case 0x0B:
     case 0x6B:
       dma_write(address, value);
-      break;
+      return;
 
     case 0x00E3:
       divmmc_control_write(address, value);
