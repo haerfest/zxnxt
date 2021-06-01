@@ -92,11 +92,7 @@ void layer2_access_write(u8_t value) {
     self.is_visible    = value & 0x02;
     self.is_writable   = value & 0x01;
 
-    if (self.mapping == E_MAPPING_FIRST_48K) {
-      log_dbg("layer2: first 48K mapping not yet implemented\n");
-    }
-
-    memory_refresh_accessors(0, 2);
+    memory_refresh_accessors(0, 6);
   }
 }
 
@@ -173,13 +169,41 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
 }
 
 
-int layer2_is_readable(void) {
-  return self.is_readable;
+int layer2_is_readable(int page) {
+  if (!self.is_readable) {
+    return 0;
+  }
+
+  if (page < 2) {
+    /* First 16K. */
+    return 1;
+  }
+
+  if (page < 6) {
+    /* First 48K. */
+    return (self.mapping == E_MAPPING_FIRST_48K);
+  }
+
+  return 0;
 }
 
 
-int layer2_is_writable(void) {
-  return self.is_writable;
+int layer2_is_writable(int page) {
+  if (!self.is_writable) {
+    return 0;
+  }
+
+  if (page < 2) {
+    /* First 16K. */
+    return 1;
+  }
+
+  if (page < 6) {
+    /* First 48K. */
+    return (self.mapping == E_MAPPING_FIRST_48K);
+  }
+
+  return 0;
 }
 
 

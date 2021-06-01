@@ -84,62 +84,70 @@ void memory_finit(void) {
  *   1. mmu
  */
 static reader_t pick_reader(int page) {
-  if (page > 1) {
-    /* Addresses 0x4000 - 0xFFFF. */
-    return mmu_read;
+  if (page < 2) {
+    /* Addresses 0x0000 - 0x3FFF. */
+    if (bootrom_is_active()) {
+      return bootrom_read;
+    }
+    if (config_is_active()) {
+      return config_read;
+    }
+    if (mf_is_active()) {
+      return (page == 0) ? mf_rom_read  : mf_ram_read;
+    }
+    if (divmmc_is_active()) {
+      return (page == 0) ? divmmc_rom_read  : divmmc_ram_read;
+    }
+    if (layer2_is_readable(page)) {
+      return layer2_read;
+    }
+    if (mmu_page_get(page) != MMU_ROM_PAGE) {
+      return mmu_read;
+    }
+
+    return altrom_is_active_on_read() ? altrom_read  : rom_read;
   }
 
-  /* Addresses 0x0000 - 0x3FFF. */
-  if (bootrom_is_active()) {
-    return bootrom_read;
-  }
-  if (config_is_active()) {
-    return config_read;
-  }
-  if (mf_is_active()) {
-    return (page == 0) ? mf_rom_read  : mf_ram_read;
-  }
-  if (divmmc_is_active()) {
-    return (page == 0) ? divmmc_rom_read  : divmmc_ram_read;
-  }
-  if (layer2_is_readable()) {
+  if (page < 6 && layer2_is_readable(page)) {
+    /* Addresses 0x4000 - 0xBFFF. */
     return layer2_read;
   }
-  if (mmu_page_get(page) != MMU_ROM_PAGE) {
-    return mmu_read;
-  }
 
-  return altrom_is_active_on_read() ? altrom_read  : rom_read;
+  return mmu_read;
 }
 
 
 static writer_t pick_writer(int page) {
-  if (page > 1) {
-    /* Addresses 0x4000 - 0xFFFF. */
-    return mmu_write;
+  if (page < 2) {
+    /* Addresses 0x0000 - 0x3FFF. */
+    if (bootrom_is_active()) {
+      return bootrom_write;
+    }
+    if (config_is_active()) {
+      return config_write;
+    }
+    if (mf_is_active()) {
+      return (page == 0) ? mf_rom_write  : mf_ram_write;
+    }
+    if (divmmc_is_active()) {
+      return (page == 0) ? divmmc_rom_write  : divmmc_ram_write;
+    }
+    if (layer2_is_writable(page)) {
+      return layer2_write;
+    }
+    if (mmu_page_get(page) != MMU_ROM_PAGE) {
+      return mmu_write;
+    }
+
+    return altrom_is_active_on_write() ? altrom_write  : rom_write;
   }
 
-  /* Addresses 0x0000 - 0x3FFF. */
-  if (bootrom_is_active()) {
-    return bootrom_write;
-  }
-  if (config_is_active()) {
-    return config_write;
-  }
-  if (mf_is_active()) {
-    return (page == 0) ? mf_rom_write  : mf_ram_write;
-  }
-  if (divmmc_is_active()) {
-    return (page == 0) ? divmmc_rom_write  : divmmc_ram_write;
-  }
-  if (layer2_is_writable()) {
+  if (page < 6 && layer2_is_writable(page)) {
+    /* Addresses 0x4000 - 0xBFFF. */
     return layer2_write;
   }
-  if (mmu_page_get(page) != MMU_ROM_PAGE) {
-    return mmu_write;
-  }
 
-  return altrom_is_active_on_write() ? altrom_write  : rom_write;
+  return mmu_write;
 }
 
 
