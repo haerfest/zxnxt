@@ -57,11 +57,6 @@ static void rom_refresh_ptr(void) {
       return;
   }
 
-  log_dbg("rom: selected=%d + locked=%s (%u) => active=%d\n",
-          self.selected,
-          self.locked == NOT_LOCKED ? "no" : "yes",
-          self.locked,
-          active);
   self.ptr = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_ROM + active * 16 * 1024];
 }
 
@@ -88,7 +83,6 @@ u8_t rom_read(u16_t address) {
 
 
 void rom_write(u16_t address, u8_t value) {
-  log_dbg("rom: unsupported write of $%02X to $%04X\n", value, address);
 }
 
 

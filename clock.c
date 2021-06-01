@@ -52,7 +52,6 @@ void clock_cpu_speed_set(clock_cpu_speed_t speed) {
 #endif
 
   self.cpu_speed = speed;
-  log_dbg("clock: CPU speed set to %s MHz\n", speeds[speed]);
 }
 
 

@@ -78,8 +78,6 @@ void layer2_reset(void) {
 
 
 void layer2_access_write(u8_t value) {
-  log_dbg("layer2: access write $%02X\n", value);
-
   if (value & 0x10)
   {
     self.bank_offset = value & 0x07;
@@ -98,14 +96,12 @@ void layer2_access_write(u8_t value) {
 
 
 void layer2_control_write(u8_t value) {
-  log_dbg("layer2: control write $%02X\n", value);
   self.resolution     = (value & 0x30) >> 4;
   self.palette_offset = value & 0x0F;
 }
 
 
 void layer2_active_bank_write(u8_t bank) {
-  log_dbg("layer2: active bank write $%02X\n", bank);
   if (bank != self.active_bank) {
     self.active_bank = bank;
   }
@@ -113,7 +109,6 @@ void layer2_active_bank_write(u8_t bank) {
 
 
 void layer2_shadow_bank_write(u8_t bank) {
-  log_dbg("layer2: shadow bank write $%02X\n", bank);
   if (bank != self.shadow_bank) {
     self.shadow_bank = bank;
   }
@@ -162,7 +157,7 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
       break;
 
     default:
-      log_dbg("layer2: resolution #%d not implemented yet\n", self.resolution);
+      log_wrn("layer2: resolution #%d not implemented yet\n", self.resolution);
       *is_transparent = 1;
       break;
   }

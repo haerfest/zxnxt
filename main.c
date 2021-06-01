@@ -139,12 +139,10 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  log_inf("main: %d joystick/gamecontrollers attached\n", SDL_NumJoysticks());
   for (i = 0; i < SDL_NumJoysticks(); i++) {
     if (SDL_IsGameController(i)) {
       self.controller = SDL_GameControllerOpen(i);
       if (self.controller) {
-        log_inf("main: %s detected\n", SDL_GameControllerName(self.controller));
         break;
       }
     }
@@ -371,7 +369,6 @@ static void main_toggle_fullscreen(void) {
       log_err("main: SDL_GetWindowDisplayMode error: %s\n", SDL_GetError());
       return;
     }
-    log_inf("main: %dx%d, %d Hz\n", mode.w, mode.h, mode.refresh_rate);
   }
 }
 
@@ -436,7 +433,7 @@ static void main_dump_memory(void) {
   }
 
   fclose(fp);
-  log_inf("main: %s written\n", filename);
+  log_dbg("main: %s written\n", filename);
 }
 
 

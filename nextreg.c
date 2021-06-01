@@ -192,8 +192,6 @@ static void nextreg_reset_write(u8_t value) {
     }
 
     cpu_reset();
-
-    log_dbg("nextreg: %s reset\n", self.is_hard_reset ? "hard" : "soft");
     return;
   }
 
@@ -239,8 +237,6 @@ static void nextreg_machine_type_write(u8_t value) {
       machine_type = E_MACHINE_TYPE_CONFIG_MODE;
     }
 
-    log_dbg("nextreg: machine type set to %s\n", descriptions[machine_type]);
-
     bootrom_deactivate();
 
     if (machine_type == E_MACHINE_TYPE_CONFIG_MODE) {
@@ -255,7 +251,6 @@ static void nextreg_machine_type_write(u8_t value) {
 
 
 static u8_t nextreg_core_boot_read(void) {
-  log_dbg("nextreg: MF / DRIVE key status read\n");
   return keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_DRIVE) << 1
        | keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_NMI);
 }
@@ -499,8 +494,6 @@ static void nextreg_palette_control_write(u8_t value) {
 static void nextreg_palette_index_write(u8_t value) {
   self.palette_index                     = value;
   self.palette_index_9bit_is_first_write = 1;
-
-  log_dbg("nextreg: palette index set to %u\n", self.palette_index);
 }
 
 
@@ -590,8 +583,6 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
 
 void nextreg_write_internal(u8_t reg, u8_t value) {
-  log_dbg("nextreg: write of $%02X to Next register $%02X\n", value, self.selected_register);
-
   switch (reg) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
       nextreg_config_mapping_write(value);
@@ -782,7 +773,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     default:
-      log_wrn("nextreg: unimplemented write of $%02X to Next register $%02X\n", value, reg);
+      log_wrn("nextreg: unimplemented write of $%02X to register $%02X\n", value, reg);
       break;
   }
 
@@ -797,8 +788,6 @@ u8_t nextreg_data_read(u16_t address) {
 
 
 u8_t nextreg_read_internal(u8_t reg) {
-  log_dbg("nextreg: read from Next register $%02X\n", reg);
-
   switch (reg) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
       return MACHINE_ID;
@@ -862,7 +851,7 @@ u8_t nextreg_read_internal(u8_t reg) {
       return slu_active_video_line_get() & 0xFF;
  
     default:
-      log_wrn("nextreg: unimplemented read from Next register $%02X\n", reg);
+      log_wrn("nextreg: unimplemented read from register $%02X\n", reg);
       break;
   }
 

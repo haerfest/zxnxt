@@ -50,7 +50,6 @@ void io_finit(void) {
 
 void io_mf_port_decoding_enable(int do_enable) {
   self.is_mf_port_decoding_enabled = do_enable;
-  log_dbg("io: MF port decoding %s\n", do_enable ? "enabled" : "disabled");
 }
 
 
@@ -64,9 +63,6 @@ u8_t io_read(u16_t address) {
   if ((address & 0x0001) == 0x0000) {
     return ula_read(address);
   }
-
-  /* Keyboard reads are not that useful to log, so log here. */
-  log_dbg("io: read from $%04X\n", address);
 
   /* TODO: Bit 14 of address must be set on Plus 3? */
   if ((address & 0x8003) == 0x0001) {
@@ -158,8 +154,6 @@ u8_t io_read(u16_t address) {
 
 
 void io_write(u16_t address, u8_t value) {
-  log_dbg("io: write of $%02X to $%04X\n", value, address);
-
   if ((address & 0x0001) == 0x0000) {
     ula_write(address, value);
     return;

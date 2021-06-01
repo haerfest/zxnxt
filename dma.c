@@ -134,16 +134,6 @@ static void dma_load(void) {
   }
 
   self.n_transferred = 0;
-
-  log_dbg("dma: ready to transfer %u bytes %s from $%04X (%s, %d) to $%04X (%s, %d)\n",
-          self.block_length,
-          is_a_to_b ? "A->B" : "B->A",
-          self.src_address,
-          self.is_src_io ? "IO" : "memory",
-          self.src_address_delta,
-          self.dst_address,
-          self.is_dst_io ? "IO" : "memory",
-          self.dst_address_delta);
 }
 
 
@@ -331,7 +321,7 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
         break;
 
       default:
-        log_dbg("dma: unknown command $%02X received\n", value);
+        log_err("dma: unknown command $%02X received\n", value);
         break;
     }
 
@@ -347,7 +337,7 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
 
 void dma_write(u16_t address, u8_t value) {
   if ((address & 0x00FF) != 0x6B) {
-    log_dbg("dma: Z80 DMA at port $%04X not implemented\n", address);
+    log_wrn("dma: Z80 DMA at port $%04X not implemented\n", address);
     return;
   }
 
@@ -364,20 +354,18 @@ void dma_write(u16_t address, u8_t value) {
   if (self.group == NO_GROUP) {
       self.group = dma_decode_group(value);
       if (self.group != NO_GROUP) {
-        log_dbg("dma: write $%02X to group %d\n", value, self.group);
         self.group_value[self.group] = value;
         handlers[self.group](value, 1);
       }
       return;
   }
 
-  log_dbg("dma: write $%02X to group %d\n", value, self.group);
   handlers[self.group](value, 0);
 }
 
 
 u8_t dma_read(u16_t address) {
-  log_dbg("dma: unimplemented DMA read from $%04X\n", address);
+  log_wrn("dma: unimplemented DMA read from $%04X\n", address);
 
   return 0xFF;
 }

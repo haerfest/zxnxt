@@ -66,23 +66,11 @@ void tilemap_tilemap_control_write(u8_t value) {
   self.tilemap_over_ula      = value & 0x01;
 
   self.palette = (value & 0x10) ? E_PALETTE_TILEMAP_SECOND : E_PALETTE_TILEMAP_FIRST;
-
-  log_dbg("tilemap: set control to $%02X => %s, %dx32, %s attr, %s mode, %d tiles, %s, palette %d\n",
-          value,
-          self.is_enabled             ? "on"       : "off",
-          self.use_80x32              ? 80         : 40,
-          self.use_default_attribute  ? "default"  : "map",
-          self.use_text_mode          ? "text"     : "tile",
-          self.use_512_tiles          ? 512        : 256,
-          self.tilemap_over_ula       ? "tile>ula" : "!tile>ula",
-          self.palette                ? 2          : 1);
 }
 
 
 void tilemap_default_tilemap_attribute_write(u8_t value) {
   self.default_attribute = value;
-
-  log_dbg("tilemap: default attribute set to $%02X\n", value);
 }
 
 
@@ -98,8 +86,6 @@ void tilemap_tilemap_tile_definitions_address_write(u8_t value) {
 
 void tilemap_transparency_index_write(u8_t value) {
   self.transparency_index = value;
-
-  log_dbg("tilemap: transparency index set to %d\n", value);
 }
 
 
@@ -174,15 +160,11 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
 
 void tilemap_offset_x_msb_write(u8_t value) {
   self.offset_x = (value << 8) | (self.offset_x & 0x00FF);
-
-  log_dbg("tilemap: offset_x MSB set to $%02X => offset_x = $%04X\n", value, self.offset_x);
 }
 
 
 void tilemap_offset_x_lsb_write(u8_t value) {
   self.offset_x = (self.offset_x & 0xFF00) | value;
-
-  log_dbg("tilemap: offset_x LSB set to $%02X => offset_x = $%04X\n", value, self.offset_x);
 }
 
 
@@ -218,6 +200,4 @@ void tilemap_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_x2 = x2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
-
-  log_dbg("tilemap: clipping window set to %d <= x <= %d and %d <= y <= %d\n", self.clip_x1, self.clip_x2, self.clip_y1, self.clip_y2);
 }

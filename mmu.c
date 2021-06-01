@@ -54,7 +54,6 @@ void mmu_page_set(u8_t slot, u8_t page) {
     const int is_rom  = page == MMU_ROM_PAGE;
 
     self.pages[slot] = page;
-    log_dbg("mmu: slot %u contains page %u\n", slot, page);
 
     if (slot < 2 && was_rom != is_rom) {
       memory_refresh_accessors(slot, 1);

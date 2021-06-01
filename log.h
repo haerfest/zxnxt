@@ -10,13 +10,11 @@
 
 #ifdef SILENT
 
-#define log_inf(...)
 #define log_wrn(...)
 #define log_dbg(...)
 
 #else  /* SILENT */
 
-#define log_inf(...) fprintf(stderr, __VA_ARGS__)
 #define log_wrn(...) fprintf(stderr, __VA_ARGS__)
 
 #ifdef DEBUG

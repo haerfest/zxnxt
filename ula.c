@@ -417,8 +417,6 @@ void ula_write(u16_t address, u8_t value) {
 
 void ula_timex_video_mode_read_enable(int do_enable) {
   self.is_timex_enabled = do_enable;
-
-  log_dbg("ula: timex port set to %s\n", do_enable ? "return video mode" : "floating bus");
 }
 
 
@@ -442,8 +440,6 @@ u8_t ula_timex_read(u16_t address) {
 
 
 void ula_timex_write(u16_t address, u8_t value) {
-  log_dbg("ula: timex write of $%02X to $%04X\n", value, address);
-
   self.timex_disable_ula_interrupt = (value & 0x40) >> 6;
   self.hi_res_ink_colour           = (value & 0x38) >> 3;
 
@@ -494,7 +490,6 @@ void ula_display_timing_set(ula_display_timing_t timing) {
 
   self.display_timing          = timing;
   self.did_display_spec_change = 1;
-  log_dbg("ula: display timing set to %s\n", descriptions[timing]);
 }
 
 
@@ -508,8 +503,6 @@ void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_x2 = x2 * 2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
-
-  log_dbg("ula: clipping window set to %d <= x <= %d and %d <= y <= %d\n", x1, x2, y1, y2);
 }
 
 
@@ -521,8 +514,6 @@ void ula_screen_bank_set(ula_screen_bank_t bank) {
     /* Changing the bank has an immediate effect. */
     ula_display_reconfigure();
   }
-
-  log_dbg("ula: screen bank set to %u\n", bank);
 }
 
 
@@ -539,7 +530,6 @@ int ula_contention_get(void) {
 void ula_contention_set(int do_contend) {
   if (do_contend != self.do_contend) {
     self.do_contend = do_contend;
-    log_inf("ula: memory contention %sabled\n", do_contend ? "en" : "dis");
   }
 }
 
@@ -627,15 +617,11 @@ void ula_display_size_get(u16_t* rows, u16_t* columns) {
 
 void ula_control_write(u8_t value) {
   self.is_enabled = !(value & 0x80);
-
-  log_dbg("ula: control set to $%02X\n", value);
 }
 
 
 void ula_transparency_colour_write(u8_t rgb) {
   self.transparency_rgba = PALETTE_UNPACK(rgb);
-
-  log_dbg("ula: transparency colour set to $%02X\n", rgb);
 }
 
 
@@ -664,6 +650,4 @@ void ula_attribute_byte_format_write(u8_t value) {
 
 void ula_next_mode_enable(int do_enable) {
   self.is_ula_next_mode = do_enable;
-
-  log_dbg("ula: ULANext mode %s\n", do_enable ? "enabled" : "disabled");
 }

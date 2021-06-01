@@ -322,7 +322,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
         break;
 
       default:
-        log_dbg("slu: unimplemented layer priority %d\n", self.layer_priority);
+        log_wrn("slu: unimplemented layer priority %d\n", self.layer_priority);
         break;
     }
     
@@ -354,8 +354,6 @@ void slu_layer_priority_set(slu_layer_priority_t priority) {
 #endif
 
   self.layer_priority = priority & 0x07;
-
-  log_dbg("slu: layer priority set to %s\n", descriptions[self.layer_priority]);
 }
 
 

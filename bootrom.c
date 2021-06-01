@@ -60,7 +60,6 @@ void bootrom_activate(void) {
   self.is_active = 1;
 
   if (!was_active) {
-    log_dbg("bootrom: activated\n");
     memory_refresh_accessors(0, 2);
   }
 }
@@ -72,7 +71,6 @@ void bootrom_deactivate(void) {
   self.is_active = 0;
 
   if (was_active) {
-    log_dbg("bootrom: deactivated\n");
     memory_refresh_accessors(0, 2);
   }
 }
@@ -89,5 +87,4 @@ u8_t bootrom_read(u16_t address) {
 
 
 void bootrom_write(u16_t address, u8_t value) {
-  log_inf("bootrom: attempt to write $%02X to $%04X\n", value, address);
 }

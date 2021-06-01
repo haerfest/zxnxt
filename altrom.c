@@ -46,14 +46,6 @@ static void altrom_refresh_ptr(void) {
       log_wrn("altrom: locking not implemented for machine type %u\n", self.machine_type);
       return;
   }
-
-  log_dbg("altrom: ROM%s selected (machinetype=%u, locked=%d, selected=%d, active=%s, on=%s)\n",
-          self.ptr == self.rom0_128k ? "0 (128K)" : "1 (48K)",
-          self.machine_type,
-          self.locked,
-          self.selected,
-          self.is_active ? "yes" : "no",
-          self.on_write  ? "write" : "read");
 }
 
 
@@ -100,14 +92,6 @@ void altrom_activate(int active, int on_write) {
   if (active != self.is_active || on_write != self.on_write) {
     self.is_active = active;
     self.on_write  = on_write;
-
-#ifdef DEBUG
-    if (active) {
-      log_dbg("altrom: active on %s\n", on_write ? "write" : "read");
-    } else {
-      log_dbg("altrom: inactive\n");
-    }
-#endif
 
     memory_refresh_accessors(0, 2);
   }

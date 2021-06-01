@@ -40,7 +40,6 @@ void config_activate(void) {
   self.is_active         = 1;
 
   if (!was_active) {
-    log_dbg("config: activated\n");
     memory_refresh_accessors(0, 2);
   }
 }
@@ -52,7 +51,6 @@ void config_deactivate(void) {
   self.is_active = 0;
 
   if (was_active) {
-    log_dbg("config: deactivated\n");
     memory_refresh_accessors(0, 2);
   }
 }
@@ -71,5 +69,4 @@ void config_write(u16_t address, u8_t value) {
 void config_set_rom_ram_bank(u8_t bank) {
   self.rom_ram_bank      = bank;
   self.rom_ram_bank_base = bank * 16 * 1024;
-  log_dbg("config: ROM/RAM bank in lower 16 KiB set to %u\n", self.rom_ram_bank);
 }

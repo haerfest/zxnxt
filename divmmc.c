@@ -85,12 +85,6 @@ void divmmc_control_write(u16_t address, u8_t value) {
 
     divmmc_refresh_ptr();
 
-    if (CONMEM_ENABLED(value)) {
-      log_dbg("divmmc: CONMEM enabled, bank %d paged in\n", BANK_NUMBER(value));
-    } else {
-      log_dbg("divmmc: CONMEM disabled\n");
-    }
-
     if (MAPRAM_ENABLED(value)) {
       log_wrn("divmmc: MAPRAM functionality not implemented\n");
     }

@@ -158,8 +158,6 @@ void memory_refresh_accessors(int page, int n_pages) {
     self.readers[i] = pick_reader(i);
     self.writers[i] = pick_writer(i);
   }
-
-  log_dbg("memory: refreshed accessors for pages %u to %u\n", page, page + n_pages - 1);
 }
 
 

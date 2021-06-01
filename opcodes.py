@@ -316,7 +316,6 @@ def halt() -> C:
 def im(mode: int) -> C:
     return f'''
         IM = {mode};
-        log_dbg("cpu: IM {mode}, I=$%02X\\n", I);
     '''
 
 def in_A_n() -> C:
@@ -454,7 +453,6 @@ def ld_I_A() -> C:
     return '''
         T(1);
         I = A;
-        log_dbg("cpu: I=$%02X\\n", I);
     '''
 
 def ld_pdd_r(dd: str, r: str, xy: Optional[str] = None) -> C:
@@ -1595,7 +1593,7 @@ case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
     optional_break = 'break;' if prefix else ''
     f.write(f'''
 default:
-  log_dbg("cpu: unknown opcode {prefix_str}$%02X at $%04X\\n", opcode, PC - 1 - {prefix_len});
+  log_err("cpu: unknown opcode {prefix_str}$%02X at $%04X\\n", opcode, PC - 1 - {prefix_len});
   return -1;
 }}
 {optional_break}

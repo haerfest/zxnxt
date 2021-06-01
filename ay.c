@@ -153,7 +153,7 @@ void ay_register_select(u8_t value) {
     return;
   }
   
-  log_wrn("ay: invalid selected register $%02X\n", value);
+  log_err("ay: invalid selected register $%02X\n", value);
 }
 
 
@@ -343,24 +343,20 @@ void ay_register_write(u8_t value) {
     case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE:
       ay->channels[A].latched.tone_period = (ay->registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE] & 0x0F) << 8 | ay->registers[E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE];
-      log_dbg("ay%u: A tone_period %u\n", self.selected_ay, ay->channels[A].latched.tone_period);
       break;
 
     case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE:
       ay->channels[B].latched.tone_period = (ay->registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_COARSE] & 0x0F) << 8 | ay->registers[E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE];
-      log_dbg("ay%u: B tone_period %u\n", self.selected_ay, ay->channels[B].latched.tone_period);
       break;
 
     case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE:
     case E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE:
       ay->channels[C].latched.tone_period = (ay->registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_COARSE] & 0x0F) << 8 | ay->registers[E_AY_REGISTER_CHANNEL_C_TONE_PERIOD_FINE];
-      log_dbg("ay%u: C tone_period %u\n", self.selected_ay, ay->channels[C].latched.tone_period);
       break;
 
     case E_AY_REGISTER_NOISE_PERIOD:
       ay->latched.noise_period = value & 0x1F;
-      log_dbg("ay%u: noise_period %u\n", self.selected_ay, ay->latched.noise_period);
       break;
 
     case E_AY_REGISTER_ENABLE:
@@ -370,53 +366,31 @@ void ay_register_write(u8_t value) {
       ay->channels[A].latched.is_noise_enabled = !(value & 0x08);
       ay->channels[B].latched.is_noise_enabled = !(value & 0x10);
       ay->channels[C].latched.is_noise_enabled = !(value & 0x20);
-      log_dbg("ay%u: tones %c %c %c, noise %c %c %c\n",
-              self.selected_ay,
-              ay->channels[A].latched.is_tone_enabled  ? 'A' : '-',
-              ay->channels[B].latched.is_tone_enabled  ? 'B' : '-',
-              ay->channels[C].latched.is_tone_enabled  ? 'C' : '-',
-              ay->channels[A].latched.is_noise_enabled ? 'A' : '-',
-              ay->channels[B].latched.is_noise_enabled ? 'B' : '-',
-              ay->channels[C].latched.is_noise_enabled ? 'C' : '-');
       break;
 
     case E_AY_REGISTER_CHANNEL_A_AMPLITUDE:
       ay->channels[A].latched.amplitude          = value & 0x0F;
       ay->channels[A].latched.is_amplitude_fixed = !(value & 0x010);
-      log_dbg("ay%u: A amplitude %u, %s\n",
-              self.selected_ay,
-              ay->channels[A].latched.amplitude,
-              ay->channels[A].latched.is_amplitude_fixed ? "fixed" : "envelope");
       break;
 
     case E_AY_REGISTER_CHANNEL_B_AMPLITUDE:
       ay->channels[B].latched.amplitude          = value & 0x0F;
       ay->channels[B].latched.is_amplitude_fixed = !(value & 0x010);
-      log_dbg("ay%u: B amplitude %u, %s\n",
-              self.selected_ay,
-              ay->channels[B].latched.amplitude,
-              ay->channels[B].latched.is_amplitude_fixed ? "fixed" : "envelope");
       break;
 
     case E_AY_REGISTER_CHANNEL_C_AMPLITUDE:
       ay->channels[C].latched.amplitude          = value & 0x0F;
       ay->channels[C].latched.is_amplitude_fixed = !(value & 0x010);
-      log_dbg("ay%u: C amplitude %u, %s\n",
-              self.selected_ay,
-              ay->channels[C].latched.amplitude,
-              ay->channels[C].latched.is_amplitude_fixed ? "fixed" : "envelope");
       break;
 
     case E_AY_REGISTER_ENVELOPE_PERIOD_FINE:
     case E_AY_REGISTER_ENVELOPE_PERIOD_COARSE:
       ay->latched.envelope_period = ay->registers[E_AY_REGISTER_ENVELOPE_PERIOD_COARSE] << 8 | ay->registers[E_AY_REGISTER_ENVELOPE_PERIOD_FINE];
-      log_dbg("ay%u: envelope_period %u\n", self.selected_ay, ay->latched.envelope_period);
       break;
 
     case E_AY_REGISTER_ENVELOPE_SHAPE_CYCLE:
       ay->latched.envelope_shape  = value;
       ay->is_envelope_first_cycle = 1;
-      log_dbg("ay%u: envelope_shape %u\n", self.selected_ay, ay->latched.envelope_shape);
       break;
 
     default:
