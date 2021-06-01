@@ -753,16 +753,28 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       ula_control_write(value);
       break;
 
-    case E_NEXTREG_REGISTER_OFFSET_X_MSB:
+    case E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_MSB:
       tilemap_offset_x_msb_write(value);
       break;
 
-    case E_NEXTREG_REGISTER_OFFSET_X_LSB:
+    case E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_LSB:
       tilemap_offset_x_lsb_write(value);
       break;
 
-    case E_NEXTREG_REGISTER_OFFSET_Y:
+    case E_NEXTREG_REGISTER_TILEMAP_Y_SCROLL:
       tilemap_offset_y_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LAYER2_X_SCROLL_MSB:
+      layer2_offset_x_msb_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LAYER2_X_SCROLL_LSB:
+      layer2_offset_x_lsb_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LAYER2_Y_SCROLL:
+      layer2_offset_y_write(value);
       break;
 
     case E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT:

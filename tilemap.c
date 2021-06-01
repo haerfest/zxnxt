@@ -9,7 +9,6 @@
  * TODO:
  * - tile rotation
  * - tile mirroring
- * - clipping window
  */
 
 
