@@ -13,11 +13,12 @@ zxnxt: opcodes.c $(OBJECTS)
 ula.o: ula.c ula_mode_x.c ula_hi_res.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c
+cpu.o: cpu.c opcodes.c opcodes.py
+	python3 opcodes.py
 	$(CC) $(CFLAGS) -c $< -o $@
 
-opcodes.c: opcodes.py
-	python3 opcodes.py
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f zxnxt *.o opcodes.c

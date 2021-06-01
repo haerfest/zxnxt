@@ -1136,6 +1136,7 @@ def ed_table() -> Table:
         0x69: ('OUT (C),L',      partial(out_C_r, 'L')),
         0x6A: ('ADC HL,HL',      partial(adc_HL_ss, 'HL')),
         0x6F: ('RLD',            rld),
+        0x71: ('OUT (C),0',      partial(out_C_r, 0)),
         0x72: ('SBC HL,SP',      partial(sbc_HL_ss, 'SP')),
         0x73: ('LD (nn),SP',     partial(ld_pnn_dd, 'SP')),
         0x78: ('IN A,(C)',       partial(in_r_C, 'A')),
