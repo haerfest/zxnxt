@@ -60,7 +60,6 @@ u8_t divmmc_rom_read(u16_t address) {
 
 
 void divmmc_rom_write(u16_t address, u8_t value) {
-  log_wrn("divmmc: unsupported write of $%02X to $%04X\n", value, address);
 }
 
 
