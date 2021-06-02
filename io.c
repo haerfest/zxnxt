@@ -159,15 +159,6 @@ void io_write(u16_t address, u8_t value) {
     return;
   }
 
-  /* TODO: Bit 14 of address must be set on Plus 3? */
-  if ((address & 0x8003) == 0x0001) {
-    /* Typically 0x7FFD. */
-    if (self.is_port_7FFD_enabled) {
-      paging_spectrum_128k_paging_write(value);
-    }
-    return;
-  }
-
   if (self.is_mf_port_decoding_enabled) {
     if ((address & 0x00FF) == self.mf_port_enable) {
       mf_enable_write(address, value);
@@ -203,7 +194,7 @@ void io_write(u16_t address, u8_t value) {
       dma_write(address, value);
       return;
 
-    case 0x00E3:
+    case 0xE3:
       divmmc_control_write(address, value);
       return;
 
@@ -260,6 +251,12 @@ void io_write(u16_t address, u8_t value) {
 
     case 0x253B:
       nextreg_data_write(address, value);
+      return;
+
+    case 0x7FFD:
+      if (self.is_port_7FFD_enabled) {
+        paging_spectrum_128k_paging_write(value);
+      }
       return;
 
     case 0xDFFD:

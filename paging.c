@@ -112,11 +112,32 @@ void paging_spectrum_plus_3_paging_write(u8_t value) {
   const u8_t is_special = value & 0x01;
 
   if (is_special) {
-    log_wrn("paging: special paging not implemented yet\n");
+    paging_all_ram((value >> 1) & 0x03);
   } else {
     const u8_t rom = (value & 0x04) >> 1 | (rom_selected() & 0x01);
     rom_select(rom);
+    paging_mmu_update();
+  }
+}
+
+
+void paging_all_ram(u8_t value) {
+  const u8_t banks[4][4] = {
+    {0, 1, 2, 3},
+    {4, 5, 6, 7},
+    {4, 5, 6, 3},
+    {4, 7, 6, 3}
+  };
+
+  log_dbg("paging: ALL RAM %d\n", value);
+
+  if (value > 3) {
+    log_wrn("paging: invalid all-ram setting %d\n", value);
+    return;
   }
 
-  paging_mmu_update();
+  mmu_bank_set(1, banks[value][0]);
+  mmu_bank_set(2, banks[value][1]);
+  mmu_bank_set(3, banks[value][2]);
+  mmu_bank_set(4, banks[value][3]);
 }
