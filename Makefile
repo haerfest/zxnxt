@@ -13,9 +13,11 @@ zxnxt: opcodes.c $(OBJECTS)
 ula.o: ula.c ula_mode_x.c ula_hi_res.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-cpu.o: cpu.c opcodes.c opcodes.py
-	python3 opcodes.py
+cpu.o: cpu.c opcodes.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+opcodes.c: opcodes.py
+	python3 opcodes.py
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
