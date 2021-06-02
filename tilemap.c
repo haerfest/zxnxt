@@ -17,7 +17,8 @@ typedef struct {
   u8_t      default_attribute;
   u16_t     definitions_base_address;
   u16_t     tilemap_base_address;
-  u8_t      transparency_index;
+  u16_t     transparency_rgba;
+  u8_t      transparency_index;  /* How is this used? */
   int       is_enabled;
   int       use_80x32;
   int       use_default_attribute;
@@ -154,7 +155,7 @@ void tilemap_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
    * >   else '0';
    */
   *rgba           = palette_read_rgba(self.palette, palette_index);
-  *is_transparent = self.use_text_mode && palette_is_msb_equal(self.palette, palette_index, self.transparency_index);
+  *is_transparent = self.use_text_mode && PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
 }
 
 
@@ -200,4 +201,9 @@ void tilemap_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_x2 = x2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
+}
+
+
+void tilemap_transparency_colour_write(u8_t rgb) {
+  self.transparency_rgba = PALETTE_UNPACK(rgb);
 }
