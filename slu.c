@@ -340,19 +340,6 @@ u32_t slu_active_video_line_get(void) {
 
 
 void slu_layer_priority_set(slu_layer_priority_t priority) {
-#ifdef DEBUG
-  const char* descriptions[] = {
-    "SLU",
-    "LSU",
-    "SUL",
-    "LUS",
-    "USL",
-    "ULS",
-    "BLEND",
-    "BLEND_5"
-  };
-#endif
-
   self.layer_priority = priority & 0x07;
 }
 
