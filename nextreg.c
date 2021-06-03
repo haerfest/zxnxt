@@ -222,15 +222,6 @@ static void nextreg_machine_type_write(u8_t value) {
   }
 
   if (config_is_active()) {
-#ifdef DEBUG
-    const char* descriptions[8] = {
-      "configuration mode",
-      "ZX Spectrum 48K",
-      "ZX Spectrum 128K/+2",
-      "ZX Spectrum +2A/+2B/+3",
-      "Pentagon"
-    };
-#endif
     u8_t machine_type = value & 0x03;
 
     if (machine_type > E_MACHINE_TYPE_PENTAGON) {
