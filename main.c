@@ -23,6 +23,7 @@
 #include "paging.h"
 #include "palette.h"
 #include "rom.h"
+#include "rtc.h"
 #include "sdcard.h"
 #include "slu.h"
 #include "spi.h"
@@ -172,8 +173,12 @@ static int main_init(void) {
     goto exit_kempston;
   }
 
-  if (i2c_init() != 0) {
+  if (rtc_init() != 0) {
     goto exit_utils;
+  }
+
+  if (i2c_init() != 0) {
+    goto exit_rtc;
   }
 
   if (sdcard_init() != 0) {
@@ -320,6 +325,8 @@ exit_sdcard:
   sdcard_finit();
 exit_i2c:
   i2c_finit();
+exit_rtc:
+  rtc_finit();
 exit_utils:
   utils_finit();
 exit_kempston:
@@ -510,6 +517,7 @@ static void main_finit(void) {
   spi_finit();
   sdcard_finit();
   i2c_finit();
+  rtc_finit();
   utils_finit();
   kempston_finit();
   ay_finit();
