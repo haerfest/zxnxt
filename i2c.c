@@ -66,7 +66,6 @@ static int is_slave_prepared(void) {
 
   for (i = 0; i < sizeof(slaves) / sizeof(*slaves); i++) {
     if (slaves[i].address == self.address) {
-      log_dbg("i2c: slave recognised\n");
       self.slave_read  = slaves[i].read;
       self.slave_write = slaves[i].write;
       return 1;
@@ -78,7 +77,6 @@ static int is_slave_prepared(void) {
 
 
 void i2c_scl_write(u16_t address, u8_t value) {
-  log_dbg("i2c: SCL %s\n", (value & 0x01) ? "high" : "low");
   const int did_clock_rise = !self.scl && (value & 0x01);
 
   self.scl = value & 0x01;
@@ -92,7 +90,6 @@ void i2c_scl_write(u16_t address, u8_t value) {
       /* Master is sending 7-bit slave address. */
       self.address = (self.address << 1) | self.sda;
       if (++self.bit_count == 7) {
-        log_dbg("i2c: address = $%02X\n", self.address);
         self.bit_count = 0;
         self.state     = E_STATE_DIRECTION;
       }
@@ -102,16 +99,15 @@ void i2c_scl_write(u16_t address, u8_t value) {
       /* Master is sending direction of transfer. */
       self.does_master_write = !self.sda;
       self.state             = is_slave_prepared() ? E_STATE_DIRECTION_ACK : E_STATE_IDLE;
-      log_dbg("i2c: master will be %s\n", self.does_master_write ? "writing" : "reading");
       break;
 
     case E_STATE_DIRECTION_ACK:
       /* Slave must acknowledge having received from Master by holding SDA low. */
-      self.sda   = 0x00;
-      self.state = E_STATE_DATA;
+      self.sda       = 0x00;
+      self.state     = E_STATE_DATA;
+      self.bit_count = 0;
       if (!self.does_master_write) {
-        self.data      = self.slave_read();
-        self.bit_count = 0;
+        self.data    = self.slave_read();
       }
       break;
 
@@ -156,33 +152,20 @@ void i2c_scl_write(u16_t address, u8_t value) {
       self.sda = 0xFF;
       break;
   }
-
-  const char* descr[] = {
-    "IDLE",
-    "ADDRESS",
-    "DIRECTION",
-    "DIRECTION_ACK",
-    "DATA",
-    "DATA_ACK"
-  };
-  log_dbg("i2c: state = %s\n", descr[self.state]);
 }
 
 
 void i2c_sda_write(u16_t address, u8_t value) {
   const u8_t sda = value & 0x01;
-  log_dbg("i2c: write %d to SDA\n", sda);
 
   if (self.scl) {
     if (self.sda && !sda) {
       /* A high to low SDA with SCL high indicates start. */
       self.state     = E_STATE_ADDRESS;
       self.bit_count = 0;
-      log_dbg("i2c: START\n");
     } else if (!self.sda && sda) {
       /* A low to high SDA with SCL high indicates stop. */
       self.state = E_STATE_IDLE;
-      log_dbg("i2c: STOP\n");
     }
   }
 
@@ -191,6 +174,5 @@ void i2c_sda_write(u16_t address, u8_t value) {
 
 
 u8_t i2c_sda_read(u16_t address) {
-  log_dbg("i2c: read SDA $%02X\n", self.sda);
   return self.sda;
 }
