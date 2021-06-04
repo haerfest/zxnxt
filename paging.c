@@ -9,6 +9,7 @@
 typedef struct {
   int  is_spectrum_128k_paging_locked;
   u8_t bank_slot_4;
+  int  is_special;
 } self_t;
 
 
@@ -61,13 +62,25 @@ u8_t paging_spectrum_128k_paging_read(void) {
  * "A write to any of the ports 0x7FFD, 0xDFFD, 0x1FFD, 0xEFF7 sets mmu0=0xff
  * and mmu1=0xff to reveal the selected rom in the bottom 16K.  mmu6 and mmu7
  * are set to reflect the selected 16K memory bank."
+ *
+ * https://wiki.specnext.dev/Plus_3_Memory_Paging_Control
+ *
+ * "NEW in core 3.0:
+ *
+ * When exiting +3 special paging mode, the banks 5 and 2 are mapped back at
+ * regular place."
  */
 
 
-static void paging_mmu_update(void) {
+static void paging_mmu_update(int was_special) {
   mmu_page_set(0, MMU_ROM_PAGE);
   mmu_page_set(1, MMU_ROM_PAGE);
   mmu_bank_set(4, self.bank_slot_4);
+
+  if (was_special) {
+    mmu_bank_set(2, 5);
+    mmu_bank_set(3, 2);
+  }
 }
 
 
@@ -87,7 +100,8 @@ void paging_spectrum_128k_paging_write(u8_t value) {
     self.is_spectrum_128k_paging_locked = 1;
   }
 
-  paging_mmu_update();
+  paging_mmu_update(self.is_special);
+  self.is_special = 0;
 }
 
 
@@ -99,7 +113,8 @@ u8_t paging_spectrum_next_bank_extension_read(void) {
 
 void paging_spectrum_next_bank_extension_write(u8_t value) {
   self.bank_slot_4 = (value & 0x0F) << 3 | (self.bank_slot_4 & 0x07);
-  paging_mmu_update();
+  paging_mmu_update(self.is_special);
+  self.is_special = 0;
 }
 
 
@@ -113,10 +128,12 @@ void paging_spectrum_plus_3_paging_write(u8_t value) {
 
   if (is_special) {
     paging_all_ram((value >> 1) & 0x03);
+    self.is_special = 1;
   } else {
     const u8_t rom = (value & 0x04) >> 1 | (rom_selected() & 0x01);
     rom_select(rom);
-    paging_mmu_update();
+    paging_mmu_update(self.is_special);
+    self.is_special = 0;
   }
 }
 
@@ -129,7 +146,7 @@ void paging_all_ram(u8_t value) {
     {4, 7, 6, 3}
   };
 
-  log_dbg("paging: ALL RAM %d\n", value);
+  log_dbg("MEM: ALL RAM %d\n", value);
 
   if (value > 3) {
     log_wrn("paging: invalid all-ram setting %d\n", value);
