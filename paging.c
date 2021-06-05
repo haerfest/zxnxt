@@ -158,3 +158,21 @@ void paging_all_ram(u8_t value) {
   mmu_bank_set(3, banks[value][2]);
   mmu_bank_set(4, banks[value][3]);
 }
+
+
+void paging_bank_slot_4_set(u8_t bank) {
+  self.bank_slot_4 = bank;
+
+  /**
+   * Doesn't change MMU, the caller will do that. This is just to remember
+   * the bank when switching back from all-ram mode.
+   */
+}
+
+
+void paging_all_ram_disable(void) {
+  if (self.is_special) {
+    paging_mmu_update(self.is_special);
+    self.is_special = 0;
+  }
+}

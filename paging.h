@@ -18,6 +18,8 @@ void paging_spectrum_next_bank_extension_write(u8_t value);
 u8_t paging_spectrum_plus_3_paging_read(void);
 void paging_spectrum_plus_3_paging_write(u8_t value);
 void paging_all_ram(u8_t value);
+void paging_bank_slot_4_set(u8_t bank);
+void paging_all_ram_disable(void);
 
 
 #endif  /* PAGING_H */
