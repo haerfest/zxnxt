@@ -1101,7 +1101,7 @@ def ed_table() -> Table:
         0x33: ('ADD BC,A',       partial(add_dd_r, 'BC', 'A')),
         0x34: ('ADD HL,nn',      partial(add_dd_nn, 'HL')),
         0x35: ('ADD DE,nn',      partial(add_dd_nn, 'DE')),
-        0x36: ('ADD BC,nn',      partial(add_dd_nn, 'DE')),
+        0x36: ('ADD BC,nn',      partial(add_dd_nn, 'BC')),
         0x40: ('IN B,(C)',       partial(in_r_C,  'B')),
         0x41: ('OUT (C),B',      partial(out_C_r, 'B')),
         0x42: ('SBC HL,BC',      partial(sbc_HL_ss, 'BC')),
