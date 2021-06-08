@@ -255,6 +255,9 @@ static u8_t nextreg_peripheral_1_setting_read(void) {
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
   /* Changing display frequency is not supported. */
+  if (value & 0x04) {
+    log_wrn("nextreg: setting display refresh to 60 Hz not supported\n");
+  }
 }
 
 
