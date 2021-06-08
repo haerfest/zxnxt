@@ -247,6 +247,12 @@ static u8_t nextreg_core_boot_read(void) {
 }
 
 
+static u8_t nextreg_peripheral_1_setting_read(void) {
+  /* Always 50 Hz, no scan doubling. */
+  return 0x04;
+}
+
+
 static void nextreg_peripheral_1_setting_write(u8_t value) {
   /* Changing display frequency is not supported. */
 }
@@ -787,6 +793,9 @@ u8_t nextreg_read_internal(u8_t reg) {
     case E_NEXTREG_REGISTER_CPU_SPEED:
       return nextreg_cpu_speed_read();
 
+    case E_NEXTREG_REGISTER_PERIPHERAL_1_SETTING:
+      return nextreg_peripheral_1_setting_read();
+      
     case E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING:
       return nextreg_peripheral_2_setting_read();
 
@@ -832,7 +841,7 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_LSB:
       return slu_active_video_line_get() & 0xFF;
- 
+
     default:
       log_wrn("nextreg: unimplemented read from register $%02X\n", reg);
       break;
