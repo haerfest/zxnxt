@@ -77,6 +77,12 @@ void layer2_reset(void) {
 }
 
 
+u8_t layer2_access_read(void) {
+  return (self.mapping << 6) | self.do_map_shadow | self.is_readable | self.is_visible | self.is_writable;
+
+}
+
+
 void layer2_access_write(u8_t value) {
   if (value & 0x10)
   {

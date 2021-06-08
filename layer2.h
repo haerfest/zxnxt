@@ -8,6 +8,7 @@
 int  layer2_init(u8_t* sram);
 void layer2_finit(void);
 void layer2_reset(void);
+u8_t layer2_access_read(void);
 void layer2_access_write(u8_t value);
 void layer2_control_write(u8_t value);
 void layer2_active_bank_write(u8_t bank);
