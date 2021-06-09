@@ -426,7 +426,7 @@ static void nextreg_clip_window_sprites_write(u8_t value) {
 
   if (++self.sprites_clip.index == 4) {
     self.sprites_clip.index = 0;
-    /* TODO: sprites_clip_set(self.sprites_clip.values[0], self.sprites_clip.values[1], self.sprites_clip.values[2], self.sprites_clip.values[3]); */
+    sprites_clip_set(self.sprites_clip.values[0], self.sprites_clip.values[1], self.sprites_clip.values[2], self.sprites_clip.values[3]);
   }
 }
 
