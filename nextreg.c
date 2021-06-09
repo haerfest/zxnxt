@@ -675,6 +675,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       ula_transparency_colour_write(value);
       layer2_transparency_colour_write(value);
       tilemap_transparency_colour_write(value);
+      sprites_transparency_colour_write(value);
       break;
 
     case E_NEXTREG_REGISTER_FALLBACK_COLOUR:

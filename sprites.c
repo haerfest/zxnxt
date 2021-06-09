@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "log.h"
+#include "palette.h"
 #include "sprites.h"
 
 
@@ -40,6 +41,8 @@ typedef struct {
 typedef struct {
   u8_t*     patterns;
   sprite_t* sprites;
+  u16_t*    frame_buffer;
+  u8_t*     is_transparent;
   int       is_enabled;
   int       is_enabled_over_border;
   int       is_enabled_clipping_over_border;
@@ -50,10 +53,10 @@ typedef struct {
   int       clip_y1;
   int       clip_y2;
   u8_t      transparency_index;
+  u16_t     transparency_rgba;
   u8_t      sprite_index;
   u16_t     pattern_index;
   u8_t      attribute_index;
-  sprite_t* last_anchor;
 } sprites_t;
 
 
@@ -63,17 +66,14 @@ static sprites_t self;
 int sprites_init(void) {
   memset(&self, 0, sizeof(self));
 
-  self.patterns = (u8_t*) malloc(16 * 1024);
-  if (self.patterns == NULL) {
-    log_err("sprites: out of memory\n");
-    return -1;
-  }
+  self.patterns       = (u8_t*)     calloc(16, 1024);
+  self.sprites        = (sprite_t*) calloc(N_SPRITES, sizeof(sprite_t));
+  self.frame_buffer   = (u16_t*)    malloc(FRAME_BUFFER_WIDTH / 2 * FRAME_BUFFER_HEIGHT * 2);
+  self.is_transparent = (u8_t*)     malloc(FRAME_BUFFER_WIDTH / 2 * FRAME_BUFFER_HEIGHT);
 
-  self.sprites = (sprite_t*) malloc(N_SPRITES * sizeof(sprite_t));
-  if (self.sprites == NULL) {
+  if (self.patterns == NULL || self.sprites == NULL || self.frame_buffer == NULL || self.is_transparent == NULL) {
     log_err("sprites: out of memory\n");
-    free(self.patterns);
-    self.patterns = NULL;
+    sprites_finit();
     return -1;
   }
 
@@ -82,19 +82,103 @@ int sprites_init(void) {
 
 
 void sprites_finit(void) {
-  if (self.patterns != NULL) {
-    free(self.patterns);
-    self.patterns = NULL;
+  if (self.is_transparent != NULL) {
+    free(self.is_transparent);
+    self.is_transparent = NULL;
+  }
+  if (self.frame_buffer != NULL) {
+    free(self.frame_buffer);
+    self.frame_buffer = NULL;
   }
   if (self.sprites != NULL) {
     free(self.sprites);
     self.sprites = NULL;
   }
+  if (self.patterns != NULL) {
+    free(self.patterns);
+    self.patterns = NULL;
+  }
 }
 
 
 void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
-  *is_transparent = 1;
+  const size_t offset = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
+
+  if (!self.is_enabled) {
+    *is_transparent = 1;
+    return;
+  }
+
+  if (self.is_transparent[offset]) {
+    *is_transparent = 1;
+    return;
+  }
+
+  *rgba           = self.frame_buffer[offset];
+  *is_transparent = *rgba == self.transparency_rgba;
+}
+
+
+static void draw(const sprite_t* sprite, const sprite_t* anchor) {
+  u8_t* pattern;
+  u16_t row;
+  u16_t column;
+  u8_t  index;
+  palette_entry_t entry;
+  size_t offset;
+  u16_t  sprite_x;
+
+  if (!sprite->is_anchor) {
+    return;
+  }
+  if (sprite->is_4bpp) {
+    return;
+  }
+  if (sprite->is_visible) {
+    return;
+  }
+
+  sprite_x = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
+
+  pattern = &self.patterns[sprite->pattern * 256];
+
+  for (row = 0; row < 16; row++) {
+    for (column = 0; column < 16; column++) {
+      index = *pattern++;
+      if (index != self.transparency_index) {
+        entry  = palette_read(E_PALETTE_SPRITES_FIRST, index);
+        offset = (sprite->y + row) * FRAME_BUFFER_WIDTH / 2 + sprite_x + column;
+        if (entry.rgba != self.transparency_rgba) {
+          self.frame_buffer[offset]   = entry.rgba;
+          self.is_transparent[offset] = 1;
+        }
+      }
+    }
+  }
+}
+
+
+static void update(void) {
+  sprite_t* sprite;
+  sprite_t* anchor;
+  size_t    i;
+
+  if (!self.is_enabled) {
+    return;
+  }
+
+  /* Assume no sprites visible. */
+  memset(self.is_transparent, 1, sizeof(FRAME_BUFFER_WIDTH / 2 * FRAME_BUFFER_HEIGHT));
+
+  /* Draw the sprites in order. */
+  anchor = NULL;
+  for (i = 0; i < 128; i++) {
+    sprite = &self.sprites[i];
+    if (sprite->is_anchor) {
+      anchor = sprite;
+    }
+    draw(sprite, anchor);
+  }
 }
 
 
@@ -104,7 +188,10 @@ void sprites_priority_set(int is_zero_on_top) {
 
 
 void sprites_enable_set(int enable) {
-  self.is_enabled = enable;
+  if (enable != self.is_enabled) {
+    self.is_enabled = enable;
+    update();
+  }
 }
 
 
@@ -132,10 +219,12 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
   switch (attribute_index) {
     case 0:
       sprite->x = (sprite->x & 0xFF00) | value;
+      update();
       break;
 
     case 1:
       sprite->y = (sprite->y & 0xFF00) | value;
+      update();
       break;
 
     case 2:
@@ -144,6 +233,7 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
       sprite->is_mirrored_y              = value & 0x04;
       sprite->is_rotated                 = value & 0x02;
       sprite->is_palette_offset_relative = value & 0x01;
+      update();            
       break;
 
     case 3:
@@ -156,6 +246,7 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
         sprite->is_anchor  = 1;
         sprite->is_unified = 0;
       }
+      update();
       break;
 
     case 4:
@@ -163,19 +254,20 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
         sprite->is_anchor = !((value >> 6) == 0x01);
         if (sprite->is_anchor) {
           sprite->is_4bpp             = value & 0x80;
-          sprite->is_unified          = value & 0x20;
-          sprite->magnification_x     = 1 << ((value & 0x18) >> 3);
-          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);
-          sprite->is_pattern_relative = value & 0x01;
           if (sprite->is_4bpp) {
             sprite->n6 = (value & 0x40) >> 6;
           }
+          sprite->is_unified          = value & 0x20;
+          sprite->magnification_x     = 1 << ((value & 0x18) >> 3);
+          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);
+          sprite->y                   = ((value & 0x01) << 8) | (sprite->y & 0x00FF);
         } else {
           sprite->n6                  = value >> 5;
-          sprite->is_pattern_relative = value & 0x01;
           sprite->magnification_x     = 1 << ((value & 0x18) >> 3);
-          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);          
+          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);
+          sprite->is_pattern_relative = value & 0x01;
         }
+        update();
         break;
       }
       /* Fallthrough. */
@@ -187,8 +279,18 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
 }
 
 
+/* TODO: What if the colour behind this index changes behind our back? */
 void sprites_transparency_index_write(u8_t value) {
-  self.transparency_index = value;
+  if (value != self.transparency_index) {
+    self.transparency_index = value;
+    update();
+  }
+}
+
+
+/* TODO: Not sure if sprites use the global transparency colour. */
+void sprites_transparency_colour_write(u8_t rgb) {
+  self.transparency_rgba = PALETTE_UNPACK(rgb);
 }
 
 
@@ -217,4 +319,5 @@ void sprites_next_attribute_set(u8_t value) {
 void sprites_next_pattern_set(u8_t value) {
   self.patterns[self.pattern_index] = value;
   self.pattern_index = (self.pattern_index + 1) & 0x3FFF;
+  update();
 }
