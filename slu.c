@@ -5,6 +5,7 @@
 #include "log.h"
 #include "palette.h"
 #include "slu.h"
+#include "sprites.h"
 #include "tilemap.h"
 #include "ula.h"
 
@@ -261,15 +262,23 @@ u32_t slu_run(u32_t ticks_14mhz) {
   u32_t tick;
   u32_t frame_buffer_row;
   u32_t frame_buffer_column;
+
   int   ula_is_transparent;
   u16_t ula_rgba;
+
   int   tilemap_is_transparent;
   u16_t tilemap_rgba;
+
+  int   sprites_is_transparent;
+  u16_t sprites_rgba;
+
   int   ula_tilemap_is_transparent;
   u16_t ula_tilemap_rgba;
+
   int   layer2_is_transparent;
   u16_t layer2_rgba;
   int   layer2_is_priority;
+
   u16_t rgba;
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
@@ -281,6 +290,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
     }
 
     tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_transparent, &tilemap_rgba);
+    sprites_tick(frame_buffer_row, frame_buffer_column, &sprites_is_transparent, &sprites_rgba);
     layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_is_transparent,  &layer2_rgba, &layer2_is_priority);
 
     /* Mix ULA and tilemap. */
@@ -294,30 +304,73 @@ u32_t slu_run(u32_t ticks_14mhz) {
     /* The default, when no layer specifies a colour. */
     rgba = self.fallback_colour;
 
-    /* TODO: Implement sprite layer. */
     switch (self.layer_priority)
     {
       case E_SLU_LAYER_PRIORITY_SLU:
-      case E_SLU_LAYER_PRIORITY_LSU:
-      case E_SLU_LAYER_PRIORITY_LUS:
-        /* Layer 2 over ULA. */
-        if (!layer2_is_transparent) {
+        if (layer2_is_priority && !layer2_is_transparent) {
+          rgba = layer2_rgba;
+        } else if (!sprites_is_transparent) {
+          rgba = sprites_rgba;
+        } else if (!layer2_is_transparent) {
           rgba = layer2_rgba;
         } else if (!ula_tilemap_is_transparent) {
           rgba = ula_tilemap_rgba;
         }
         break;
+
+      case E_SLU_LAYER_PRIORITY_LSU:
+        if (!layer2_is_transparent) {
+          rgba = layer2_rgba;
+        } else if (!sprites_is_transparent) {
+          rgba = sprites_rgba;
+        } else if (!ula_tilemap_is_transparent) {
+          rgba = ula_tilemap_rgba;
+        }
+        break;
+
+      case E_SLU_LAYER_PRIORITY_LUS:
+        if (!layer2_is_transparent) {
+          rgba = layer2_rgba;
+        } else if (!ula_tilemap_is_transparent) {
+          rgba = ula_tilemap_rgba;
+        } else if (!sprites_is_transparent) {
+          rgba = sprites_rgba;
+        }
+        break;
         
       case E_SLU_LAYER_PRIORITY_SUL:
+        if (layer2_is_priority && !layer2_is_transparent) {
+          rgba = layer2_rgba;
+        } else if (!sprites_is_transparent) {
+          rgba = sprites_rgba;
+        } else if (!ula_tilemap_is_transparent) {
+          rgba = ula_tilemap_rgba;
+        } else if (!layer2_is_transparent) {
+          rgba = layer2_rgba;
+        }
+        break;
+ 
       case E_SLU_LAYER_PRIORITY_USL:
+        if (layer2_is_priority && !layer2_is_transparent) {
+          rgba = layer2_rgba;
+        } else if (!ula_tilemap_is_transparent) {
+          rgba = ula_tilemap_rgba;
+        } else if (!sprites_is_transparent) {
+          rgba = sprites_rgba;
+        } else if (!layer2_is_transparent) {
+          rgba = layer2_rgba;
+        }
+        break;
+
       case E_SLU_LAYER_PRIORITY_ULS:
-        /* ULA over Layer 2. */
-        if (layer2_is_priority) {
+        if (layer2_is_priority && !layer2_is_transparent) {
           rgba = layer2_rgba;
         } else if (!ula_tilemap_is_transparent) {
           rgba = ula_tilemap_rgba;
         } else if (!layer2_is_transparent) {
           rgba = layer2_rgba;
+        } else if (!sprites_is_transparent) {
+          rgba = sprites_rgba;
         }
         break;
 
