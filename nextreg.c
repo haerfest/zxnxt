@@ -739,6 +739,10 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       tilemap_transparency_index_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_SPRITES_TRANSPARENCY_INDEX:
+      sprites_transparency_index_write(value);
+      break;
+
     case E_NEXTREG_REGISTER_ULA_CONTROL:
       ula_control_write(value);
       break;
