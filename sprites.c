@@ -50,7 +50,8 @@ typedef struct {
   int       clip_y1;
   int       clip_y2;
   u8_t      transparency_index;
-  u8_t      slot;
+  u8_t      sprite_index;
+  u16_t     pattern_index;
   u8_t      attribute_index;
   sprite_t* last_anchor;
 } sprites_t;
@@ -192,24 +193,28 @@ void sprites_transparency_index_write(u8_t value) {
 
 
 u8_t sprites_slot_get(void) {
-  return self.slot;
+  return self.sprite_index;
 }
 
 
 void sprites_slot_set(u8_t slot) {
-  self.slot = slot & 0x7F;
+  self.sprite_index  = slot & 0x7F;
+  self.pattern_index = (((slot & 0x3F) << 1) | (slot >> 7)) * 256;
 }
 
 
 void sprites_next_attribute_set(u8_t value) {
-  sprites_attribute_set(self.slot, self.attribute_index, value);
+  sprites_attribute_set(self.sprite_index, self.attribute_index, value);
 
   self.attribute_index++;
-  if (self.attribute_index == 5 || (self.attribute_index == 4 && !self.sprites[self.slot].has_fifth_attribute)) {
+  if (self.attribute_index == 5 || (self.attribute_index == 4 && !self.sprites[self.sprite_index].has_fifth_attribute)) {
     self.attribute_index = 0;
+    self.sprite_index    = (self.sprite_index + 1) & 0x7F;
   }
 }
 
 
 void sprites_next_pattern_set(u8_t value) {
+  self.patterns[self.pattern_index] = value;
+  self.pattern_index = (self.pattern_index + 1) & 0x3FFF;
 }
