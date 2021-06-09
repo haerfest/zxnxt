@@ -146,8 +146,6 @@ void paging_all_ram(u8_t value) {
     {4, 7, 6, 3}
   };
 
-  log_dbg("MEM: ALL RAM %d\n", value);
-
   if (value > 3) {
     log_wrn("paging: invalid all-ram setting %d\n", value);
     return;
