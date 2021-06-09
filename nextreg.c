@@ -248,16 +248,12 @@ static u8_t nextreg_core_boot_read(void) {
 
 
 static u8_t nextreg_peripheral_1_setting_read(void) {
-  /* Always 50 Hz, no scan doubling. */
-  return 0x04;
+  return ula_60hz_get() ? 0x04 : 0x00;
 }
 
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
-  /* Changing display frequency is not supported. */
-  if (value & 0x04) {
-    log_wrn("nextreg: setting display refresh to 60 Hz not supported\n");
-  }
+  ula_60hz_set(value & 0x04);
 }
 
 

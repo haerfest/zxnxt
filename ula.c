@@ -239,6 +239,8 @@ typedef struct {
   u8_t                       ula_next_mask_ink;
   u8_t                       ula_next_mask_paper;
   int                        is_ula_next_mode;
+  int                        is_60hz;
+  int                        is_60hz_requested;
 } self_t;
 
 
@@ -276,7 +278,8 @@ static void ula_display_reconfigure(void) {
 
   /* Remember the requested mode in case we honor it in bank 5. */
   self.display_mode = self.display_mode_requested;
-  self.display_spec = &ula_display_spec[self.display_timing][0];
+  self.is_60hz      = self.is_60hz_requested;
+  self.display_spec = &ula_display_spec[self.display_timing][self.is_60hz & 1];
 
   /* Use the effective mode, which depends on the actual bank. */
   switch (mode) {
@@ -690,4 +693,17 @@ void ula_attribute_byte_format_write(u8_t value) {
 
 void ula_next_mode_enable(int do_enable) {
   self.is_ula_next_mode = do_enable;
+}
+
+
+void ula_60hz_set(int enable) {
+  if (self.is_60hz != enable) {
+    self.is_60hz_requested       = enable;
+    self.did_display_spec_change = 1;
+  }
+}
+
+
+int ula_60hz_get(void) {
+  return self.is_60hz;
 }

@@ -47,6 +47,8 @@ int                  ula_tick(u32_t beam_row, u32_t beam_column, int* is_transpa
 void                 ula_transparency_colour_write(u8_t rgb);
 void                 ula_attribute_byte_format_write(u8_t value);
 void                 ula_next_mode_enable(int do_enable);
+void                 ula_60hz_set(int enable);
+int                  ula_60hz_get(void);
 
 
 #endif  /* __ULA_H */
