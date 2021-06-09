@@ -16,6 +16,7 @@
 #include "palette.h"
 #include "paging.h"
 #include "slu.h"
+#include "sprites.h"
 #include "tilemap.h"
 #include "rom.h"
 #include "ula.h"
@@ -71,6 +72,7 @@ typedef struct {
   int                      is_hotkey_cpu_speed_enabled;
   int                      is_hotkey_nmi_multiface_enabled;
   int                      is_hotkey_nmi_divmmc_enabled;
+  u8_t                     sprite_number;
 } nextreg_t;
 
 
@@ -315,6 +317,10 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
   nextreg_ay_configure(E_NEXTREG_AY_1);
   nextreg_ay_configure(E_NEXTREG_AY_2);
   nextreg_ay_configure(E_NEXTREG_AY_3);
+
+  if (value & 0x01) {
+    log_wrn("nextreg: sprites lockstep not implemented yet\n");
+  }
 }
 
 
@@ -556,8 +562,11 @@ static u8_t nextreg_sprite_layers_system_read(void) {
 
 
 void nextreg_sprite_layers_system_write(u8_t value) {
-  /* TODO: Implement other bits in this register. */
   slu_layer_priority_set((value & 0x1C) >> 2);
+  sprites_priority_set(value & 0x40);
+  sprites_enable_clipping_over_border_set(value & 0x20);
+  sprites_enable_over_border_set(value & 0x02);
+  sprites_enable_set(value & 0x01);
 }
 
 
@@ -758,6 +767,27 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT:
       ula_attribute_byte_format_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_SPRITE_NUMBER:
+      self.sprite_number = value & 0x7F;
+      break;
+
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_1:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4:
+      sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0, value);
+      break;
+
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_1_POST_INCREMENT:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2_POST_INCREMENT:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3_POST_INCREMENT:
+    case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4_POST_INCREMENT:
+      sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
+      self.sprite_number = (self.sprite_number + 1) & 0x7F;
       break;
 
     default:
