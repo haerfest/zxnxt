@@ -25,6 +25,7 @@ typedef struct {
   int   clip_y1;
   int   clip_y2;
   u8_t  transparency_index;
+  u8_t  number;
 } sprites_t;
 
 
@@ -91,4 +92,22 @@ void sprites_attribute_set(u8_t number, int attribute, u8_t value) {
 
 void sprites_transparency_index_write(u8_t value) {
   self.transparency_index = value;
+}
+
+
+u8_t sprites_number_get(void) {
+  return self.number;
+}
+
+
+void sprites_number_set(u8_t number) {
+  self.number = number & 0x7F;
+}
+
+
+void sprites_next_attribute_set(u8_t value) {
+}
+
+
+void sprites_next_pattern_set(u8_t value) {
 }

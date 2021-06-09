@@ -73,6 +73,7 @@ typedef struct {
   int                      is_hotkey_nmi_multiface_enabled;
   int                      is_hotkey_nmi_divmmc_enabled;
   u8_t                     sprite_number;
+  int                      is_sprites_lockstepped;
 } nextreg_t;
 
 
@@ -318,8 +319,9 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
   nextreg_ay_configure(E_NEXTREG_AY_2);
   nextreg_ay_configure(E_NEXTREG_AY_3);
 
-  if (value & 0x01) {
-    log_wrn("nextreg: sprites lockstep not implemented yet\n");
+  self.is_sprites_lockstepped = value & 0x10;
+  if (self.is_sprites_lockstepped) {
+    self.sprite_number = sprites_number_get();
   }
 }
 
@@ -770,7 +772,11 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_SPRITE_NUMBER:
-      self.sprite_number = value & 0x7F;
+      if (self.is_sprites_lockstepped) {
+        io_write(0x303B, value);
+      } else {
+        self.sprite_number = value & 0x7F;
+      }
       break;
 
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0:
@@ -778,7 +784,11 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4:
-      sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0, value);
+      if (self.is_sprites_lockstepped) {
+        io_write(0x57, value);
+      } else {
+        sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0, value);
+      }
       break;
 
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT:
@@ -786,8 +796,13 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2_POST_INCREMENT:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3_POST_INCREMENT:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4_POST_INCREMENT:
-      sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
-      self.sprite_number = (self.sprite_number + 1) & 0x7F;
+      if (self.is_sprites_lockstepped) {
+        io_write(0x57, value);
+        io_write(0x303B, self.sprite_number + 1);
+      } else {
+        sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
+        self.sprite_number = (self.sprite_number + 1) & 0x7F;
+      }
       break;
 
     default:
