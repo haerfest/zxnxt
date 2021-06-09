@@ -20,6 +20,7 @@
 #include "mf.h"
 #include "mmu.h"
 #include "nextreg.h"
+#include "sprites.h"
 #include "paging.h"
 #include "palette.h"
 #include "rom.h"
@@ -267,8 +268,12 @@ static int main_init(void) {
     goto exit_layer2;
   }
 
-  if (slu_init(self.renderer, self.texture) != 0) {
+  if (sprites_init() != 0) {
     goto exit_tilemap;
+  }
+
+  if (slu_init(self.renderer, self.texture) != 0) {
+    goto exit_sprites;
   }
 
   if (cpu_init() != 0) {
@@ -281,6 +286,8 @@ static int main_init(void) {
 
 exit_slu:
   slu_finit();
+exit_sprites:
+  sprites_finit();
 exit_tilemap:
   tilemap_finit();
 exit_layer2:
@@ -495,6 +502,7 @@ static void main_eventloop(void) {
 static void main_finit(void) {
   cpu_finit();
   slu_finit();
+  sprites_finit();
   tilemap_finit();
   layer2_finit();
   ula_finit();
