@@ -9,9 +9,10 @@
 
 typedef struct {
   u8_t          pattern;
+  u8_t          n6;
   int           is_pattern_relative;
-  int           x;
-  int           y;
+  u16_t         x;
+  u16_t         y;
   int           palette_offset;
   int           is_palette_offset_relative;
   int           is_rotated;
@@ -50,6 +51,8 @@ typedef struct {
   int       clip_y2;
   u8_t      transparency_index;
   u8_t      slot;
+  u8_t      attribute_index;
+  sprite_t* last_anchor;
 } sprites_t;
 
 
@@ -122,7 +125,64 @@ void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
 }
 
 
-void sprites_attribute_set(u8_t slot, int attribute, u8_t value) {
+void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
+  sprite_t* sprite = &self.sprites[slot & 0x7F];
+
+  switch (attribute_index) {
+    case 0:
+      sprite->x = (sprite->x & 0xFF00) | value;
+      break;
+
+    case 1:
+      sprite->y = (sprite->y & 0xFF00) | value;
+      break;
+
+    case 2:
+      sprite->palette_offset             = value >> 4;
+      sprite->is_mirrored_x              = value & 0x08;
+      sprite->is_mirrored_y              = value & 0x04;
+      sprite->is_rotated                 = value & 0x02;
+      sprite->is_palette_offset_relative = value & 0x01;
+      break;
+
+    case 3:
+      sprite->is_visible          = value & 0x80;
+      sprite->has_fifth_attribute = value & 0x40;
+      sprite->pattern             = value & 0x3F;
+
+      if (!sprite->has_fifth_attribute) {
+        sprite->is_4bpp    = 0;
+        sprite->is_anchor  = 1;
+        sprite->is_unified = 0;
+      }
+      break;
+
+    case 4:
+      if (sprite->has_fifth_attribute) {
+        sprite->is_anchor = !((value >> 6) == 0x01);
+        if (sprite->is_anchor) {
+          sprite->is_4bpp             = value & 0x80;
+          sprite->is_unified          = value & 0x20;
+          sprite->magnification_x     = 1 << ((value & 0x18) >> 3);
+          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);
+          sprite->is_pattern_relative = value & 0x01;
+          if (sprite->is_4bpp) {
+            sprite->n6 = (value & 0x40) >> 6;
+          }
+        } else {
+          sprite->n6                  = value >> 5;
+          sprite->is_pattern_relative = value & 0x01;
+          sprite->magnification_x     = 1 << ((value & 0x18) >> 3);
+          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);          
+        }
+        break;
+      }
+      /* Fallthrough. */
+
+    default:
+      log_wrn("sprites: invalid attribute index %d for sprite %d\n", attribute_index, slot & 0x7F);
+      break;
+  }
 }
 
 
@@ -142,6 +202,12 @@ void sprites_slot_set(u8_t slot) {
 
 
 void sprites_next_attribute_set(u8_t value) {
+  sprites_attribute_set(self.slot, self.attribute_index, value);
+
+  self.attribute_index++;
+  if (self.attribute_index == 5 || (self.attribute_index == 4 && !self.sprites[self.slot].has_fifth_attribute)) {
+    self.attribute_index = 0;
+  }
 }
 
 
