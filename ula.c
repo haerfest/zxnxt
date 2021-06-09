@@ -18,21 +18,12 @@ typedef enum {
 } ula_display_mode_t;
 
 
+#define N_DISPLAY_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_ZX_48K + 1)
+#define N_REFRESH_FREQUENCIES  2
+
+
 /**
  * https://wiki.specnext.dev/Refresh_Rates
- *
- * "The 60Hz VGA timing should only be used if the monitor can't do anything
- * under 60Hz, or if the higher 50Hz settings are too annoying due to high
- * speed. But all the relative timing relationships are broken, and programs
- * depending on timing will not display properly, just like with HDMI."
- *
- * Therefore zxnxt only implements VGA 50 Hz timing for the different machine
- * types.
- */
-#define N_DISPLAY_TIMINGS  (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_ZX_48K + 1)
-
-
-/**
  * https://wiki.specnext.dev/Reference_machines.
  *
  * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/blob/master/cores/zxnext/src/video/zxula_timing.vhd
@@ -43,8 +34,9 @@ typedef enum {
  * tables below have been adjusted for this, such that (0, 0) is the first
  * pixel of the generated display, i.e. borders included.
  *
- * Note that zxnxt only implements the exactly-28 MHz VGA 50 Hz timings, as
- * that is how the machine is supposed to run.
+ * Note that zxnxt only implements the "VGA 0" machine timings, where the
+ * master clock is exaclty 28 MHz, as that is how the machine is supposed to
+ * run. Both display refresh rates of 50 Hz and 60 Hz are supported.
  */
 typedef struct {
   unsigned int rows;                   /** Number of rows.                 */
@@ -56,7 +48,7 @@ typedef struct {
 } ula_display_spec_t;
 
 
-const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
+const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCIES] = {
   /**
    * Note:
    * - X marks the spot of the vertical blank interrupt.
@@ -64,83 +56,119 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
    *   frame buffer is generated in "half pixel" (horizontally), we have
    *   to multiply the columns by two.
    *
-   * VGA, ZX 48K, 50 Hz:
+   * VGA, ZX 48K, 50 Hz:                                 60 Hz:
    *
-   *     0                256      320      416      448
-   *   0 +----------------+--------+--------+--------+
-   *     | 192  content   | border | hblank | border |
-   *     |        256     |   64   |   96   |   32   |
-   * 192 +----------------+                          |
-   *     |  56  border                               |
-   * 248 X-----------------                          |
-   *     |   8  vblank                               |
-   * 256 +-----------------                          |
-   *     |  56  border                               |
-   * 312 +-------------------------------------------+
+   *     0                256      320      416      448     0                256      320      416      448
+   *   0 +----------------+--------+--------+--------+     0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |       | 192  content   | border | hblank | border |
+   *     |        256     |   64   |   96   |   32   |       |        256     |   64   |   96   |   32   |
+   * 192 +----------------+                          |   192 +----------------+                          |
+   *     |  56  border                               |       |  32  border                               |
+   * 248 X-----------------                          |   224 X-----------------                          |
+   *     |   8  vblank                               |       |   8  vblank                               |
+   * 256 +-----------------                          |   232 +-----------------                          |
+   *     |  56  border                               |       |  32  border                               |
+   * 312 +-------------------------------------------+   264 +-------------------------------------------+
    *
    * Also note that the display is generated in "half pixel" units (see
    * FRAME_BUFFER_{WIDTH,HEIGHT}), hence the macro.
    */
   {
-    .rows               = 312,
-    .columns            = 448       * 2,
-    .row_border_top     = 56 - 32,
-    .column_border_left = 0         * 2,
-    .row_irq            = 56 + 248,
-    .column_irq         = (32 + 0)  * 2,
+    /* 50 Hz */
+    {
+      .rows               = 312,
+      .columns            = 448       * 2,
+      .row_border_top     = 56 - 32,
+      .column_border_left = 0         * 2,
+      .row_irq            = 56 + 248,
+      .column_irq         = (32 + 0)  * 2,
+    },
+    /* 60 Hz */
+    {
+      .rows               = 264,
+      .columns            = 448       * 2,
+      .row_border_top     = 32 - 32,
+      .column_border_left = 0         * 2,
+      .row_irq            = 32 + 224,
+      .column_irq         = (32 + 0)  * 2,
+    },
   },
 
   /**
-   * VGA, ZX 128K, 50 Hz:
+   * VGA, ZX 128K, 50 Hz:                                60 Hz:
    *
-   *     0                256      320      416      456
-   *   0 +----------------+--------+--------+--------+
-   *     | 192  content   | border | hblank | border |
-   *     |        256     |   64   |   96   |   40   |
-   * 192 +----------------+                          |
-   *     |  56  border                               |
-   * 248 +---X------------- (at horizontal pos 4)    |
-   *     |   8  vblank                               |
-   * 256 +-----------------                          |
-   *     |  55  border                               |
-   * 311 +-------------------------------------------+
+   *     0                256      320      416      456     0                256      320      416      456
+   *   0 +----------------+--------+--------+--------+     0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |       | 192  content   | border | hblank | border |
+   *     |        256     |   64   |   96   |   40   |       |        256     |   64   |   96   |   40   |
+   * 192 +----------------+                          |   192 +----------------+                          |
+   *     |  56  border                               |       |  32  border                               |
+   * 248 +---X------------- (at horizontal pos 4)    |   224 +---X------------- (at horizontal pos 4)    |
+   *     |   8  vblank                               |       |   8  vblank                               |
+   * 256 +-----------------                          |   232 +-----------------                          |
+   *     |  55  border                               |       |  32  border                               |
+   * 311 +-------------------------------------------+   264 +-------------------------------------------+
    */
   {
-    .rows               = 311,
-    .columns            = 456       * 2,
-    .row_border_top     = 55 - 32,
-    .column_border_left = (40 - 32) * 2,
-    .row_irq            = 55 + 248,
-    .column_irq         = (40 + 4)  * 2
+    /* 50 Hz */
+    {
+      .rows               = 311,
+      .columns            = 456       * 2,
+      .row_border_top     = 55 - 32,
+      .column_border_left = (40 - 32) * 2,
+      .row_irq            = 55 + 248,
+      .column_irq         = (40 + 4)  * 2
+    },
+    /* 60 Hz */
+    {
+      .rows               = 264,
+      .columns            = 456       * 2,
+      .row_border_top     = 32 - 32,
+      .column_border_left = (40 - 32) * 2,
+      .row_irq            = 32 + 224,
+      .column_irq         = (40 + 4)  * 2
+    }
   },
 
   /**
-   * VGA, +3, 50 Hz:
+   * VGA, +3, 50 Hz:                                     60 Hz:
    *
-   *     0                256      320      416      456
-   *   0 +----------------+--------+--------+--------+
-   *     | 192  content   | border | hblank | border |
-   *     |        256     |   64   |   96   |   40   |
-   * 192 +----------------+                          |
-   *     |  56  border                               |
-   * 248 +-X--------------- (at horizontal pos 2)    |
-   *     |   8  vblank                               |
-   * 256 +-----------------                          |
-   *     |  55  border                               |
-   * 311 +-------------------------------------------+
+   *     0                256      320      416      456     0                256      320      416      456
+   *   0 +----------------+--------+--------+--------+     0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |       | 192  content   | border | hblank | border |
+   *     |        256     |   64   |   96   |   40   |       |        256     |   64   |   96   |   40   |
+   * 192 +----------------+                          |   192 +----------------+                          |
+   *     |  56  border                               |       |  32  border                               |
+   * 248 +-X--------------- (at horizontal pos 2)    |   224 +-X--------------- (at horizontal pos 2)    |
+   *     |   8  vblank                               |       |   8  vblank                               |
+   * 256 +-----------------                          |   256 +-----------------                          |
+   *     |  55  border                               |       |  32  border                               |
+   * 311 +-------------------------------------------+   264 +-------------------------------------------+
    */
   {
-    .rows               = 311,
-    .columns            = 456       * 2,
-    .row_border_top     = 55 - 32,
-    .column_border_left = (40 - 32) * 2,
-    .row_irq            = 55 + 248,
-    .column_irq         = (40 + 2)  * 2
+    /* 50 Hz */
+    {
+      .rows               = 311,
+      .columns            = 456       * 2,
+      .row_border_top     = 55 - 32,
+      .column_border_left = (40 - 32) * 2,
+      .row_irq            = 55 + 248,
+      .column_irq         = (40 + 2)  * 2
+    },
+    /* 60 Hz */
+    {
+      .rows               = 264,
+      .columns            = 456       * 2,
+      .row_border_top     = 32 - 32,
+      .column_border_left = (40 - 32) * 2,
+      .row_irq            = 32 + 224,
+      .column_irq         = (40 + 2)  * 2
+    }
   },
 
   /**
    *
-   * VGA, Pentagon, 50 Hz:
+   * VGA, Pentagon, 50 Hz only:
    *
    *     0                256      336      400      448
    *   0 +----------------+--------+--------+--------+
@@ -155,13 +183,25 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS] = {
    * 320 +-------------------------------------------+
    */
   {
-    .rows               = 320,
-    .columns            = 448        * 2,
-    .row_border_top     = 64 - 32,
-    .column_border_left = (48 - 32)  * 2,
-    .row_irq            = 64 + 239,
-    .column_irq         = (48 + 323) * 2
-  }
+    {
+      /* 50 Hz */
+      .rows               = 320,
+      .columns            = 448        * 2,
+      .row_border_top     = 64 - 32,
+      .column_border_left = (48 - 32)  * 2,
+      .row_irq            = 64 + 239,
+      .column_irq         = (48 + 323) * 2
+    },
+    {
+      /* 60 Hz = 50 Hz */
+      .rows               = 320,
+      .columns            = 448        * 2,
+      .row_border_top     = 64 - 32,
+      .column_border_left = (48 - 32)  * 2,
+      .row_irq            = 64 + 239,
+      .column_irq         = (48 + 323) * 2
+    }
+  }    
 };
 
 
@@ -236,7 +276,7 @@ static void ula_display_reconfigure(void) {
 
   /* Remember the requested mode in case we honor it in bank 5. */
   self.display_mode = self.display_mode_requested;
-  self.display_spec = &ula_display_spec[self.display_timing];
+  self.display_spec = &ula_display_spec[self.display_timing][0];
 
   /* Use the effective mode, which depends on the actual bank. */
   switch (mode) {
