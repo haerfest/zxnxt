@@ -230,11 +230,11 @@ void io_write(u16_t address, u8_t value) {
 
     case 0x57:
       sprites_next_attribute_set(value);
-      break;
+      return;
 
     case 0x5B:
       sprites_next_pattern_set(value);
-      break;
+      return;
 
     default:
       break;
@@ -267,7 +267,7 @@ void io_write(u16_t address, u8_t value) {
 
     case 0x303B:
       sprites_slot_set(value);
-      break;
+      return;
  
     case 0x7FFD:
       if (self.is_port_7FFD_enabled) {
