@@ -266,7 +266,7 @@ void io_write(u16_t address, u8_t value) {
       return;
 
     case 0x303B:
-      sprites_number_set(value);
+      sprites_slot_set(value);
       break;
  
     case 0x7FFD:

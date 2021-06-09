@@ -321,7 +321,7 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
 
   self.is_sprites_lockstepped = value & 0x10;
   if (self.is_sprites_lockstepped) {
-    self.sprite_number = sprites_number_get();
+    self.sprite_number = sprites_slot_get();
   }
 }
 

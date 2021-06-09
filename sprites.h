@@ -13,10 +13,10 @@ void sprites_enable_set(int enable);
 void sprites_enable_over_border_set(int enable);
 void sprites_enable_clipping_over_border_set(int enable);
 void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2);
-void sprites_attribute_set(u8_t number, int attribute, u8_t value);
+void sprites_attribute_set(u8_t slot, int attribute, u8_t value);
 void sprites_transparency_index_write(u8_t value);
-u8_t sprites_number_get(void);
-void sprites_number_set(u8_t number);
+u8_t sprites_slot_get(void);
+void sprites_slot_set(u8_t slot);
 void sprites_next_attribute_set(u8_t value);
 void sprites_next_pattern_set(u8_t value);
 
