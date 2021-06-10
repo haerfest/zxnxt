@@ -68,8 +68,8 @@ int sprites_init(void) {
 
   self.patterns       = (u8_t*)     calloc(16, 1024);
   self.sprites        = (sprite_t*) calloc(N_SPRITES, sizeof(sprite_t));
-  self.frame_buffer   = (u16_t*)    malloc(FRAME_BUFFER_WIDTH / 2 * FRAME_BUFFER_HEIGHT * 2);
-  self.is_transparent = (u8_t*)     malloc(FRAME_BUFFER_WIDTH / 2 * FRAME_BUFFER_HEIGHT);
+  self.frame_buffer   = (u16_t*)    malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2) * 2);
+  self.is_transparent = (u8_t*)     malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2));
 
   if (self.patterns == NULL || self.sprites == NULL || self.frame_buffer == NULL || self.is_transparent == NULL) {
     log_err("sprites: out of memory\n");
@@ -104,29 +104,25 @@ void sprites_finit(void) {
 void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
   const size_t offset = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
 
-  if (!self.is_enabled) {
-    *is_transparent = 1;
-    return;
-  }
-
-  if (self.is_transparent[offset]) {
-    *is_transparent = 1;
-    return;
-  }
-
+  *is_transparent = !self.is_enabled || self.is_transparent[offset];
   *rgba           = self.frame_buffer[offset];
-  *is_transparent = *rgba == self.transparency_rgba;
 }
 
 
 static void draw(const sprite_t* sprite, const sprite_t* anchor) {
-  u8_t* pattern;
-  u16_t row;
-  u16_t column;
-  u8_t  index;
+  u8_t*           pattern;
+  u16_t           dr;
+  u16_t           dc;
+  u8_t            index;
   palette_entry_t entry;
-  size_t offset;
-  u16_t  sprite_x;
+  size_t          offset;
+  u16_t           x;
+  u16_t           y;
+  u16_t           sprite_x;
+
+  if (!sprite->is_visible) {
+    return;
+  }
 
   if (!sprite->is_anchor) {
     return;
@@ -134,23 +130,25 @@ static void draw(const sprite_t* sprite, const sprite_t* anchor) {
   if (sprite->is_4bpp) {
     return;
   }
-  if (sprite->is_visible) {
-    return;
-  }
 
   sprite_x = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
 
   pattern = &self.patterns[sprite->pattern * 256];
 
-  for (row = 0; row < 16; row++) {
-    for (column = 0; column < 16; column++) {
+  for (dr = 0; dr < 16; dr++) {
+    for (dc = 0; dc < 16; dc++) {
+      x      = sprite_x  + dc;
+      y      = sprite->y + dr;
+      offset = y * FRAME_BUFFER_WIDTH / 2 + x;
+
+      self.is_transparent[offset] = 1;
+
       index = *pattern++;
       if (index != self.transparency_index) {
-        entry  = palette_read(E_PALETTE_SPRITES_FIRST, index);
-        offset = (sprite->y + row) * FRAME_BUFFER_WIDTH / 2 + sprite_x + column;
+        entry = palette_read(E_PALETTE_SPRITES_FIRST, index);
         if (entry.rgba != self.transparency_rgba) {
           self.frame_buffer[offset]   = entry.rgba;
-          self.is_transparent[offset] = 1;
+          self.is_transparent[offset] = 0;
         }
       }
     }
@@ -168,7 +166,7 @@ static void update(void) {
   }
 
   /* Assume no sprites visible. */
-  memset(self.is_transparent, 1, sizeof(FRAME_BUFFER_WIDTH / 2 * FRAME_BUFFER_HEIGHT));
+  memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
 
   /* Draw the sprites in order. */
   anchor = NULL;
@@ -291,6 +289,7 @@ void sprites_transparency_index_write(u8_t value) {
 /* TODO: Not sure if sprites use the global transparency colour. */
 void sprites_transparency_colour_write(u8_t rgb) {
   self.transparency_rgba = PALETTE_UNPACK(rgb);
+  update();
 }
 
 
