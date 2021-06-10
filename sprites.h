@@ -20,6 +20,7 @@ u8_t sprites_slot_get(void);
 void sprites_slot_set(u8_t slot);
 void sprites_next_attribute_set(u8_t value);
 void sprites_next_pattern_set(u8_t value);
+void sprites_palette_set(int use_second);
 
 
 #endif  /* __SPRITES_H */

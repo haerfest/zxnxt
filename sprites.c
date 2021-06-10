@@ -59,6 +59,7 @@ typedef struct {
   u16_t     pattern_index;
   u8_t      attribute_index;
   int       is_dirty;
+  palette_t palette;
 } sprites_t;
 
 
@@ -152,7 +153,7 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
 
       index = *pattern++;
       if (index != self.transparency_index) {
-        entry = palette_read(E_PALETTE_SPRITES_FIRST, index);
+        entry = palette_read(self.palette, index);
         if (entry.rgba != self.transparency_rgba) {
           self.frame_buffer[offset]   = entry.rgba;
           self.is_transparent[offset] = 0;
@@ -355,4 +356,9 @@ void sprites_next_pattern_set(u8_t value) {
   self.patterns[self.pattern_index] = value;
   self.pattern_index = (self.pattern_index + 1) & 0x3FFF;
   self.is_dirty      = 1;
+}
+
+
+void sprites_palette_set(int use_second) {
+  self.palette = use_second ? E_PALETTE_SPRITES_SECOND : E_PALETTE_SPRITES_FIRST;
 }

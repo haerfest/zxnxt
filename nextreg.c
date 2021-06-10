@@ -477,9 +477,10 @@ static void nextreg_palette_control_write(u8_t value) {
   self.palette_ula                    = (value & 0x02) ? E_PALETTE_ULA_SECOND     : E_PALETTE_ULA_FIRST;
   self.ula_next_mode                  = value & 0x01;
 
-  ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
   ula_next_mode_enable(self.ula_next_mode);
+  ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
   layer2_palette_set(self.palette_layer2 == E_PALETTE_LAYER2_SECOND);
+  sprites_palette_set(self.palette_sprites == E_PALETTE_SPRITES_SECOND);
 }
 
 
