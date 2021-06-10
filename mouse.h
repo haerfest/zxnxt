@@ -11,6 +11,7 @@ u8_t mouse_read_x(void);
 u8_t mouse_read_y(void);
 u8_t mouse_read_buttons(void);
 void mouse_refresh(void);
+void mouse_toggle(void);
 
 
 #endif  /* __MOUSE_H */

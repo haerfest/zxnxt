@@ -434,28 +434,6 @@ static void main_nmi_multiface(void) {
 }
 
 
-static void main_dump_memory(void) {
-  const u16_t pc = cpu_pc_get();
-  FILE*       fp;
-  u32_t       address;
-  char        filename[18 + 1];
-
-  (void) snprintf(filename, sizeof(filename), "memory-PC=%04X.bin", pc);
-  fp = fopen(filename, "wb");
-  if (fp == NULL) {
-    log_err("main: could not open %s for writing\n", filename);
-    return;
-  }
-
-  for (address = 0x0000; address <= 0xFFFF; address++) {
-    fputc(memory_read(address), fp);
-  }
-
-  fclose(fp);
-  log_dbg("main: %s written\n", filename);
-}
-
-
 static void main_handle_function_keys(void) {
   const int key_reset_hard = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_RESET_HARD);
   const int key_reset_soft = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_RESET_SOFT);
@@ -472,7 +450,7 @@ static void main_handle_function_keys(void) {
       if (key_cpu_speed)   main_change_cpu_speed();
       if (key_nmi)         main_nmi_multiface();
       if (key_drive)       main_nmi_divmmc();
-      if (f11)             main_dump_memory();
+      if (f11)             mouse_toggle();
       if (f12)             main_toggle_fullscreen();
 
       /* Prevent auto-repeat from continuous triggering. */
