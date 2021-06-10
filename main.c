@@ -19,6 +19,7 @@
 #include "memory.h"
 #include "mf.h"
 #include "mmu.h"
+#include "mouse.h"
 #include "nextreg.h"
 #include "sprites.h"
 #include "paging.h"
@@ -256,8 +257,12 @@ static int main_init(void) {
     goto exit_clock;
   }
 
-  if (ula_init(sram) != 0) {
+  if (mouse_init() != 0) {
     goto exit_keyboard;
+  }
+
+  if (ula_init(sram) != 0) {
+    goto exit_mouse;
   }
 
   if (layer2_init(sram) != 0) {
@@ -294,6 +299,8 @@ exit_layer2:
   layer2_finit();
 exit_ula:
   ula_finit();
+exit_mouse:
+  mouse_finit();
 exit_keyboard:
   keyboard_finit();
 exit_clock:
@@ -506,6 +513,7 @@ static void main_finit(void) {
   tilemap_finit();
   layer2_finit();
   ula_finit();
+  mouse_finit();
   keyboard_finit();
   clock_finit();
   mf_finit();

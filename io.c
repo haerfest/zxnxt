@@ -10,6 +10,7 @@
 #include "layer2.h"
 #include "log.h"
 #include "mf.h"
+#include "mouse.h"
 #include "paging.h"
 #include "spi.h"
 #include "sprites.h"
@@ -146,6 +147,15 @@ u8_t io_read(u16_t address) {
     case 0xDFFD:
       paging_spectrum_next_bank_extension_read();
       break;
+
+    case 0xFBDF:
+      return mouse_read_x();
+
+    case 0xFFDF:
+      return mouse_read_y();
+
+    case 0xFADF:
+      return mouse_read_buttons();
 
     default:
       break;
