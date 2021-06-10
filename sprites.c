@@ -107,6 +107,8 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   u8_t*           pattern;
   u16_t           dr;
   u16_t           dc;
+  u16_t           dx;
+  u16_t           dy;
   u8_t            index;
   palette_entry_t entry;
   size_t          offset;
@@ -133,13 +135,17 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
 
   for (dr = 0; dr < 16; dr++) {
     for (dc = 0; dc < 16; dc++) {
-      if (sprite->is_mirrored_x) {
-        x = sprite_x + 15 - dc;
-        y = sprite_y + dr;
+      dx = sprite->is_mirrored_x ? 15 - dc : dc;
+      dy = sprite->is_mirrored_y ? 15 - dr : dr;
+
+      if (sprite->is_rotated) {
+        x = sprite_y + dx;
+        y = sprite_x + dy;
       } else {
-        x = sprite_x + dc;
-        y = sprite_y + dr;
+        x = sprite_x + dx;
+        y = sprite_y + dy;
       }
+
       offset = y * FRAME_BUFFER_WIDTH / 2 + x;
 
       self.is_transparent[offset] = 1;
