@@ -153,8 +153,6 @@ static int main_init(void) {
 
   (void) SDL_GameControllerEventState(SDL_ENABLE);
 
-  (void) SDL_ShowCursor(SDL_DISABLE);
-  
   self.keyboard_state       = SDL_GetKeyboardState(NULL);
   self.is_function_key_down = 0;
   self.is_windowed          = 1;
@@ -559,6 +557,7 @@ void main_sync(void) {
   /* Perform these housekeeping tasks in downtime. */
   kempston_refresh();
   keyboard_refresh();
+  mouse_refresh();
   main_handle_function_keys();
 
   if (SDL_QuitRequested()) {
