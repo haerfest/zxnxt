@@ -66,6 +66,43 @@ u8_t io_read(u16_t address) {
     return ula_read(address);
   }
 
+
+  switch (address) {
+    case 0x113B:
+      return i2c_sda_read(address);
+
+    case 0x123B:
+      return layer2_access_read();
+
+    case 0x1FFD:
+      return paging_spectrum_plus_3_paging_read();
+
+    case 0x243B:
+      return nextreg_select_read(address);
+
+    case 0x253B:
+      return nextreg_data_read(address);
+
+    case 0x7FFD:
+      return paging_spectrum_128k_paging_read();
+
+    case 0xDFFD:
+      paging_spectrum_next_bank_extension_read();
+      break;
+
+    case 0xFBDF:
+      return mouse_read_x();
+
+    case 0xFFDF:
+      return mouse_read_y();
+
+    case 0xFADF:
+      return mouse_read_buttons();
+
+    default:
+      break;
+  } 
+
   /* TODO: Bit 14 of address must be set on Plus 3? */
   if ((address & 0x8003) == 0x0001) {
     /* Typically 0x7FFD. */
@@ -124,42 +161,6 @@ u8_t io_read(u16_t address) {
     default:
       break;
   }
-
-  switch (address) {
-    case 0x113B:
-      return i2c_sda_read(address);
-
-    case 0x123B:
-      return layer2_access_read();
-
-    case 0x1FFD:
-      return paging_spectrum_plus_3_paging_read();
-
-    case 0x243B:
-      return nextreg_select_read(address);
-
-    case 0x253B:
-      return nextreg_data_read(address);
-
-    case 0x7FFD:
-      return paging_spectrum_128k_paging_read();
-
-    case 0xDFFD:
-      paging_spectrum_next_bank_extension_read();
-      break;
-
-    case 0xFBDF:
-      return mouse_read_x();
-
-    case 0xFFDF:
-      return mouse_read_y();
-
-    case 0xFADF:
-      return mouse_read_buttons();
-
-    default:
-      break;
-  } 
 
   log_wrn("io: unimplemented read from $%04X\n", address);
 
