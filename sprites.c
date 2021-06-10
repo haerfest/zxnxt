@@ -113,6 +113,7 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   u16_t           x;
   u16_t           y;
   u16_t           sprite_x;
+  u16_t           sprite_y;
 
   if (!sprite->is_visible) {
     return;
@@ -126,13 +127,19 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   }
 
   sprite_x = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
+  sprite_y = sprite->y;
 
   pattern = &self.patterns[sprite->pattern * 256];
 
   for (dr = 0; dr < 16; dr++) {
     for (dc = 0; dc < 16; dc++) {
-      x      = sprite_x  + dc;
-      y      = sprite->y + dr;
+      if (sprite->is_mirrored_x) {
+        x = sprite_x + 15 - dc;
+        y = sprite_y + dr;
+      } else {
+        x = sprite_x + dc;
+        y = sprite_y + dr;
+      }
       offset = y * FRAME_BUFFER_WIDTH / 2 + x;
 
       self.is_transparent[offset] = 1;
@@ -190,7 +197,10 @@ void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
 
 
 void sprites_priority_set(int is_zero_on_top) {
-  self.is_zero_on_top = is_zero_on_top;
+  if (is_zero_on_top != self.is_zero_on_top) {
+    self.is_zero_on_top = is_zero_on_top;
+    self.is_dirty       = 1;
+  }
 }
 
 
@@ -203,16 +213,23 @@ void sprites_enable_set(int enable) {
 
 
 void sprites_enable_over_border_set(int enable) {
-  self.is_enabled_over_border = enable;
+  if (enable != self.is_enabled_over_border) {
+    self.is_enabled_over_border = enable;
+    self.is_dirty               = 1;
+  }
 }
 
 
 void sprites_enable_clipping_over_border_set(int enable) {
-  self.is_enabled_clipping_over_border = enable;
+  if (enable != self.is_enabled_clipping_over_border) {
+    self.is_enabled_clipping_over_border = enable;
+    self.is_dirty                        = 1;
+  }
 }
 
 
 void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
+  /* TODO Implement clipping window. */
   self.clip_x1 = x1;
   self.clip_x2 = x2;
   self.clip_y1 = y1;
