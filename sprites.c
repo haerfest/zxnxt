@@ -9,6 +9,7 @@
 
 
 typedef struct {
+  u8_t          attribute[5];
   u8_t          pattern;
   u8_t          n6;
   int           is_pattern_relative;
@@ -57,6 +58,7 @@ typedef struct {
   u8_t      sprite_index;
   u16_t     pattern_index;
   u8_t      attribute_index;
+  int       is_dirty;
 } sprites_t;
 
 
@@ -101,15 +103,7 @@ void sprites_finit(void) {
 }
 
 
-void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
-  const size_t offset = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
-
-  *is_transparent = !self.is_enabled || self.is_transparent[offset];
-  *rgba           = self.frame_buffer[offset];
-}
-
-
-static void draw(const sprite_t* sprite, const sprite_t* anchor) {
+static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   u8_t*           pattern;
   u16_t           dr;
   u16_t           dc;
@@ -156,14 +150,10 @@ static void draw(const sprite_t* sprite, const sprite_t* anchor) {
 }
 
 
-static void update(void) {
+static void draw_sprites(void) {
   sprite_t* sprite;
   sprite_t* anchor;
   size_t    i;
-
-  if (!self.is_enabled) {
-    return;
-  }
 
   /* Assume no sprites visible. */
   memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
@@ -175,8 +165,27 @@ static void update(void) {
     if (sprite->is_anchor) {
       anchor = sprite;
     }
-    draw(sprite, anchor);
+    draw_sprite(sprite, anchor);
   }
+}
+
+
+void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
+  size_t offset;
+
+  if (!self.is_enabled) {
+    *is_transparent = 1;
+    return;
+  }
+
+  if (self.is_dirty) {
+    draw_sprites();
+    self.is_dirty = 0;
+  }
+
+  offset          = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
+  *is_transparent = !self.is_enabled || self.is_transparent[offset];
+  *rgba           = self.frame_buffer[offset];
 }
 
 
@@ -188,7 +197,7 @@ void sprites_priority_set(int is_zero_on_top) {
 void sprites_enable_set(int enable) {
   if (enable != self.is_enabled) {
     self.is_enabled = enable;
-    update();
+    self.is_dirty   = 1;
   }
 }
 
@@ -211,18 +220,27 @@ void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
 }
 
 
-void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
+void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
   sprite_t* sprite = &self.sprites[slot & 0x7F];
+
+  if (attribute_index > 4) {
+    return;
+  }
+
+  if (value == sprite->attribute[attribute_index]) {
+    return;
+  }
+
+  sprite->attribute[attribute_index] = value;
+  self.is_dirty                      = 1;
 
   switch (attribute_index) {
     case 0:
       sprite->x = (sprite->x & 0xFF00) | value;
-      update();
       break;
 
     case 1:
       sprite->y = (sprite->y & 0xFF00) | value;
-      update();
       break;
 
     case 2:
@@ -231,20 +249,18 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
       sprite->is_mirrored_y              = value & 0x04;
       sprite->is_rotated                 = value & 0x02;
       sprite->is_palette_offset_relative = value & 0x01;
-      update();            
       break;
 
     case 3:
       sprite->is_visible          = value & 0x80;
       sprite->has_fifth_attribute = value & 0x40;
       sprite->pattern             = value & 0x3F;
-
+        
       if (!sprite->has_fifth_attribute) {
         sprite->is_4bpp    = 0;
         sprite->is_anchor  = 1;
         sprite->is_unified = 0;
       }
-      update();
       break;
 
     case 4:
@@ -265,13 +281,7 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
           sprite->magnification_y     = 1 << ((value & 0x06) >> 1);
           sprite->is_pattern_relative = value & 0x01;
         }
-        update();
-        break;
       }
-      /* Fallthrough. */
-
-    default:
-      log_wrn("sprites: invalid attribute index %d for sprite %d\n", attribute_index, slot & 0x7F);
       break;
   }
 }
@@ -281,15 +291,18 @@ void sprites_attribute_set(u8_t slot, int attribute_index, u8_t value) {
 void sprites_transparency_index_write(u8_t value) {
   if (value != self.transparency_index) {
     self.transparency_index = value;
-    update();
+    self.is_dirty           = 1;
   }
 }
 
 
 /* TODO: Not sure if sprites use the global transparency colour. */
 void sprites_transparency_colour_write(u8_t rgb) {
-  self.transparency_rgba = PALETTE_UNPACK(rgb);
-  update();
+  const u16_t rgba = PALETTE_UNPACK(rgb);
+  if (rgba != self.transparency_rgba) {
+    self.transparency_rgba = rgba;
+    self.is_dirty          = 1;
+  }
 }
 
 
@@ -318,5 +331,5 @@ void sprites_next_attribute_set(u8_t value) {
 void sprites_next_pattern_set(u8_t value) {
   self.patterns[self.pattern_index] = value;
   self.pattern_index = (self.pattern_index + 1) & 0x3FFF;
-  update();
+  self.is_dirty      = 1;
 }
