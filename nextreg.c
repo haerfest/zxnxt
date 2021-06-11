@@ -559,8 +559,11 @@ static void nextreg_internal_port_decoding_3_write(u8_t value) {
 
 
 static u8_t nextreg_sprite_layers_system_read(void) {
-  /* TODO: Implement other bits in this register. */
-  return slu_layer_priority_get() << 2;
+  return (slu_layer_priority_get() << 2)                      |
+    (sprites_priority_get()                    ? 0x40 : 0x00) |
+    (sprites_enable_clipping_over_border_get() ? 0x20 : 0x00) |
+    (sprites_enable_over_border_get()          ? 0x02 : 0x00) |
+    (sprites_enable_get()                      ? 0x01 : 0x00);
 }
 
 

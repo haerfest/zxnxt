@@ -193,6 +193,11 @@ void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
 }
 
 
+int sprites_priority_get(void) {
+  return self.is_zero_on_top;
+}
+
+
 void sprites_priority_set(int is_zero_on_top) {
   if (is_zero_on_top != self.is_zero_on_top) {
     self.is_zero_on_top = is_zero_on_top;
@@ -201,11 +206,21 @@ void sprites_priority_set(int is_zero_on_top) {
 }
 
 
+int sprites_enable_get(void) {
+  return self.is_enabled;
+}
+
+
 void sprites_enable_set(int enable) {
   if (enable != self.is_enabled) {
     self.is_enabled = enable;
-    self.is_dirty   = 1;
+    self.is_dirty   = enable;
   }
+}
+
+
+int sprites_enable_over_border_get(void) {
+  return self.is_enabled_over_border;
 }
 
 
@@ -214,6 +229,11 @@ void sprites_enable_over_border_set(int enable) {
     self.is_enabled_over_border = enable;
     self.is_dirty               = 1;
   }
+}
+
+
+int sprites_enable_clipping_over_border_get(void) {
+  return self.is_enabled_clipping_over_border;
 }
 
 
