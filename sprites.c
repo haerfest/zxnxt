@@ -10,9 +10,9 @@
 
 typedef struct {
   u8_t          attribute[5];
-  u8_t          pattern;
+  u8_t          pattern_index;
   u8_t          n6;
-  int           is_pattern_relative;
+  int           is_pattern_index_relative;
   u16_t         x;
   u16_t         y;
   int           palette_offset;
@@ -115,22 +115,35 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   size_t          offset;
   u16_t           sprite_x;
   u16_t           sprite_y;
+  u8_t            palette_offset;
+  u8_t            pattern_index;
+  int             is_anchor;
 
-  if (!sprite->is_visible) {
+  /* Always let 'anchor' point to an anchor. */
+  if (sprite->is_anchor || anchor == NULL) {
+    anchor    = sprite;
+    is_anchor = 1;
+  } else {
+    is_anchor = 0;
+  }
+
+  if (!anchor->is_visible) {
     return;
   }
 
-  if (!sprite->is_anchor) {
-    return;
-  }
-  if (sprite->is_4bpp) {
-    return;
+  sprite_x       = (anchor->x & 0x00FF) | (anchor->is_palette_offset_relative << 8);
+  sprite_y       = anchor->y;
+  palette_offset = anchor->palette_offset;
+  pattern_index  = anchor->pattern_index;
+  
+  if (!is_anchor) {
+    sprite_x += (s8_t) sprite->x;
+    sprite_y += (s8_t) sprite->y;
+    palette_offset = sprite->is_palette_offset_relative ? (palette_offset + sprite->palette_offset) : sprite->palette_offset;
+    pattern_index  = sprite->is_pattern_index_relative  ? (pattern_index  + sprite->pattern_index ) : sprite->pattern_index;
   }
 
-  sprite_x = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
-  sprite_y = sprite->y;
-
-  pattern = &self.patterns[sprite->pattern * 256];
+  pattern = &self.patterns[pattern_index * 256];
 
   for (dr = 0; dr < 16; dr++) {
     for (dc = 0; dc < 16; dc++) {
@@ -141,14 +154,22 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
 
       offset = (sprite_y + dy) * FRAME_BUFFER_WIDTH / 2 + (sprite_x + dx);
 
-      index = *pattern++;
-      if (index != self.transparency_index) {
-        entry = palette_read(self.palette, index);
-        if (entry.rgba != self.transparency_rgba) {
-          self.frame_buffer[offset]   = entry.rgba;
-          self.is_transparent[offset] = 0;
-        }
+      index  = *pattern++;
+      index += palette_offset << 8;
+
+      if (index == self.transparency_index) {
+        continue;
       }
+
+      entry = palette_read(self.palette, index);
+#if 0
+      if (entry.rgba == self.transparency_rgba) {
+        continue;
+      }
+#endif
+
+      self.frame_buffer[offset]   = entry.rgba;
+      self.is_transparent[offset] = 0;
     }
   }
 }
@@ -166,10 +187,10 @@ static void draw_sprites(void) {
   anchor = NULL;
   for (i = 0; i < 128; i++) {
     sprite = &self.sprites[i];
+    draw_sprite(sprite, anchor);
     if (sprite->is_anchor) {
       anchor = sprite;
     }
-    draw_sprite(sprite, anchor);
   }
 }
 
@@ -288,7 +309,7 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
     case 3:
       sprite->is_visible          = value & 0x80;
       sprite->has_fifth_attribute = value & 0x40;
-      sprite->pattern             = value & 0x3F;
+      sprite->pattern_index       = value & 0x3F;
         
       if (!sprite->has_fifth_attribute) {
         sprite->is_4bpp    = 0;
@@ -305,15 +326,15 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
           if (sprite->is_4bpp) {
             sprite->n6 = (value & 0x40) >> 6;
           }
-          sprite->is_unified          = value & 0x20;
-          sprite->magnification_x     = 1 << ((value & 0x18) >> 3);
-          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);
-          sprite->y                   = ((value & 0x01) << 8) | (sprite->y & 0x00FF);
+          sprite->is_unified      = value & 0x20;
+          sprite->magnification_x = 1 << ((value & 0x18) >> 3);
+          sprite->magnification_y = 1 << ((value & 0x06) >> 1);
+          sprite->y               = ((value & 0x01) << 8) | (sprite->y & 0x00FF);
         } else {
-          sprite->n6                  = value >> 5;
-          sprite->magnification_x     = 1 << ((value & 0x18) >> 3);
-          sprite->magnification_y     = 1 << ((value & 0x06) >> 1);
-          sprite->is_pattern_relative = value & 0x01;
+          sprite->n6                        = value >> 5;
+          sprite->magnification_x           = 1 << ((value & 0x18) >> 3);
+          sprite->magnification_y           = 1 << ((value & 0x06) >> 1);
+          sprite->is_pattern_index_relative = value & 0x01;
         }
       }
       break;
