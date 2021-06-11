@@ -149,8 +149,6 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
 
       offset = y * FRAME_BUFFER_WIDTH / 2 + x;
 
-      self.is_transparent[offset] = 1;
-
       index = *pattern++;
       if (index != self.transparency_index) {
         entry = palette_read(self.palette, index);
