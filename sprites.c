@@ -9,6 +9,7 @@
 
 
 typedef struct {
+  u8_t          number;
   u8_t          attribute[5];
   u8_t          pattern_index;
   u8_t          n6;
@@ -67,12 +68,18 @@ static sprites_t self;
 
 
 int sprites_init(void) {
+  u8_t number;
+
   memset(&self, 0, sizeof(self));
 
   self.patterns       = (u8_t*)     calloc(16, 1024);
   self.sprites        = (sprite_t*) calloc(N_SPRITES, sizeof(sprite_t));
   self.frame_buffer   = (u16_t*)    malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2) * 2);
   self.is_transparent = (u8_t*)     malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2));
+
+  for (number = 0; number < N_SPRITES; number++) {
+    self.sprites[number].number = number;
+  }
 
   if (self.patterns == NULL || self.sprites == NULL || self.frame_buffer == NULL || self.is_transparent == NULL) {
     log_err("sprites: out of memory\n");
@@ -117,45 +124,53 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   s16_t           sprite_y;
   u8_t            palette_offset;
   u8_t            pattern_index;
-  int             is_anchor;
   u16_t           final_x;
   u16_t           final_y;
+  int             is_4bpp;
 
-  /* TODO: Removing this line gives some garbled sprite when walking to the left
-   * in Night Knight. */
-  if (!sprite->is_anchor) {
+  if (!sprite->is_visible) {
     return;
   }
 
-  /* Always let 'anchor' point to an anchor. */
-  if (sprite->is_anchor || anchor == NULL) {
-    anchor    = sprite;
-    is_anchor = 1;
+  if (!sprite->is_anchor && anchor) {
+    if (!anchor->is_visible) {
+      return;
+    }
+  }
+
+  if (!sprite->is_anchor && anchor) {
+    sprite_x       = ((anchor->is_palette_offset_relative << 8) | (anchor->x & 0x00FF)) + (s8_t) sprite->x;
+    sprite_y       = anchor->y + (s8_t) sprite->y;
+    palette_offset = sprite->is_palette_offset_relative ? (anchor->palette_offset + sprite->palette_offset) : sprite->palette_offset;
+    pattern_index  = sprite->is_pattern_index_relative  ? (anchor->pattern_index  + sprite->pattern_index ) : sprite->pattern_index;
+    is_4bpp        = anchor->is_4bpp;
   } else {
-    is_anchor = 0;
+    sprite_x       = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
+    sprite_y       = sprite->y;
+    palette_offset = sprite->palette_offset;
+    pattern_index  = sprite->pattern_index;
+    is_4bpp        = sprite->is_4bpp;
   }
 
-  if (!anchor->is_visible) {
-    return;
-  }
+#if 0
+  log_wrn("sprites: sprite #%03d %02X %02X %02X %02X %02X is_anchor=%d pattern_index=%03d palette_offset=%d is_4bpp=%d\n",
+          sprite->number,
+          sprite->attribute[0],
+          sprite->attribute[1],
+          sprite->attribute[2],
+          sprite->attribute[3],
+          sprite->attribute[4],
+          sprite->is_anchor,
+          pattern_index,
+          palette_offset,
+          is_4bpp);
+#endif
 
-  sprite_x       = (anchor->x & 0x00FF) | (anchor->is_palette_offset_relative << 8);
-  sprite_y       = anchor->y;
-  palette_offset = anchor->palette_offset;
-  pattern_index  = anchor->pattern_index;
-  
-  if (!is_anchor) {
-    sprite_x += (s8_t) sprite->x;
-    sprite_y += (s8_t) sprite->y;
-    palette_offset = sprite->is_palette_offset_relative ? (palette_offset + sprite->palette_offset) : anchor->palette_offset;
-    pattern_index  = sprite->is_pattern_index_relative  ? (pattern_index  + sprite->pattern_index ) : anchor->pattern_index;
-  }
-
-  if (anchor->is_4bpp) {
-    pattern_index = (pattern_index << 1) | anchor->n6;
-    pattern = &self.patterns[pattern_index * 128];
+  if (is_4bpp) {
+    pattern_index = (pattern_index << 1) | sprite->n6;
+    pattern       = &self.patterns[pattern_index * 128];
   } else {
-    pattern = &self.patterns[pattern_index * 256];
+    pattern       = &self.patterns[pattern_index * 256];
   }
 
   for (dr = 0; dr < 16; dr++) {
@@ -173,9 +188,9 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
       if (final_y >= FRAME_BUFFER_HEIGHT) {
         continue;
       }
-      offset = (sprite_y + dy) * FRAME_BUFFER_WIDTH / 2 + (sprite_x + dx);
+      offset = final_y * FRAME_BUFFER_WIDTH / 2 + final_x;
 
-      if (anchor->is_4bpp) {
+      if (is_4bpp) {
         if (dc & 0x01) {
           index = (*pattern++) & 0x0F;
         } else {
@@ -214,10 +229,10 @@ static void draw_sprites(void) {
   anchor = NULL;
   for (i = 0; i < 128; i++) {
     sprite = &self.sprites[i];
-    draw_sprite(sprite, anchor);
     if (sprite->is_anchor) {
       anchor = sprite;
     }
+    draw_sprite(sprite, anchor);
   }
 }
 
@@ -395,7 +410,7 @@ u8_t sprites_slot_get(void) {
 
 void sprites_slot_set(u8_t slot) {
   self.sprite_index  = slot & 0x7F;
-  self.pattern_index = (((slot & 0x3F) << 1) | (slot >> 7)) * 256;
+  self.pattern_index = (slot & 0x3F) * 256 + (slot & 0x80);
 }
 
 
