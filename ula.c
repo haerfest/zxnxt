@@ -20,7 +20,7 @@ typedef enum {
 
 
 #define N_IRQ_TSTATES          32
-#define N_DISPLAY_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_ZX_48K + 1)
+#define N_DISPLAY_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_CONFIGURATION + 1)
 #define N_REFRESH_FREQUENCIES  2
 
 
@@ -52,7 +52,7 @@ typedef struct {
 } ula_display_spec_t;
 
 
-const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCIES] = {
+const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCIES] = {  
   /**
    * Note:
    * - X marks the spot of the vertical blank interrupt.
@@ -60,6 +60,34 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCI
    *   frame buffer is generated in "half pixel" (horizontally), we have
    *   to multiply the columns by two.
    *
+   * Configuration mode, like ZX 48K further down:
+   */
+  {
+    /* 50 Hz */
+    {
+      .rows         = 312,
+      .columns      = 448             * 2,
+      .hblank_start = (256 + 32)      * 2,
+      .hblank_end   = (256 + 64 + 96) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 56 + 8 + 24,
+      .vsync_row    = 192 + 56,
+      .vsync_column = 0
+    },
+    /* 60 Hz */
+    {
+      .rows         = 264,
+      .columns      = 448             * 2,
+      .hblank_start = (256 + 32)      * 2,
+      .hblank_end   = (256 + 64 + 96) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 32 + 8,
+      .vsync_row    = 192 + 32,
+      .vsync_column = 0
+    }
+  },
+
+  /**
    * VGA, ZX 48K, 50 Hz:                                 60 Hz:
    *
    *     0                256      320      416      448     0                256      320      416      448
