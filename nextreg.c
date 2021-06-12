@@ -831,6 +831,14 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       copper_data_16bit_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_LINE_INTERRUPT_CONTROL:
+      slu_line_interrupt_control_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LINE_INTERRUPT_VALUE_LSB:
+      slu_line_interrupt_value_lsb_write(value);
+      break;
+
     default:
       log_wrn("nextreg: unimplemented write of $%02X to register $%02X\n", value, reg);
       break;
@@ -911,6 +919,12 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_LSB:
       return slu_active_video_line_get() & 0xFF;
+
+    case E_NEXTREG_REGISTER_LINE_INTERRUPT_CONTROL:
+      return slu_line_interrupt_control_read();
+
+    case E_NEXTREG_REGISTER_LINE_INTERRUPT_VALUE_LSB:
+      return slu_line_interrupt_value_lsb_read();
 
     default:
       log_wrn("nextreg: unimplemented read from register $%02X\n", reg);

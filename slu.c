@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <string.h>
 #include "copper.h"
+#include "cpu.h"
 #include "defs.h"
 #include "layer2.h"
 #include "log.h"
@@ -174,6 +175,8 @@ typedef struct {
   u32_t                beam_column;
   int                  is_beam_visible;
   u16_t                fallback_colour;
+  int                  line_irq_enabled;
+  u16_t                line_irq_row;
 } self_t;
 
 
@@ -288,6 +291,10 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
     slu_beam_advance();
+
+    if (self.line_irq_enabled && self.beam_column == 0 && self.beam_row == self.line_irq_row) {
+      cpu_irq(32);
+    }
 
     /* Copper runs at 28 MHz. */
     copper_tick(self.beam_row, self.beam_column);
@@ -413,4 +420,30 @@ slu_layer_priority_t slu_layer_priority_get(void) {
 
 void slu_transparency_fallback_colour_write(u8_t value) {
   self.fallback_colour = PALETTE_UNPACK(value);
+}
+
+
+u8_t slu_line_interrupt_control_read(void) {
+  return (ula_irq_asserted()      ? 0x80 : 0x00) |
+         (!ula_irq_enable_get()   ? 0x04 : 0x00) |
+         (self.line_irq_enabled   ? 0x02 : 0x00) |
+         (self.line_irq_row >> 8);
+}
+
+
+void slu_line_interrupt_control_write(u8_t value) {
+  ula_irq_enable_set(value & 0x04);
+
+  self.line_irq_enabled = value & 0x02;
+  self.line_irq_row     = ((value & 0x01) << 8) | (self.line_irq_row & 0x00FF);
+}
+
+
+u8_t slu_line_interrupt_value_lsb_read(void) {
+  return self.line_irq_row & 0x00FF;
+}
+
+
+void slu_line_interrupt_value_lsb_write(u8_t value) {
+  self.line_irq_row = (self.line_irq_row & 0x0100) | value;
 }

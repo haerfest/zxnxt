@@ -19,6 +19,7 @@ typedef enum {
 } ula_display_mode_t;
 
 
+#define N_IRQ_TSTATES          32
 #define N_DISPLAY_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_ZX_48K + 1)
 #define N_REFRESH_FREQUENCIES  2
 
@@ -246,7 +247,7 @@ typedef struct {
   int                        blink_state;
   s8_t                       audio_last_sample;
   ula_screen_bank_t          screen_bank;
-  int                        timex_disable_ula_interrupt;
+  int                        disable_ula_irq;
   u8_t                       hi_res_ink_colour;
   int                        do_contend;
   u32_t                      ticks_14mhz_after_irq;
@@ -326,8 +327,8 @@ static void ula_display_reconfigure(void) {
 
 
 static void ula_irq(void) {
-  if (!self.timex_disable_ula_interrupt) {
-    cpu_irq(32);
+  if (!self.disable_ula_irq) {
+    cpu_irq(N_IRQ_TSTATES);
   }
 
   copper_irq();
@@ -433,25 +434,25 @@ static void ula_set_display_mode(ula_display_mode_t mode) {
 
 
 int ula_init(u8_t* sram) {
-  self.sram                        = sram;
-  self.screen_bank                 = E_ULA_SCREEN_BANK_5;
-  self.display_timing              = E_ULA_DISPLAY_TIMING_ZX_48K;
-  self.border_colour               = 0;
-  self.speaker_state               = 0;
-  self.palette                     = E_PALETTE_ULA_FIRST;
-  self.clip_x1                     = 0;
-  self.clip_x2                     = 255;
-  self.clip_y1                     = 0;
-  self.clip_y2                     = 191;
-  self.audio_last_sample           = 0;
-  self.timex_disable_ula_interrupt = 0;
-  self.hi_res_ink_colour           = 0;
-  self.is_timex_enabled            = 0;
-  self.is_7mhz_tick                = 1;
-  self.is_enabled                  = 1;
-  self.is_ula_next_mode            = 0;
-  self.ula_next_mask_ink           = 7;
-  self.ula_next_mask_paper         = ~7;
+  self.sram                = sram;
+  self.screen_bank         = E_ULA_SCREEN_BANK_5;
+  self.display_timing      = E_ULA_DISPLAY_TIMING_ZX_48K;
+  self.border_colour       = 0;
+  self.speaker_state       = 0;
+  self.palette             = E_PALETTE_ULA_FIRST;
+  self.clip_x1             = 0;
+  self.clip_x2             = 255;
+  self.clip_y1             = 0;
+  self.clip_y2             = 191;
+  self.audio_last_sample   = 0;
+  self.disable_ula_irq     = 0;
+  self.hi_res_ink_colour   = 0;
+  self.is_timex_enabled    = 0;
+  self.is_7mhz_tick        = 1;
+  self.is_enabled          = 1;
+  self.is_ula_next_mode    = 0;
+  self.ula_next_mask_ink   = 7;
+  self.ula_next_mask_paper = ~7;
 
   ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
   ula_display_reconfigure();
@@ -487,8 +488,8 @@ void ula_timex_video_mode_read_enable(int do_enable) {
 
 u8_t ula_timex_read(u16_t address) {
   if (self.is_timex_enabled) {
-    return self.timex_disable_ula_interrupt << 6
-         | self.hi_res_ink_colour           << 3
+    return self.disable_ula_irq   << 6
+         | self.hi_res_ink_colour << 3
          | self.display_mode;
   }
 
@@ -505,8 +506,8 @@ u8_t ula_timex_read(u16_t address) {
 
 
 void ula_timex_write(u16_t address, u8_t value) {
-  self.timex_disable_ula_interrupt = (value & 0x40) >> 6;
-  self.hi_res_ink_colour           = (value & 0x38) >> 3;
+  self.disable_ula_irq   = (value & 0x40) >> 6;
+  self.hi_res_ink_colour = (value & 0x38) >> 3;
 
   switch (value & 0x07) {
     case 0x00:
@@ -717,4 +718,19 @@ void ula_60hz_set(int enable) {
 
 int ula_60hz_get(void) {
   return self.is_60hz;
+}
+
+
+int ula_irq_enable_get(void) {
+  return !self.disable_ula_irq;
+}
+
+
+void ula_irq_enable_set(int enable) {
+  self.disable_ula_irq = !enable;
+}
+
+
+int ula_irq_asserted(void) {
+  return self.ticks_14mhz_after_irq < N_IRQ_TSTATES * 4;
 }
