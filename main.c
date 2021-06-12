@@ -5,6 +5,7 @@
 #include "bootrom.h"
 #include "clock.h"
 #include "config.h"
+#include "copper.h"
 #include "cpu.h"
 #include "dac.h"
 #include "dma.h"
@@ -279,14 +280,20 @@ static int main_init(void) {
     goto exit_sprites;
   }
 
-  if (cpu_init() != 0) {
+  if (copper_init() != 0) {
     goto exit_slu;
+  }
+
+  if (cpu_init() != 0) {
+    goto exit_copper;
   }
 
   memory_refresh_accessors(0, 8);
 
   return 0;
 
+exit_copper:
+  copper_finit();
 exit_slu:
   slu_finit();
 exit_sprites:
@@ -484,6 +491,7 @@ static void main_eventloop(void) {
 
 static void main_finit(void) {
   cpu_finit();
+  copper_finit();
   slu_finit();
   sprites_finit();
   tilemap_finit();

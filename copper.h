@@ -2,7 +2,7 @@
 #define __COPPER_H
 
 
-void copper_init(void);
+int  copper_init(void);
 void copper_finit(void);
 void copper_data_8bit_write(u8_t value);
 void copper_data_16bit_write(u8_t value);
