@@ -1,6 +1,7 @@
 #include <time.h>
 #include "audio.h"
 #include "clock.h"
+#include "copper.h"
 #include "cpu.h"
 #include "defs.h"
 #include "keyboard.h"
@@ -39,12 +40,14 @@ typedef enum {
  * run. Both display refresh rates of 50 Hz and 60 Hz are supported.
  */
 typedef struct {
-  unsigned int rows;                   /** Number of rows.                 */
-  unsigned int columns;                /** Number of columns.              */
-  unsigned int row_border_top;         /** Start row of top border.        */
-  unsigned int column_border_left;     /** Start column of left border.    */
-  unsigned int row_irq;                /** Row where IRQ triggers.         */
-  unsigned int column_irq;             /** Column where IRQ triggers.      */
+  unsigned int rows;                   /** Number of rows.                  */
+  unsigned int columns;                /** Number of columns.               */
+  unsigned int hblank_start;           /** Column where HBLANK starts.      */
+  unsigned int hblank_end;             /** Column where HBLANK ends.        */
+  unsigned int vblank_start;           /** Row where VBLANK starts.         */
+  unsigned int vblank_end;             /** Row where VBLANK ends.           */
+  unsigned int vsync_row;              /** Row where VSYNC IRQ triggers.    */
+  unsigned int vsync_column;           /** Column where VSYNC IRQ triggers. */
 } ula_display_spec_t;
 
 
@@ -76,21 +79,25 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCI
   {
     /* 50 Hz */
     {
-      .rows               = 312,
-      .columns            = 448       * 2,
-      .row_border_top     = 56 - 32,
-      .column_border_left = 0         * 2,
-      .row_irq            = 56 + 248,
-      .column_irq         = (32 + 0)  * 2,
+      .rows         = 312,
+      .columns      = 448             * 2,
+      .hblank_start = (256 + 32)      * 2,
+      .hblank_end   = (256 + 64 + 96) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 56 + 8 + 24,
+      .vsync_row    = 192 + 56,
+      .vsync_column = 0 
     },
     /* 60 Hz */
     {
-      .rows               = 264,
-      .columns            = 448       * 2,
-      .row_border_top     = 32 - 32,
-      .column_border_left = 0         * 2,
-      .row_irq            = 32 + 224,
-      .column_irq         = (32 + 0)  * 2,
+      .rows         = 264,
+      .columns      = 448             * 2,
+      .hblank_start = (256 + 32)      * 2,
+      .hblank_end   = (256 + 64 + 96) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 32 + 8,
+      .vsync_row    = 192 + 32,
+      .vsync_column = 0
     },
   },
 
@@ -112,21 +119,25 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCI
   {
     /* 50 Hz */
     {
-      .rows               = 311,
-      .columns            = 456       * 2,
-      .row_border_top     = 55 - 32,
-      .column_border_left = (40 - 32) * 2,
-      .row_irq            = 55 + 248,
-      .column_irq         = (40 + 4)  * 2
+      .rows         = 311,
+      .columns      = 456                 * 2,
+      .hblank_start = (256 + 32)          * 2,
+      .hblank_end   = (256 + 64 + 96 + 8) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 56 + 8 + 23,
+      .vsync_row    = 192 + 56,
+      .vsync_column = 4                   * 2
     },
     /* 60 Hz */
     {
-      .rows               = 264,
-      .columns            = 456       * 2,
-      .row_border_top     = 32 - 32,
-      .column_border_left = (40 - 32) * 2,
-      .row_irq            = 32 + 224,
-      .column_irq         = (40 + 4)  * 2
+      .rows         = 264,
+      .columns      = 456                 * 2,
+      .hblank_start = (256 + 32)          * 2,
+      .hblank_end   = (256 + 64 + 96 + 8) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 32 + 8,
+      .vsync_row    = 192 + 32,
+      .vsync_column = 4                   * 2
     }
   },
 
@@ -148,21 +159,25 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCI
   {
     /* 50 Hz */
     {
-      .rows               = 311,
-      .columns            = 456       * 2,
-      .row_border_top     = 55 - 32,
-      .column_border_left = (40 - 32) * 2,
-      .row_irq            = 55 + 248,
-      .column_irq         = (40 + 2)  * 2
+      .rows         = 311,
+      .columns      = 456                 * 2,
+      .hblank_start = (256 + 32)          * 2,
+      .hblank_end   = (256 + 64 + 96 + 8) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 56 + 8 + 23,
+      .vsync_row    = 192 + 56,
+      .vsync_column = 2                   * 2
     },
     /* 60 Hz */
     {
-      .rows               = 264,
-      .columns            = 456       * 2,
-      .row_border_top     = 32 - 32,
-      .column_border_left = (40 - 32) * 2,
-      .row_irq            = 32 + 224,
-      .column_irq         = (40 + 2)  * 2
+      .rows         = 264,
+      .columns      = 456                 * 2,
+      .hblank_start = (256 + 32)          * 2,
+      .hblank_end   = (256 + 64 + 96 + 8) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 32 + 8,
+      .vsync_row    = 192 + 32,
+      .vsync_column = 2                   * 2
     }
   },
 
@@ -183,23 +198,27 @@ const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCI
    * 320 +-------------------------------------------+
    */
   {
+    /* 50 Hz */
     {
-      /* 50 Hz */
-      .rows               = 320,
-      .columns            = 448        * 2,
-      .row_border_top     = 64 - 32,
-      .column_border_left = (48 - 32)  * 2,
-      .row_irq            = 64 + 239,
-      .column_irq         = (48 + 323) * 2
+      .rows         = 320,
+      .columns      = 448                  * 2,
+      .hblank_start = (256 + 32)           * 2,
+      .hblank_end   = (256 + 80 + 64 + 16) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 48 + 16 + 32,
+      .vsync_row    = 239,
+      .vsync_column = 323                  * 2
     },
+    /* 60 Hz = 50 Hz */
     {
-      /* 60 Hz = 50 Hz */
-      .rows               = 320,
-      .columns            = 448        * 2,
-      .row_border_top     = 64 - 32,
-      .column_border_left = (48 - 32)  * 2,
-      .row_irq            = 64 + 239,
-      .column_irq         = (48 + 323) * 2
+      .rows         = 320,
+      .columns      = 448                  * 2,
+      .hblank_start = (256 + 32)           * 2,
+      .hblank_end   = (256 + 80 + 64 + 16) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 48 + 16 + 32,
+      .vsync_row    = 239,
+      .vsync_column = 323                  * 2
     }
   }    
 };
@@ -219,8 +238,8 @@ typedef struct {
   u8_t                       border_colour;
   u8_t                       speaker_state;
   palette_t                  palette;
-  int                        clip_x1;  /** In half-pixels. */
-  int                        clip_x2;  /** In half-pixels. */
+  int                        clip_x1;
+  int                        clip_x2;
   int                        clip_y1;
   int                        clip_y2;
   uint64_t                   frame_counter;
@@ -311,6 +330,8 @@ static void ula_irq(void) {
     cpu_irq(32);
   }
 
+  copper_irq();
+
   self.ticks_14mhz_after_irq = 0;
 }
 
@@ -328,9 +349,13 @@ void ula_did_complete_frame(void) {
 
 
 /**
- * Given the CRT's beam position, returns a flag indicating whether it falls
- * within the visible frame buffer. If so, also returns the frame buffer
- * position so we can align the other layers.
+ * Given the CRT's beam position, where (0, 0) is the first pixel of the
+ * (typically) 256x192 content area, returns a flag indicating whether it falls
+ * within the visible 320x256 frame buffer (in truth it's 640x256).
+ *
+ * Only if it returns non-zero does it also return the frame buffer position,
+ * (0, 0) is the first pixel of the border, such that we can align the other
+ * layers which use the 320x256 or 640x256 resolutions.
  *
  * Returns the ULA pixel colour for the frame buffer position, if any, and
  * whether it is transparent or not.
@@ -340,21 +365,24 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
 
   self.ticks_14mhz_after_irq++;
 
-  if (beam_row == self.display_spec->row_irq && beam_column == self.display_spec->column_irq) {
+  if (beam_row == self.display_spec->vsync_row && beam_column == self.display_spec->vsync_column) {
     ula_irq();
   }
 
   /* Nothing to draw when beam is outside visible area. */
-  if (beam_row    <  self.display_spec->row_border_top
-   || beam_row    >= self.display_spec->row_border_top + 32 + 192 + 32
-   || beam_column <  self.display_spec->column_border_left
-   || beam_column >= self.display_spec->column_border_left + (32 + 256 + 32) * 2) {
-    *is_transparent = 1;
+  if (beam_row >= self.display_spec->vblank_start && beam_row < self.display_spec->vblank_end) {
+    /* In VBLANK. */
+    return 0;
+  }
+  if (beam_column >= self.display_spec->hblank_start && beam_column < self.display_spec->hblank_end) {
+    /* In HBLANK. */
     return 0;
   }
 
-  *frame_buffer_row    = beam_row    - self.display_spec->row_border_top;
-  *frame_buffer_column = beam_column - self.display_spec->column_border_left;
+  /* Convert beam position to frame buffer position, where (0, 0) is first
+   * visible border pixel. */
+  *frame_buffer_row    = (beam_row    >= self.display_spec->vblank_end) ? (beam_row    - self.display_spec->vblank_end) : (beam_row    + 32);
+  *frame_buffer_column = (beam_column >= self.display_spec->hblank_end) ? (beam_column - self.display_spec->hblank_end) : (beam_column + 32 * 2);
 
   if (!self.is_enabled) {
     *is_transparent = 1;
@@ -362,26 +390,20 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
   }
 
   /* Need to know this for floating bus support. */
-  self.is_displaying_content = !(*frame_buffer_row    < 32           ||
-                                 *frame_buffer_row    > 32 + 192 - 1 ||
-                                 *frame_buffer_column < 32 * 2       ||
-                                 *frame_buffer_column > (32 + 256 - 1) * 2);
+  self.is_displaying_content = beam_row < 192 && beam_column < 256 * 2;
 
   if (self.is_displaying_content) {
-    const u32_t content_row    = *frame_buffer_row    - 32;
-    const u32_t content_column = *frame_buffer_column - 32 * 2;
-
     /* Honour the clipping area. */
-    if (content_row    < self.clip_y1
-     || content_row    > self.clip_y2
-     || content_column < self.clip_x1
-     || content_column > self.clip_x2) {
+    if (beam_row        < self.clip_y1
+     || beam_row        > self.clip_y2
+     || beam_column / 2 < self.clip_x1
+     || beam_column / 2 > self.clip_x2) {
       *is_transparent = 1;
       return 1;
     }
 
     /* Leave the pixel colour up to the specialized ULA mode handlers. */
-    if (!ula_display_handlers[self.display_mode](content_row, content_column, &palette_index)) {
+    if (!ula_display_handlers[self.display_mode](beam_row, beam_column, &palette_index)) {
       *is_transparent = 1;
       return 1;
     }
@@ -418,7 +440,7 @@ int ula_init(u8_t* sram) {
   self.speaker_state               = 0;
   self.palette                     = E_PALETTE_ULA_FIRST;
   self.clip_x1                     = 0;
-  self.clip_x2                     = 255 * 2;
+  self.clip_x2                     = 255;
   self.clip_y1                     = 0;
   self.clip_y2                     = 191;
   self.audio_last_sample           = 0;
@@ -515,19 +537,8 @@ ula_display_timing_t ula_display_timing_get(void) {
 
 
 void ula_display_timing_set(ula_display_timing_t timing) {
-  const char* descriptions[] = {
-    "internal use",
-    "ZX Spectrum 48K",
-    "ZX Spectrum 128K/+2",
-    "ZX Spectrum +2A/+2B/+3",
-    "Pentagon",
-    "invalid (5)",
-    "invalid (6)",
-    "invalid (7)"
-  };
-
   if (timing < E_ULA_DISPLAY_TIMING_ZX_48K || timing > E_ULA_DISPLAY_TIMING_PENTAGON) {
-    log_err("ula: refused to set display timing to %s\n", descriptions[timing]);
+    log_err("ula: refused to set display timing to %d\n", timing);
     return;
   }
 
@@ -542,8 +553,8 @@ void ula_palette_set(int use_second) {
 
 
 void ula_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
-  self.clip_x1 = x1 * 2;
-  self.clip_x2 = x2 * 2;
+  self.clip_x1 = x1;
+  self.clip_x2 = x2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
 }

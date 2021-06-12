@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <string.h>
+#include "copper.h"
 #include "defs.h"
 #include "layer2.h"
 #include "log.h"
@@ -234,6 +235,10 @@ static void slu_beam_advance(void) {
   u16_t rows;
   u16_t columns;
 
+  /**
+   * Beam (0, 0) is the top-left pixel of the (typically) 256x192 content
+   * area.
+   */
   ula_display_size_get(&rows, &columns);
 
   /* Advance beam one pixel horizontally. */
@@ -283,6 +288,10 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
     slu_beam_advance();
+
+    /* Copper runs at 28 MHz. */
+    copper_tick(self.beam_row, self.beam_column);
+    copper_tick(self.beam_row, self.beam_column);
 
     if (!ula_tick(self.beam_row, self.beam_column, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
