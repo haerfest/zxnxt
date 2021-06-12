@@ -419,7 +419,7 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_transparent, u16_t* rgba
   }
 
   /* Need to know this for floating bus support. */
-  self.is_displaying_content = beam_row < 192 && beam_column < 256 * 2;
+  self.is_displaying_content = beam_row < 192 && beam_column / 2 < 256;
 
   if (self.is_displaying_content) {
     /* Honour the clipping area. */
