@@ -4,6 +4,7 @@
 #include "bootrom.h"
 #include "clock.h"
 #include "config.h"
+#include "copper.h"
 #include "cpu.h"
 #include "defs.h"
 #include "io.h"
@@ -812,6 +813,22 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
         sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
         self.sprite_number = (self.sprite_number + 1) & 0x7F;
       }
+      break;
+
+    case E_NEXTREG_REGISTER_COPPER_DATA_8BIT:
+      copper_data_8bit_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_COPPER_ADDRESS:
+      copper_address_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_COPPER_CONTROL:
+      copper_control_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_COPPER_DATA_16BIT:
+      copper_data_16bit_write(value);
       break;
 
     default:
