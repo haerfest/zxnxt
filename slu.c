@@ -390,7 +390,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
         }
         break;
 
-      default:
+      case E_SLU_LAYER_PRIORITY_BLEND:
+      case E_SLU_LAYER_PRIORITY_BLEND_5:
         log_wrn("slu: unimplemented layer priority %d\n", self.layer_priority);
         break;
     }
