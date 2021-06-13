@@ -25,7 +25,7 @@ typedef struct {
   int           has_fifth_attribute;
   int           is_4bpp;
   int           is_anchor;
-  int           is_unified;
+  int           are_relative_unified;
   int           magnification_x;
   int           magnification_y;
 } sprite_t;
@@ -113,10 +113,10 @@ void sprites_finit(void) {
 
 static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   u8_t*           pattern;
-  u8_t            dr;
-  u8_t            dc;
-  u8_t            dx;
-  u8_t            dy;
+  u8_t            sprite_row;
+  u8_t            sprite_column;
+  u8_t            projected_row;
+  u8_t            projected_column;
   u8_t            index;
   palette_entry_t entry;
   size_t          offset;
@@ -127,15 +127,20 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   u16_t           final_x;
   u16_t           final_y;
   int             is_4bpp;
+  u8_t            magnified_row;
+  u8_t            magnified_column;
+  u8_t            magnification_x;
+  u8_t            magnification_y;
+  int             is_rotated;
+  int             is_mirrored_x;
+  int             is_mirrored_y;
 
   if (!sprite->is_visible) {
     return;
   }
 
-  if (!sprite->is_anchor && anchor) {
-    if (!anchor->is_visible) {
-      return;
-    }
+  if (!sprite->is_anchor && anchor && !anchor->is_visible) {
+    return;
   }
 
   if (!sprite->is_anchor && anchor) {
@@ -144,26 +149,42 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
     palette_offset = sprite->is_palette_offset_relative ? (anchor->palette_offset + sprite->palette_offset) : sprite->palette_offset;
     pattern_index  = sprite->is_pattern_index_relative  ? (anchor->pattern_index  + sprite->pattern_index ) : sprite->pattern_index;
     is_4bpp        = anchor->is_4bpp;
+    if (anchor->are_relative_unified) {
+      is_rotated      = anchor->is_rotated;
+      is_mirrored_x   = anchor->is_mirrored_x;
+      is_mirrored_y   = anchor->is_mirrored_y;
+      magnification_x = 1 << anchor->magnification_x;
+      magnification_y = 1 << anchor->magnification_y;
+    } else {
+      is_rotated      = sprite->is_rotated;
+      is_mirrored_x   = sprite->is_mirrored_x;
+      is_mirrored_y   = sprite->is_mirrored_y;
+      magnification_x = 1 << sprite->magnification_x;
+      magnification_y = 1 << sprite->magnification_y;
+    }
   } else {
-    sprite_x       = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
-    sprite_y       = sprite->y;
-    palette_offset = sprite->palette_offset;
-    pattern_index  = sprite->pattern_index;
-    is_4bpp        = sprite->is_4bpp;
+    sprite_x        = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
+    sprite_y        = sprite->y;
+    palette_offset  = sprite->palette_offset;
+    pattern_index   = sprite->pattern_index;
+    is_4bpp         = sprite->is_4bpp;
+    is_rotated      = sprite->is_rotated;
+    is_mirrored_x   = sprite->is_mirrored_x;
+    is_mirrored_y   = sprite->is_mirrored_y;
+    magnification_x = 1 << sprite->magnification_x;
+    magnification_y = 1 << sprite->magnification_y;
   }
 
 #if 0
-  log_wrn("sprites: sprite #%03d %02X %02X %02X %02X %02X is_anchor=%d pattern_index=%03d palette_offset=%d is_4bpp=%d\n",
+  log_wrn("sprites: sprite #%03d %02X %02X %02X %02X %02X type=%s pattern_index=%03d\n",
           sprite->number,
           sprite->attribute[0],
           sprite->attribute[1],
           sprite->attribute[2],
           sprite->attribute[3],
           sprite->attribute[4],
-          sprite->is_anchor,
-          pattern_index,
-          palette_offset,
-          is_4bpp);
+          (sprite->is_anchor ? "anchor" : (!anchor ? "?" : (anchor->are_relative_unified ? "unified" : "composite"))),
+          pattern_index);
 #endif
 
   if (is_4bpp) {
@@ -173,25 +194,12 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
     pattern       = &self.patterns[pattern_index * 256];
   }
 
-  for (dr = 0; dr < 16; dr++) {
-    for (dc = 0; dc < 16; dc++) {
-      dx = sprite->is_rotated    ? dr      : dc;
-      dy = sprite->is_rotated    ? dc      : dr;
-      dx = sprite->is_mirrored_x ? 15 - dx : dx;
-      dy = sprite->is_mirrored_y ? 15 - dy : dy;
+  for (sprite_row = 0; sprite_row < 16; sprite_row++) {
+    for (sprite_column = 0; sprite_column < 16; sprite_column++) {
 
-      final_x = sprite_x + dx;
-      final_y = sprite_y + dy;
-      if (final_x >= FRAME_BUFFER_WIDTH / 2) {
-        continue;
-      }
-      if (final_y >= FRAME_BUFFER_HEIGHT) {
-        continue;
-      }
-      offset = final_y * FRAME_BUFFER_WIDTH / 2 + final_x;
-
+      /* Read the colour value from the pattern. */
       if (is_4bpp) {
-        if (dc & 0x01) {
+        if (sprite_row & 1) {
           index = (*pattern++) & 0x0F;
         } else {
           index = (*pattern) >> 4;
@@ -210,8 +218,32 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
         continue;
       }
 
-      self.frame_buffer[offset]   = entry.rgba;
-      self.is_transparent[offset] = 0;
+      /* Then figure out where to project it to. */
+      for (magnified_row = sprite_row * magnification_y; magnified_row < (sprite_row + 1) * magnification_y; magnified_row++) {
+        for (magnified_column = sprite_column * magnification_x; magnified_column < (sprite_column + 1) * magnification_x; magnified_column++) {
+
+          /* Apply rotation first. */
+          projected_column = is_rotated ? magnified_row    : magnified_column;
+          projected_row    = is_rotated ? magnified_column : magnified_row;
+
+          /* Then mirroring. */
+          projected_column = is_mirrored_x ? (16 * magnification_x - 1 - projected_column) : projected_column;
+          projected_row    = is_mirrored_y ? (16 * magnification_y - 1 - projected_row)    : projected_row;
+
+          final_x = sprite_x + projected_column;
+          final_y = sprite_y + projected_row;
+          if (final_x >= FRAME_BUFFER_WIDTH / 2) {
+            continue;
+          }
+          if (final_y >= FRAME_BUFFER_HEIGHT) {
+            continue;
+          }
+          offset = final_y * FRAME_BUFFER_WIDTH / 2 + final_x;
+
+          self.frame_buffer[offset]   = entry.rgba;
+          self.is_transparent[offset] = 0;
+        }
+      }
     }
   }
 }
@@ -324,10 +356,6 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
     return;
   }
 
-  if (value == sprite->attribute[attribute_index]) {
-    return;
-  }
-
   sprite->attribute[attribute_index] = value;
   self.is_dirty                      = 1;
 
@@ -352,30 +380,30 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
       sprite->is_visible          = value & 0x80;
       sprite->has_fifth_attribute = value & 0x40;
       sprite->pattern_index       = value & 0x3F;
-        
+
       if (!sprite->has_fifth_attribute) {
-        sprite->is_4bpp    = 0;
-        sprite->is_anchor  = 1;
-        sprite->is_unified = 0;
+        sprite->is_4bpp              = 0;
+        sprite->is_anchor            = 1;
+        sprite->are_relative_unified = 0;
       }
       break;
 
     case 4:
       if (sprite->has_fifth_attribute) {
-        sprite->is_anchor = !((value >> 6) == 0x01);
+        sprite->is_anchor = ((value >> 6) != 0x01);
         if (sprite->is_anchor) {
           sprite->is_4bpp = value & 0x80;
           if (sprite->is_4bpp) {
             sprite->n6 = (value & 0x40) >> 6;
           }
-          sprite->is_unified      = value & 0x20;
-          sprite->magnification_x = 1 << ((value & 0x18) >> 3);
-          sprite->magnification_y = 1 << ((value & 0x06) >> 1);
-          sprite->y               = ((value & 0x01) << 8) | (sprite->y & 0x00FF);
+          sprite->are_relative_unified = value & 0x20;
+          sprite->magnification_x      = (value & 0x18) >> 3;
+          sprite->magnification_y      = (value & 0x06) >> 1;
+          sprite->y                    = ((value & 0x01) << 8) | (sprite->y & 0x00FF);
         } else {
           sprite->n6                        = (value & 0x20) >> 5;
-          sprite->magnification_x           = 1 << ((value & 0x18) >> 3);
-          sprite->magnification_y           = 1 << ((value & 0x06) >> 1);
+          sprite->magnification_x           = (value & 0x18) >> 3;
+          sprite->magnification_y           = (value & 0x06) >> 1;
           sprite->is_pattern_index_relative = value & 0x01;
         }
       }
