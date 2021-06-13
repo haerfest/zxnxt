@@ -8,7 +8,7 @@
 
 typedef enum {
   E_RESOLUTION_256X192 = 0,
-  E_RESOLUTION_320x256,
+  E_RESOLUTION_320X256,
   E_RESOLUTION_640X256
 } resolution_t;
 
@@ -162,9 +162,41 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
       *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
       break;
 
-    default:
-      log_wrn("layer2: resolution #%d not implemented yet\n", self.resolution);
-      *is_transparent = 1;
+    case E_RESOLUTION_320X256:
+      /* Honour the clipping area. */
+      if (row        < self.clip_y1
+       || row        > self.clip_y2
+       || column / 2 < self.clip_x1
+       || column / 2 > self.clip_x2) {
+        *is_transparent = 1;
+        return;
+      }
+
+      palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
+      entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
+
+      *rgba           = entry.rgba;
+      *is_priority    = entry.is_layer2_priority;
+      *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
+      break;
+
+    case E_RESOLUTION_640X256:
+      /* Honour the clipping area. */
+      if (row        < self.clip_y1
+       || row        > self.clip_y2
+       || column / 2 < self.clip_x1
+       || column / 2 > self.clip_x2) {
+        *is_transparent = 1;
+        return;
+      }
+
+      palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
+      palette_index = (column & 1) ? (palette_index & 0x0F) : (palette_index >> 4);
+      entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
+
+      *rgba           = entry.rgba;
+      *is_priority    = entry.is_layer2_priority;
+      *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
       break;
   }
 }
