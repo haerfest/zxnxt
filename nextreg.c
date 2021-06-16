@@ -687,17 +687,14 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       slu_transparency_fallback_colour_write(value);
       break;
 
-    case E_NEXTREG_REGISTER_MMU_SLOT6_CONTROL:
-    case E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL:
-      paging_bank_slot_4_set(value / 2);
-      /* Fallthrough. */
- 
     case E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT1_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT2_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT3_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT4_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT5_CONTROL:
+    case E_NEXTREG_REGISTER_MMU_SLOT6_CONTROL:
+    case E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL:
       mmu_page_set(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL, value);
       break;
 
