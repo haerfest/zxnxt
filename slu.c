@@ -296,9 +296,11 @@ u32_t slu_run(u32_t ticks_14mhz) {
       cpu_irq(32);
     }
 
+#if 0
     /* Copper runs at 28 MHz. */
     copper_tick(self.beam_row, self.beam_column);
     copper_tick(self.beam_row, self.beam_column);
+#endif
 
     if (!ula_tick(self.beam_row, self.beam_column, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
