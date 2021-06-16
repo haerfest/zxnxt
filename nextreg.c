@@ -747,7 +747,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_ULA_CONTROL:
-      ula_control_write(value);
+      slu_ula_control_write(value);
       break;
 
     case E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_MSB:

@@ -29,6 +29,7 @@ u8_t                 slu_line_interrupt_control_read(void);
 void                 slu_line_interrupt_control_write(u8_t value);
 u8_t                 slu_line_interrupt_value_lsb_read(void);
 void                 slu_line_interrupt_value_lsb_write(u8_t value);
+void                 slu_ula_control_write(u8_t value);
 
 
 #endif  /* __SLU_H */

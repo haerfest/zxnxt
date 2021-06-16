@@ -177,6 +177,8 @@ typedef struct {
   u16_t                fallback_colour;
   int                  line_irq_enabled;
   u16_t                line_irq_row;
+  int                  stencil_mode;
+  int                  ula_tilemap_mix_for_blending;
 } self_t;
 
 
@@ -274,12 +276,14 @@ u32_t slu_run(u32_t ticks_14mhz) {
   int   ula_is_transparent;
   u16_t ula_rgba;
 
+  int   tilemap_is_enabled;
   int   tilemap_is_transparent;
   u16_t tilemap_rgba;
 
   int   sprites_is_transparent;
   u16_t sprites_rgba;
 
+  int   ula_is_enabled;
   int   ula_tilemap_is_transparent;
   u16_t ula_tilemap_rgba;
 
@@ -300,21 +304,26 @@ u32_t slu_run(u32_t ticks_14mhz) {
     copper_tick(self.beam_row, self.beam_column);
     copper_tick(self.beam_row, self.beam_column);
 
-    if (!ula_tick(self.beam_row, self.beam_column, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
+    if (!ula_tick(self.beam_row, self.beam_column, &ula_is_enabled, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
       continue;
     }
 
-    tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_transparent, &tilemap_rgba);
+    tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_enabled, &tilemap_is_transparent, &tilemap_rgba);
     sprites_tick(frame_buffer_row, frame_buffer_column, &sprites_is_transparent, &sprites_rgba);
     layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_is_transparent,  &layer2_rgba, &layer2_is_priority);
 
     /* Mix ULA and tilemap. */
-    ula_tilemap_is_transparent = ula_is_transparent && tilemap_is_transparent;
-    if (!ula_tilemap_is_transparent) {
-      ula_tilemap_rgba = (!tilemap_is_transparent && (ula_is_transparent || tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)))
-        ? tilemap_rgba
-        : ula_rgba;
+    if (ula_is_enabled && tilemap_is_enabled && self.stencil_mode) {
+      ula_tilemap_is_transparent = ula_is_transparent || tilemap_is_transparent;
+      ula_tilemap_rgba           = ula_rgba & tilemap_rgba;
+    } else {
+      ula_tilemap_is_transparent = ula_is_transparent && tilemap_is_transparent;
+      if (!ula_tilemap_is_transparent) {
+        ula_tilemap_rgba = (!tilemap_is_transparent && (ula_is_transparent || tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)))
+          ? tilemap_rgba
+          : ula_rgba;
+      }
     }
 
     /* The default, when no layer specifies a colour. */
@@ -390,6 +399,12 @@ u32_t slu_run(u32_t ticks_14mhz) {
         }
         break;
 
+        /**
+         * https://www.specnext.com/tilemap-mode/
+         *
+         * "Bit 6 determines what colour is used in SLU modes 6 & 7 where the
+         * ULA is combined with Layer 2 to generate highlighting effects."
+         */
       case E_SLU_LAYER_PRIORITY_BLEND:
       case E_SLU_LAYER_PRIORITY_BLEND_5:
         log_wrn("slu: unimplemented layer priority %d\n", self.layer_priority);
@@ -447,4 +462,11 @@ u8_t slu_line_interrupt_value_lsb_read(void) {
 
 void slu_line_interrupt_value_lsb_write(u8_t value) {
   self.line_irq_row = (self.line_irq_row & 0x0100) | value;
+}
+
+
+void slu_ula_control_write(u8_t value) {
+  ula_enable_set((value & 0x80) == 0);
+  self.ula_tilemap_mix_for_blending = (value & 0x40) != 0;
+  self.stencil_mode                 = value & 0x01;
 }
