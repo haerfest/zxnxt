@@ -354,17 +354,6 @@ static void ula_display_reconfigure(void) {
 }
 
 
-static void ula_irq(void) {
-  if (!self.disable_ula_irq) {
-    cpu_irq(N_IRQ_TSTATES);
-  }
-
-  copper_irq();
-
-  self.ticks_14mhz_after_irq = 0;
-}
-
-
 void ula_did_complete_frame(void) {
   if ((++self.frame_counter & 15) == 0) {
     self.blink_state ^= 1;
@@ -395,7 +384,13 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_transpa
   self.ticks_14mhz_after_irq++;
 
   if (beam_row == self.display_spec->vsync_row && beam_column == self.display_spec->vsync_column) {
-    ula_irq();
+    copper_irq();
+    if (!self.disable_ula_irq) {
+      cpu_irq();
+    }
+    self.ticks_14mhz_after_irq = 0;
+  } else if (self.ticks_14mhz_after_irq < N_IRQ_TSTATES * 4 && !self.disable_ula_irq) {
+    cpu_irq();
   }
 
   /* Nothing to draw when beam is outside visible area. */
@@ -755,9 +750,4 @@ int ula_irq_enable_get(void) {
 
 void ula_irq_enable_set(int enable) {
   self.disable_ula_irq = !enable;
-}
-
-
-int ula_irq_asserted(void) {
-  return self.ticks_14mhz_after_irq < N_IRQ_TSTATES * 4;
 }

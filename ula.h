@@ -52,7 +52,6 @@ void                 ula_60hz_set(int enable);
 int                  ula_60hz_get(void);
 int                  ula_irq_enable_get(void);
 void                 ula_irq_enable_set(int enable);
-int                  ula_irq_asserted(void);
 
 
 #endif  /* __ULA_H */

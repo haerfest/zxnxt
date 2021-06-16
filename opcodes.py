@@ -308,7 +308,7 @@ def exx() -> C:
 
 def halt() -> C:
     return '''
-        if (!(self.irq_pending || self.irq_pending_delayed) || IFF1 == 0) {
+        if (!self.irq_pending || IFF1 == 0) {
           PC--;
         }
     '''

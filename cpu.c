@@ -98,8 +98,7 @@
 
 
 /* A shortcut to advance the system clock by a number of CPU ticks. */
-static void cpu_tick(u32_t);
-#define T    cpu_tick
+#define T    clock_run
 
 
 #define SZ53(value)   self.sz53[value]
@@ -181,9 +180,7 @@ typedef struct {
   /* IRQ. */
   u8_t  im;                   /* Interrupt mode.                              */
   int   irq_pending;          /* Non-zero if IRQ pending.                     */
-  u32_t irq_duration;         /* T-states until irq_pending resets.           */
   int   irq_delay;            /* Non-zero if any pending IRQ must be delayed. */
-  int   irq_pending_delayed;  /* Non-zero if IRQ pending and delayed.         */
 
   /* NMI. */
   int              nmi_pending;  /* Non-zero if NMI pending.                  */
@@ -216,20 +213,6 @@ static void cpu_fill_tables(void) {
     self.sz53[value]   = (value & 0x80) | (value == 0) << ZF_SHIFT | (value & 0x20) | (value & 0x08);
     self.sz53p[value]  = self.sz53[value] | (1 - parity[value]) << PF_SHIFT;
   }
-}
-
-
-static void cpu_tick(u32_t ticks) {
-  if (self.irq_pending) {
-    if (self.irq_duration > ticks) {
-      self.irq_duration -= ticks;
-    } else {
-      self.irq_duration = 0;
-      self.irq_pending  = 0;
-    }
-  }
-
-  clock_run(ticks);
 }
 
 
@@ -275,9 +258,8 @@ void cpu_reset(void) {
 }
 
 
-void cpu_irq(u32_t duration) {
-  self.irq_pending  = 1;
-  self.irq_duration = duration;  /* In T-states. */
+void cpu_irq(void) {
+  self.irq_pending = 1;
 }
 
 
@@ -290,13 +272,11 @@ void cpu_nmi(cpu_nmi_reason_t reason) {
 static void cpu_irq_pending(void) {
   /* After EI the next RETN must complete before servicing IRQ. */
   if (self.irq_delay) {
-    self.irq_delay           = 0;
-    self.irq_pending_delayed = 1;
+    self.irq_delay = 0;
     return;
   }
 
-  /* No longer any pending but delayed IRQs. */
-  self.irq_pending_delayed = 0;
+  self.irq_pending = 0;
 
   /* Interrupts must be enabled. */
   if (IFF1 == 0) {
@@ -417,7 +397,7 @@ void cpu_step(void) {
     cpu_nmi_pending();
   }
 
-  if (self.irq_pending || self.irq_pending_delayed) {
+  if (self.irq_pending) {
     cpu_irq_pending();
   }
 }

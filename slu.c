@@ -175,6 +175,7 @@ typedef struct {
   u32_t                beam_column;
   int                  is_beam_visible;
   u16_t                fallback_colour;
+  int                  line_irq_active;
   int                  line_irq_enabled;
   u16_t                line_irq_row;
   int                  stencil_mode;
@@ -296,8 +297,13 @@ u32_t slu_run(u32_t ticks_14mhz) {
   for (tick = 0; tick < ticks_14mhz; tick++) {
     slu_beam_advance();
 
-    if (self.line_irq_enabled && self.beam_column == 0 && self.beam_row == self.line_irq_row) {
-      cpu_irq(32);
+    if (self.line_irq_enabled && self.beam_row == self.line_irq_row) {
+      if (self.beam_column == 0) {
+        self.line_irq_active = 1;
+        cpu_irq();
+      }
+    } else {
+      self.line_irq_active = 0;
     }
 
     /* Copper runs at 28 MHz. */
@@ -440,18 +446,22 @@ void slu_transparency_fallback_colour_write(u8_t value) {
 
 
 u8_t slu_line_interrupt_control_read(void) {
-  return (ula_irq_asserted()      ? 0x80 : 0x00) |
-         (!ula_irq_enable_get()   ? 0x04 : 0x00) |
-         (self.line_irq_enabled   ? 0x02 : 0x00) |
+  return (self.line_irq_active  ? 0x80 : 0x00) |
+         (!ula_irq_enable_get() ? 0x04 : 0x00) |
+         (self.line_irq_enabled ? 0x02 : 0x00) |
          (self.line_irq_row >> 8);
 }
 
 
 void slu_line_interrupt_control_write(u8_t value) {
-  ula_irq_enable_set(value & 0x04);
+  ula_irq_enable_set(!(value & 0x04));
 
-  self.line_irq_enabled = value & 0x02;
   self.line_irq_row     = ((value & 0x01) << 8) | (self.line_irq_row & 0x00FF);
+  self.line_irq_enabled = value & 0x02;
+
+  if (!self.line_irq_enabled) {
+    self.line_irq_active = 0;
+  }
 }
 
 
