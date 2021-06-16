@@ -189,6 +189,9 @@ typedef struct {
   int              nmi_pending;  /* Non-zero if NMI pending.                  */
   cpu_nmi_reason_t nmi_reason;   /* Reason for NMI.                           */
 
+  /* Reset. */
+  int do_reset;
+
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
 
@@ -216,6 +219,34 @@ static void cpu_fill_tables(void) {
 }
 
 
+static void cpu_tick(u32_t ticks) {
+  if (self.irq_pending) {
+    if (self.irq_duration > ticks) {
+      self.irq_duration -= ticks;
+    } else {
+      self.irq_duration = 0;
+      self.irq_pending  = 0;
+    }
+  }
+
+  clock_run(ticks);
+}
+
+
+static void cpu_reset_internal(void) {
+  self.do_reset = 0;
+
+  IFF1 = 0;
+  IFF2 = 0;
+  PC   = 0;
+  I    = 0;
+  R    = 0;
+  IM   = 0;
+
+  T(3);
+}
+
+
 int cpu_init(void) {
   memset(&self, 0, sizeof(self));
 
@@ -229,7 +260,7 @@ int cpu_init(void) {
   IX   = 0xFFFF;
   IY   = 0xFFFF;
 
-  cpu_reset();
+  cpu_reset_internal();
 
   return 0;
 }
@@ -240,28 +271,7 @@ void cpu_finit(void) {
 
 
 void cpu_reset(void) {
-  IFF1 = 0;
-  IFF2 = 0;
-  PC   = 0;
-  I    = 0;
-  R    = 0;
-  IM   = 0;
-
-  T(3);
-}
-
-
-static void cpu_tick(u32_t ticks) {
-  if (self.irq_pending) {
-    if (self.irq_duration > ticks) {
-      self.irq_duration -= ticks;
-    } else {
-      self.irq_duration = 0;
-      self.irq_pending  = 0;
-    }
-  }
-  
-  clock_run(ticks);
+  self.do_reset = 1;
 }
 
 
@@ -398,6 +408,10 @@ static void cpu_trace(void) {
 void cpu_step(void) {
   cpu_trace();
   cpu_execute_next_opcode();
+
+  if (self.do_reset) {
+    cpu_reset_internal();
+  }
 
   if (self.nmi_pending) {
     cpu_nmi_pending();
