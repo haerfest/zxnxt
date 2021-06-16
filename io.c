@@ -174,6 +174,49 @@ void io_write(u16_t address, u8_t value) {
     return;
   }
 
+  switch (address) {
+    case 0x103B:
+      i2c_scl_write(address, value);
+      return;
+
+    case 0x113B:
+      i2c_sda_write(address, value);
+      return;
+
+    case 0x123B:
+      layer2_access_write(value);
+      return;
+
+    case 0x1FFD:
+      paging_spectrum_plus_3_paging_write(value);
+      return;
+
+    case 0x243B:
+      nextreg_select_write(address, value);
+      return;
+
+    case 0x253B:
+      nextreg_data_write(address, value);
+      return;
+
+    case 0x303B:
+      sprites_slot_set(value);
+      return;
+
+    case 0x7FFD:
+      if (self.is_port_7FFD_enabled) {
+        paging_spectrum_128k_paging_write(value);
+      }
+      return;
+
+    case 0xDFFD:
+      paging_spectrum_next_bank_extension_write(value);
+      return;
+
+    default:
+      break;
+  }
+
   if (self.is_mf_port_decoding_enabled) {
     if ((address & 0x00FF) == self.mf_port_enable) {
       mf_enable_write(address, value);
@@ -250,49 +293,6 @@ void io_write(u16_t address, u8_t value) {
     default:
       break;
   }
-
-  switch (address) {
-    case 0x103B:
-      i2c_scl_write(address, value);
-      return;
-
-    case 0x113B:
-      i2c_sda_write(address, value);
-      return;
-
-    case 0x123B:
-      layer2_access_write(value);
-      return;
-
-    case 0x1FFD:
-      paging_spectrum_plus_3_paging_write(value);
-      return;
-
-    case 0x243B:
-      nextreg_select_write(address, value);
-      return;
-
-    case 0x253B:
-      nextreg_data_write(address, value);
-      return;
-
-    case 0x303B:
-      sprites_slot_set(value);
-      return;
- 
-    case 0x7FFD:
-      if (self.is_port_7FFD_enabled) {
-        paging_spectrum_128k_paging_write(value);
-      }
-      return;
-
-    case 0xDFFD:
-      paging_spectrum_next_bank_extension_write(value);
-      return;
-
-    default:
-      break;
-  } 
 
   log_wrn("io: unimplemented write of $%02X to $%04X\n", value, address);
 }
