@@ -36,7 +36,7 @@ typedef struct {
   resolution_t resolution;
   palette_t    palette;
   u8_t         palette_offset;
-  u16_t        transparency_rgba;
+  u16_t        transparency_rgb8;
   int          clip_x1;
   int          clip_x2;
   int          clip_y1;
@@ -122,8 +122,8 @@ void layer2_shadow_bank_write(u8_t bank) {
 
 
 void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int* is_priority) {
-  u8_t            palette_index;
-  palette_entry_t entry;
+  u8_t                   palette_index ;
+  const palette_entry_t* entry = NULL;
 
   if (!self.is_visible) {
     *is_transparent = 1;
@@ -156,10 +156,6 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
 
       palette_index = self.ram[self.active_bank * 16 * 1024 + row * 256 + column];
       entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
-
-      *rgba           = entry.rgba;
-      *is_priority    = entry.is_layer2_priority;
-      *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
       break;
 
     case E_RESOLUTION_320X256:
@@ -174,10 +170,6 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
 
       palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
       entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
-
-      *rgba           = entry.rgba;
-      *is_priority    = entry.is_layer2_priority;
-      *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
       break;
 
     case E_RESOLUTION_640X256:
@@ -193,12 +185,12 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
       palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
       palette_index = (column & 1) ? (palette_index & 0x0F) : (palette_index >> 4);
       entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
-
-      *rgba           = entry.rgba;
-      *is_priority    = entry.is_layer2_priority;
-      *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
       break;
   }
+
+  *rgba           = entry->rgb16;
+  *is_priority    = entry->is_layer2_priority;
+  *is_transparent = entry->rgb8 == self.transparency_rgb8;
 }
 
 
@@ -273,7 +265,7 @@ void layer2_palette_set(int use_second) {
 
 
 void layer2_transparency_colour_write(u8_t rgb) {
-  self.transparency_rgba = PALETTE_UNPACK(rgb);
+  self.transparency_rgb8 = rgb;
 }
 
 

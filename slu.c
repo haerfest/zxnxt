@@ -174,7 +174,7 @@ typedef struct {
   u32_t                beam_row;
   u32_t                beam_column;
   int                  is_beam_visible;
-  u16_t                fallback_colour;
+  u16_t                fallback_rgba;
   int                  line_irq_active;
   int                  line_irq_enabled;
   u16_t                line_irq_row;
@@ -334,7 +334,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
     }
 
     /* The default, when no layer specifies a colour. */
-    rgba = self.fallback_colour;
+    rgba = self.fallback_rgba;
 
     switch (self.layer_priority)
     {
@@ -452,7 +452,7 @@ slu_layer_priority_t slu_layer_priority_get(void) {
 
 
 void slu_transparency_fallback_colour_write(u8_t value) {
-  self.fallback_colour = PALETTE_UNPACK(value);
+  self.fallback_rgba = palette_rgb8_rgb16(value);
 }
 
 

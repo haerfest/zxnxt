@@ -17,7 +17,7 @@ typedef struct {
   u8_t      default_attribute;
   u16_t     definitions_base_address;
   u16_t     tilemap_base_address;
-  u16_t     transparency_rgba;
+  u16_t     transparency_rgb8;
   u8_t      transparency_index;  /* How is this used? */
   int       is_enabled;
   int       use_80x32;
@@ -142,6 +142,7 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_transparent,
   const u8_t  palette_index  = palette_offset | (self.use_text_mode
                                                  ? ((pattern & (0x80 >> def_column)) ? 1 : 0)
                                                  : ((def_column & 0x01) ? (pattern & 0x0F) : (pattern >> 4)));
+  const palette_entry_t* entry = palette_read(self.palette, palette_index);
 
   /**
    * According to the VHDL, a check against the transparency colour is only
@@ -155,8 +156,8 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_transparent,
    * >        (tm_en_2 = '0')
    * >   else '0';
    */
-  *rgba           = palette_read_rgba(self.palette, palette_index);
-  *is_transparent = self.use_text_mode && PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
+  *rgba           = entry->rgb16;
+  *is_transparent = self.use_text_mode && (entry->rgb8 == self.transparency_rgb8);
 }
 
 
@@ -206,5 +207,5 @@ void tilemap_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
 
 
 void tilemap_transparency_colour_write(u8_t rgb) {
-  self.transparency_rgba = PALETTE_UNPACK(rgb);
+  self.transparency_rgb8 = rgb;
 }

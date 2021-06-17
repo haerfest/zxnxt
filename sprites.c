@@ -112,28 +112,28 @@ void sprites_finit(void) {
 
 
 static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
-  u8_t*           pattern;
-  u8_t            sprite_row;
-  u8_t            sprite_column;
-  u8_t            projected_row;
-  u8_t            projected_column;
-  u8_t            index;
-  palette_entry_t entry;
-  size_t          offset;
-  s16_t           sprite_x;
-  s16_t           sprite_y;
-  u8_t            palette_offset;
-  u8_t            pattern_index;
-  u16_t           final_x;
-  u16_t           final_y;
-  int             is_4bpp;
-  u8_t            magnified_row;
-  u8_t            magnified_column;
-  u8_t            magnification_x;
-  u8_t            magnification_y;
-  int             is_rotated;
-  int             is_mirrored_x;
-  int             is_mirrored_y;
+  u8_t*                  pattern;
+  u8_t                   sprite_row;
+  u8_t                   sprite_column;
+  u8_t                   projected_row;
+  u8_t                   projected_column;
+  u8_t                   index;
+  const palette_entry_t* entry;
+  size_t                 offset;
+  s16_t                  sprite_x;
+  s16_t                  sprite_y;
+  u8_t                   palette_offset;
+  u8_t                   pattern_index;
+  u16_t                  final_x;
+  u16_t                  final_y;
+  int                    is_4bpp;
+  u8_t                   magnified_row;
+  u8_t                   magnified_column;
+  u8_t                   magnification_x;
+  u8_t                   magnification_y;
+  int                    is_rotated;
+  int                    is_mirrored_x;
+  int                    is_mirrored_y;
 
   if (!sprite->is_visible) {
     return;
@@ -214,7 +214,7 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
       }
 
       entry = palette_read(self.palette, index);
-      if (entry.rgba == self.transparency_rgba) {
+      if (entry->rgb16 == self.transparency_rgba) {
         continue;
       }
 
@@ -240,7 +240,7 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
           }
           offset = final_y * FRAME_BUFFER_WIDTH / 2 + final_x;
 
-          self.frame_buffer[offset]   = entry.rgba;
+          self.frame_buffer[offset]   = entry->rgb16;
           self.is_transparent[offset] = 0;
         }
       }
@@ -423,7 +423,7 @@ void sprites_transparency_index_write(u8_t value) {
 
 /* TODO: Not sure if sprites use the global transparency colour. */
 void sprites_transparency_colour_write(u8_t rgb) {
-  const u16_t rgba = PALETTE_UNPACK(rgb);
+  const u16_t rgba = palette_rgb8_rgb16(rgb);
   if (rgba != self.transparency_rgba) {
     self.transparency_rgba = rgba;
     self.is_dirty          = 1;

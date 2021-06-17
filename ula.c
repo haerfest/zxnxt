@@ -283,7 +283,7 @@ typedef struct {
   int                        is_7mhz_tick;
   int                        is_displaying_content;
   int                        is_enabled;
-  u16_t                      transparency_rgba;
+  u16_t                      transparency_rgb8;
   u8_t                       ula_next_mask_ink;
   u8_t                       ula_next_mask_paper;
   int                        is_ula_next_mode;
@@ -444,8 +444,9 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border,
     palette_index = 16 + self.border_colour;
   }
 
-  *rgba           = palette_read_rgba(self.palette, palette_index);
-  *is_transparent = PALETTE_PACK(*rgba) == PALETTE_PACK(self.transparency_rgba);
+  const palette_entry_t* entry = palette_read(self.palette, palette_index);
+  *rgba           = entry->rgb16;
+  *is_transparent = entry->rgb8 == self.transparency_rgb8;
 
   return 1;
 }
@@ -700,7 +701,7 @@ void ula_enable_set(int enable) {
 
 
 void ula_transparency_colour_write(u8_t rgb) {
-  self.transparency_rgba = PALETTE_UNPACK(rgb);
+  self.transparency_rgb8 = rgb;
 }
 
 

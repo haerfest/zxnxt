@@ -492,18 +492,12 @@ static void nextreg_palette_index_write(u8_t value) {
 
 
 static u8_t nextreg_palette_value_8bits_read(void) {
-  const u16_t rgba = palette_read_rgba(self.palette_selected, self.palette_index);
-  return PALETTE_PACK(rgba);
+  return palette_read(self.palette_selected, self.palette_index)->rgb8;
 }
 
 
 static void nextreg_palette_value_8bits_write(u8_t value) {
-  const palette_entry_t entry = {
-    .rgba               = PALETTE_UNPACK(value),
-    .is_layer2_priority = 0
-  };
-  palette_write(self.palette_selected, self.palette_index, entry);
-
+  palette_write_rgb8(self.palette_selected, self.palette_index, value);
   if (!self.palette_disable_auto_increment) {
     self.palette_index++;
   }
@@ -511,25 +505,16 @@ static void nextreg_palette_value_8bits_write(u8_t value) {
 
 
 static u8_t nextreg_palette_value_9bits_read(void) {
-  const palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
-
-  return entry.is_layer2_priority << 7 | (entry.rgba & 0x0020) >> 5;
+  const palette_entry_t* entry = palette_read(self.palette_selected, self.palette_index);
+  return (entry->is_layer2_priority << 7) | (entry->rgb9 & 1);
 }
 
 
 static void nextreg_palette_value_9bits_write(u8_t value) {
   if (self.palette_index_9bit_is_first_write) {
-    const palette_entry_t entry = {
-      .rgba               = PALETTE_UNPACK(value),
-      .is_layer2_priority = 0
-    };
-    palette_write(self.palette_selected, self.palette_index, entry);
+    palette_write_rgb8(self.palette_selected, self.palette_index, value);
   } else {
-    palette_entry_t entry = palette_read(self.palette_selected, self.palette_index);
-    entry.rgba               = (entry.rgba & ~0x0020) | (value & 0x01) << 5;
-    entry.is_layer2_priority = value >> 7;
-    palette_write(self.palette_selected, self.palette_index, entry);
-
+    palette_write_rgb9(self.palette_selected, self.palette_index, value);
     if (!self.palette_disable_auto_increment) {
       self.palette_index++;
     }
