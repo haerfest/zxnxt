@@ -166,6 +166,14 @@
 #define VERTICAL_RETRACE      8  /* Lines.                 */
 
 
+typedef enum {
+  E_BLEND_MODE_ULA = 0,
+  E_BLEND_MODE_ULA_TILEMAP_MIX,
+  E_BLEND_MODE_TILEMAP,
+  E_BLEND_MODE_NONE
+} blend_mode_t;
+
+
 typedef struct {
   SDL_Renderer*        renderer;
   SDL_Texture*         texture;
@@ -179,7 +187,7 @@ typedef struct {
   int                  line_irq_enabled;
   u16_t                line_irq_row;
   int                  stencil_mode;
-  int                  ula_tilemap_mix_for_blending;
+  blend_mode_t         blend_mode;
 } self_t;
 
 
@@ -497,6 +505,8 @@ void slu_line_interrupt_value_lsb_write(u8_t value) {
 
 void slu_ula_control_write(u8_t value) {
   ula_enable_set((value & 0x80) == 0);
-  self.ula_tilemap_mix_for_blending = (value & 0x40) != 0;
-  self.stencil_mode                 = value & 0x01;
+  self.blend_mode               = (value & 0x60) >> 5;
+  self.stencil_mode             = value & 0x01;
+
+  log_wrn("slu: blend mode %d\n", self.blend_mode);
 }
