@@ -417,6 +417,15 @@ u32_t slu_run(u32_t ticks_14mhz) {
          * > 6 Sprites over (Layer 2 + ULA combined) – colours clamped to 7
          * > 7 Sprites over (Layer 2 + ULA combined) – colours clamped to (0,7)
          *
+         * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
+         *
+         * > 0x68 (104) => ULA Control
+         * >   bits 6:5 = Blending in SLU modes 6 & 7 (soft reset = 0)
+         * >    = 00 for ula as blend colour
+         * >    = 10 for ula/tilemap mix result as blend colour
+         * >    = 11 for tilemap as blend colour
+         * >    = 01 for no blending
+         *
          * https://www.specnext.com/tilemap-mode/
          *
          * > Bit 6 determines what colour is used in SLU modes 6 & 7 where the
