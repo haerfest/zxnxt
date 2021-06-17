@@ -172,7 +172,7 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
       entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
       break;
 
-    case E_RESOLUTION_640X256:
+    default:
       /* Honour the clipping area. */
       if (row        < self.clip_y1
        || row        > self.clip_y2
