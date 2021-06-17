@@ -274,6 +274,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
   u32_t frame_buffer_row;
   u32_t frame_buffer_column;
 
+  int   ula_is_enabled;
+  int   ula_is_border;
   int   ula_is_transparent;
   u16_t ula_rgba;
 
@@ -284,9 +286,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
   int   sprites_is_transparent;
   u16_t sprites_rgba;
 
-  int   ula_is_enabled;
-  int   ula_tilemap_is_transparent;
-  u16_t ula_tilemap_rgba;
+  int   ula_final_is_transparent;
+  u16_t ula_final_rgba;
 
   int   layer2_is_transparent;
   u16_t layer2_rgba;
@@ -310,7 +311,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
     copper_tick(self.beam_row, self.beam_column);
     copper_tick(self.beam_row, self.beam_column);
 
-    if (!ula_tick(self.beam_row, self.beam_column, &ula_is_enabled, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
+    if (!ula_tick(self.beam_row, self.beam_column, &ula_is_enabled, &ula_is_border, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
       continue;
     }
@@ -321,12 +322,12 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
     /* Mix ULA and tilemap. */
     if (ula_is_enabled && tilemap_is_enabled && self.stencil_mode) {
-      ula_tilemap_is_transparent = ula_is_transparent || tilemap_is_transparent;
-      ula_tilemap_rgba           = ula_rgba & tilemap_rgba;
+      ula_final_is_transparent = ula_is_transparent || tilemap_is_transparent;
+      ula_final_rgba           = ula_rgba & tilemap_rgba;
     } else {
-      ula_tilemap_is_transparent = ula_is_transparent && tilemap_is_transparent;
-      if (!ula_tilemap_is_transparent) {
-        ula_tilemap_rgba = (!tilemap_is_transparent && (ula_is_transparent || tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)))
+      ula_final_is_transparent = ula_is_transparent && tilemap_is_transparent;
+      if (!ula_final_is_transparent) {
+        ula_final_rgba = (!tilemap_is_transparent && (ula_is_transparent || tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)))
           ? tilemap_rgba
           : ula_rgba;
       }
@@ -344,8 +345,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
           rgba = sprites_rgba;
         } else if (!layer2_is_transparent) {
           rgba = layer2_rgba;
-        } else if (!ula_tilemap_is_transparent) {
-          rgba = ula_tilemap_rgba;
+        } else if (!ula_final_is_transparent) {
+          rgba = ula_final_rgba;
         }
         break;
 
@@ -354,16 +355,16 @@ u32_t slu_run(u32_t ticks_14mhz) {
           rgba = layer2_rgba;
         } else if (!sprites_is_transparent) {
           rgba = sprites_rgba;
-        } else if (!ula_tilemap_is_transparent) {
-          rgba = ula_tilemap_rgba;
+        } else if (!ula_final_is_transparent) {
+          rgba = ula_final_rgba;
         }
         break;
 
       case E_SLU_LAYER_PRIORITY_LUS:
         if (!layer2_is_transparent) {
           rgba = layer2_rgba;
-        } else if (!ula_tilemap_is_transparent) {
-          rgba = ula_tilemap_rgba;
+        } else if (!ula_final_is_transparent  && !(ula_is_border && tilemap_is_transparent && !sprites_is_transparent)) {
+          rgba = ula_final_rgba;
         } else if (!sprites_is_transparent) {
           rgba = sprites_rgba;
         }
@@ -374,8 +375,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
           rgba = layer2_rgba;
         } else if (!sprites_is_transparent) {
           rgba = sprites_rgba;
-        } else if (!ula_tilemap_is_transparent) {
-          rgba = ula_tilemap_rgba;
+        } else if (!ula_final_is_transparent) {
+          rgba = ula_final_rgba;
         } else if (!layer2_is_transparent) {
           rgba = layer2_rgba;
         }
@@ -384,8 +385,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
       case E_SLU_LAYER_PRIORITY_USL:
         if (layer2_is_priority && !layer2_is_transparent) {
           rgba = layer2_rgba;
-        } else if (!ula_tilemap_is_transparent) {
-          rgba = ula_tilemap_rgba;
+        } else if (!ula_final_is_transparent && !(ula_is_border && tilemap_is_transparent && !sprites_is_transparent)) {
+          rgba = ula_final_rgba;
         } else if (!sprites_is_transparent) {
           rgba = sprites_rgba;
         } else if (!layer2_is_transparent) {
@@ -396,8 +397,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
       case E_SLU_LAYER_PRIORITY_ULS:
         if (layer2_is_priority && !layer2_is_transparent) {
           rgba = layer2_rgba;
-        } else if (!ula_tilemap_is_transparent) {
-          rgba = ula_tilemap_rgba;
+        } else if (!ula_final_is_transparent && !(ula_is_border && tilemap_is_transparent && !sprites_is_transparent)) {
+          rgba = ula_final_rgba;
         } else if (!layer2_is_transparent) {
           rgba = layer2_rgba;
         } else if (!sprites_is_transparent) {
@@ -406,10 +407,20 @@ u32_t slu_run(u32_t ticks_14mhz) {
         break;
 
         /**
+         * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
+         *
+         * > 110 - (U|T)S(T|U)(B+L) Blending layer and Layer 2 combined, colours clamped to [0,7]
+         * > 111 - (U|T)S(T|U)(B+L-5) Blending layer and Layer 2 combined, colours clamped to [0,7]
+         *
+         * Manual:
+         *
+         * > 6 Sprites over (Layer 2 + ULA combined) – colours clamped to 7
+         * > 7 Sprites over (Layer 2 + ULA combined) – colours clamped to (0,7)
+         *
          * https://www.specnext.com/tilemap-mode/
          *
-         * "Bit 6 determines what colour is used in SLU modes 6 & 7 where the
-         * ULA is combined with Layer 2 to generate highlighting effects."
+         * > Bit 6 determines what colour is used in SLU modes 6 & 7 where the
+         * > ULA is combined with Layer 2 to generate highlighting effects."
          */
       case E_SLU_LAYER_PRIORITY_BLEND:
       case E_SLU_LAYER_PRIORITY_BLEND_5:

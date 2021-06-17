@@ -378,7 +378,7 @@ void ula_did_complete_frame(void) {
  * Returns the ULA pixel colour for the frame buffer position, if any, and
  * whether it is transparent or not.
  */
-int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
+int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
   u8_t palette_index;
 
   self.ticks_14mhz_after_irq++;
@@ -408,7 +408,8 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_transpa
   *frame_buffer_row    = (beam_row    >= self.display_spec->vblank_end) ? (beam_row    - self.display_spec->vblank_end) : (beam_row    + 32);
   *frame_buffer_column = (beam_column >= self.display_spec->hblank_end) ? (beam_column - self.display_spec->hblank_end) : (beam_column + 32 * 2);
 
-  *is_enabled      = self.is_enabled;
+  *is_enabled     = self.is_enabled;
+  *is_border      = 0;
   *is_transparent = 1;
 
   if (!self.is_enabled) {
@@ -417,6 +418,7 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_transpa
 
   /* Need to know this for floating bus support. */
   self.is_displaying_content = beam_row < 192 && beam_column / 2 < 256;
+  *is_border                 = !self.is_displaying_content;
 
   if (self.is_displaying_content) {
     /* Honour the clipping area. */
