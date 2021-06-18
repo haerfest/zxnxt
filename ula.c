@@ -467,9 +467,17 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border,
     return 1;
   }
 
-  palette_index = self.is_displaying_content
-    ? ula_display_handlers[self.display_mode](beam_row, beam_column)
-    : 16 + self.border_colour;
+  palette_index = \
+    self.is_displaying_content ? ula_display_handlers[self.display_mode](beam_row, beam_column) :
+    self.is_ula_next_mode      ? 128 + self.border_colour :
+    /* else */                    16 + self.border_colour;
+
+#if 0
+    if (self.ula_next_mask_paper == 0) {
+      /* No background mask, border color is fallback color. */
+      return 1;
+    }
+#endif
 
   *rgb        = palette_read(self.palette, palette_index);
   *is_enabled = 1;
