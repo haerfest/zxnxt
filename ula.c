@@ -327,10 +327,25 @@ static u8_t ula_display_mode_screen_x(u32_t row, u32_t column) {
   /* For floating-bus support. */
   self.attribute_byte = attribute_byte;
 
-  bright = (attribute_byte & 0x40) >> 3;
-  ink    = 0  + bright + (attribute_byte & 0x07);
-  paper  = 16 + bright + ((attribute_byte >> 3) & 0x07);
-  blink  = attribute_byte & 0x80;
+  if (self.is_ula_next_mode) {
+#if 0
+    if (!is_foreground && self.ula_next_mask_paper == 0) {
+      /* No background mask, background color is fallback color. */
+      return 0;
+    }
+#endif
+
+    /* TODO: shift paper palette index to the right! */
+    ink    = 0   + (attribute_byte & self.ula_next_mask_ink);
+    paper  = 128 + (attribute_byte & self.ula_next_mask_paper);
+    blink  = 0;
+    bright = 0;
+  } else {
+    bright = (attribute_byte & 0x40) >> 3;
+    ink    = 0  + bright + (attribute_byte & 0x07);
+    paper  = 16 + bright + ((attribute_byte >> 3) & 0x07);
+    blink  = attribute_byte & 0x80;
+  }
 
   return is_foreground
     ? ((blink && self.blink_state) ? paper : ink)
