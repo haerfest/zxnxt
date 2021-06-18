@@ -141,6 +141,47 @@ static void slu_irq(void) {
 }
 
 
+void slu_mix_layer2(const palette_entry_t* layer2_rgb, const palette_entry_t* mix_rgb, int mix_rgb_transparent, u8_t* mixer_r, u8_t* mixer_g, u8_t* mixer_b) {
+  u8_t r = ((layer2_rgb->rgb9 & 0x1C0) >> 2) | ((mix_rgb->rgb9 & 0x1C0) >> 6);
+  u8_t g = ((layer2_rgb->rgb9 & 0x038) << 1) | ((mix_rgb->rgb9 & 0x038) >> 3);
+  u8_t b = ((layer2_rgb->rgb9 & 0x007) << 4) |  (mix_rgb->rgb9 & 0x007);
+
+  if (self.layer_priority == E_SLU_LAYER_PRIORITY_BLEND) {
+    if (r & 0x08) r = 7;
+    if (g & 0x08) g = 7;
+    if (b & 0x08) b = 7;
+  } else if (!mix_rgb_transparent) {
+    if (r <= 4) {
+      r = 0;
+    } else if ((r & 0x0C) == 0x0C) {
+      r = 7;
+    } else {
+      r = r - 5;
+    }
+
+    if (g <= 4) {
+      g = 0;
+    } else if ((g & 0x0C) == 0x0C) {
+      g = 7;
+    } else {
+      g = g - 5;
+    }
+
+    if (b <= 4) {
+      b = 0;
+    } else if ((b & 0x0C) == 0x0C) {
+      b = 7;
+    } else {
+      b = b - 5;
+    }
+  }
+
+  *mixer_r = r;
+  *mixer_g = g;
+  *mixer_b = b;
+}
+
+
 u32_t slu_run(u32_t ticks_14mhz) {
   const palette_entry_t black = {
     .rgb8  = 0,
@@ -204,9 +245,11 @@ u32_t slu_run(u32_t ticks_14mhz) {
     slu_beam_advance();
     slu_irq();
 
+#if 0
     /* Copper runs at 28 MHz. */
     copper_tick(self.beam_row, self.beam_column);
     copper_tick(self.beam_row, self.beam_column);
+#endif
 
     if (!ula_tick(self.beam_row, self.beam_column, &ula_en, &ula_border, &ula_clipped, &ula_rgb, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
@@ -364,43 +407,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
             break;
         }
 
-        if (layer2_priority || !layer2_transparent) {
-          mixer_r = ((layer2_rgb->rgb9 & 0x1C0) >> 2) | ((mix_rgb->rgb9 & 0x1C0) >> 6);
-          mixer_g = ((layer2_rgb->rgb9 & 0x038) << 1) | ((mix_rgb->rgb9 & 0x038) >> 3);
-          mixer_b = ((layer2_rgb->rgb9 & 0x007) << 4) |  (mix_rgb->rgb9 & 0x007);
-
-          if (self.layer_priority == E_SLU_LAYER_PRIORITY_BLEND) {
-            if (mixer_r & 0x08) mixer_r = 7;
-            if (mixer_g & 0x08) mixer_g = 7;
-            if (mixer_b & 0x08) mixer_b = 7;
-          } else if (!mix_rgb_transparent) {
-            if (mixer_r <= 4) {
-              mixer_r = 0;
-            } else if ((mixer_r & 0x0C) == 0x0C) {
-              mixer_r = 7;
-            } else {
-              mixer_r = mixer_r - 5;
-            }
-
-            if (mixer_g <= 4) {
-              mixer_g = 0;
-            } else if ((mixer_g & 0x0C) == 0x0C) {
-              mixer_g = 7;
-            } else {
-              mixer_g = mixer_g - 5;
-            }
-
-            if (mixer_b <= 4) {
-              mixer_b = 0;
-            } else if ((mixer_b & 0x0C) == 0x0C) {
-              mixer_b = 7;
-            } else {
-              mixer_b = mixer_b - 5;
-            }
-          }
-        }
-
         if (layer2_priority) {
+          slu_mix_layer2(layer2_rgb, mix_rgb, mix_rgb_transparent, &mixer_r, &mixer_g, &mixer_b);
           rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
         } else if (!mix_top_transparent) {
           rgb_out = mix_top_rgb->rgb16;
@@ -409,6 +417,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
         } else if (!mix_bot_transparent) {
           rgb_out = mix_bot_rgb->rgb16;
         } else if (!layer2_transparent) {
+          slu_mix_layer2(layer2_rgb, mix_rgb, mix_rgb_transparent, &mixer_r, &mixer_g, &mixer_b);
           rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
         }
         break;
