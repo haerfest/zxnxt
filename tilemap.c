@@ -139,7 +139,7 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enable
 
   *is_enabled        = 1;
   *is_pixel_enabled  = !(is_clipped || is_transparent);
-  *is_pixel_below    = self.use_512_tiles ? 0 : !(attribute & 1);
+  *is_pixel_below    = self.use_512_tiles ? 0 : (attribute & 1);
   *is_pixel_textmode = self.use_text_mode;
   *rgb               = palette_read(self.palette, palette_index);
 }
