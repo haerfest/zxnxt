@@ -7,19 +7,22 @@
 #include "nextreg.h"
 
 
-#define N_INSTRUCTIONS  1024
-#define PC_MASK         (2 * N_INSTRUCTIONS - 1)
+/* Instructions are stored in big-endian format. */
+typedef struct {
+  u8_t msb;
+  u8_t lsb;
+} instruction_t;
 
 
 typedef struct {
-  u16_t pc;
-  u16_t address;
-  u8_t  instruction[N_INSTRUCTIONS * 2];
-  u8_t  lsb;
-  int   is_lsb;
-  int   is_running;
-  int   do_reset_pc_on_irq;
-  int   do_move_wait_one_cycle;
+  u16_t         cpc;      /** 0 - 1023 */
+  u16_t         address;  /** 0 - 2047 */
+  instruction_t instruction[1024];
+  u8_t          lsb;
+  int           is_lsb;
+  int           is_running;
+  int           do_reset_pc_on_irq;
+  int           do_move_wait_one_cycle;
 } copper_t;
 
 
@@ -37,8 +40,8 @@ void copper_finit(void) {
 
 
 void copper_data_8bit_write(u8_t value) {
-  self.instruction[self.address] = value;
-  self.address = (self.address + 1) & PC_MASK;
+  ((u8_t*) self.instruction)[self.address] = value;
+  self.address = (self.address + 1) & 0x7FF;
 }
 
 
@@ -46,10 +49,10 @@ void copper_data_16bit_write(u8_t value)  {
   if (self.is_lsb) {
     self.lsb = value;
   } else {
-    const u16_t odd = self.address & (PC_MASK - 1);
-    self.instruction[odd + 0] = value;
-    self.instruction[odd + 1] = self.lsb;
-    self.address = (self.address + 1) & PC_MASK;
+    const u16_t even = self.address & 0x7FE;
+    self.instruction[even].msb = value;
+    self.instruction[even].lsb = self.lsb;
+    self.address = (even + 2) & 0x7FF;
   }
 
   self.is_lsb = !self.is_lsb;
@@ -70,7 +73,7 @@ void copper_control_write(u8_t value) {
       break;
 
     case 1:
-      self.pc                 = 0;
+      self.cpc                = 0;
       self.do_reset_pc_on_irq = 0;
       self.is_running         = 1;
       break;
@@ -81,7 +84,7 @@ void copper_control_write(u8_t value) {
       break;
 
     case 3:
-      self.pc                 = 0;
+      self.cpc                = 0;
       self.do_reset_pc_on_irq = 1;
       self.is_running         = 1;
       break;
@@ -91,16 +94,14 @@ void copper_control_write(u8_t value) {
 
 void copper_tick(u32_t beam_row, u32_t beam_column) {
   u16_t instruction;
-  u16_t offset        = self.pc * 2;
-  int   do_advance_pc = 1;
+  int   do_advance_cpc = 1;
 
   if (!self.is_running) {
     return;
   }
 
-  /* Instructions are stored in big-endian format. */
-  instruction = (self.instruction[offset] << 8) | self.instruction[offset + 1];
-  
+  instruction = (self.instruction[self.cpc].msb << 8) | self.instruction[self.cpc].lsb;
+
   switch (instruction) {
     case 0x0000:
       /* NOOP: 1 cycle. */
@@ -116,11 +117,11 @@ void copper_tick(u32_t beam_row, u32_t beam_column) {
         /* WAIT: 1 cycle. */
         const u32_t wait_row    = instruction & 0x01FF;
         const u32_t wait_column = (instruction & 0x7E00) >> 6;
-        do_advance_pc           = (beam_row == wait_row && beam_column >= wait_column);
+        do_advance_cpc          = (beam_row == wait_row && beam_column >= wait_column);
       } else {
         /* MOVE: 2 cycles. */
         self.do_move_wait_one_cycle = !self.do_move_wait_one_cycle;
-        do_advance_pc               = !self.do_move_wait_one_cycle;
+        do_advance_cpc              = !self.do_move_wait_one_cycle;
         if (!self.do_move_wait_one_cycle) {
           const u8_t reg   = (instruction & 0x7F00) >> 8;
           const u8_t value = instruction & 0x00FF;
@@ -130,14 +131,14 @@ void copper_tick(u32_t beam_row, u32_t beam_column) {
       break;
   }
 
-  if (do_advance_pc) {
-    self.pc = (self.pc + 1) & PC_MASK;
+  if (do_advance_cpc) {
+    self.cpc = (self.cpc + 1) & 0x3FF;
   }
 }
 
 
 void copper_irq(void) {
   if (self.do_reset_pc_on_irq) {
-    self.pc = 0;
+    self.cpc = 0;
   }
 }
