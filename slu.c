@@ -217,8 +217,8 @@ u32_t slu_run(u32_t ticks_14mhz) {
     sprites_tick(frame_buffer_row, frame_buffer_column, &sprite_pixel_en, &sprite_rgb16);
     layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_pixel_en, &layer2_rgb, &layer2_priority);
 
-    ula_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8) || !ula_en;
-    tm_transparent = !tm_en || !tm_pixel_en || (tm_pixel_textmode && tm_rgb->rgb8 == self.transparent_rgb8);
+    ula_transparent = !ula_en || ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
+    tm_transparent  = !tm_en || !tm_pixel_en || (tm_pixel_textmode && tm_rgb->rgb8 == self.transparent_rgb8);
 
     sprite_transparent = !sprite_pixel_en;
 
@@ -364,37 +364,39 @@ u32_t slu_run(u32_t ticks_14mhz) {
             break;
         }
 
-        mixer_r = ((layer2_rgb->rgb9 & 0x1C0) >> 2) | ((mix_rgb->rgb9 & 0x1C0) >> 6);
-        mixer_g = ((layer2_rgb->rgb9 & 0x038) << 1) | ((mix_rgb->rgb9 & 0x038) >> 3);
-        mixer_b = ((layer2_rgb->rgb9 & 0x007) << 4) |  (mix_rgb->rgb9 & 0x007);
+        if (layer2_priority || !layer2_transparent) {
+          mixer_r = ((layer2_rgb->rgb9 & 0x1C0) >> 2) | ((mix_rgb->rgb9 & 0x1C0) >> 6);
+          mixer_g = ((layer2_rgb->rgb9 & 0x038) << 1) | ((mix_rgb->rgb9 & 0x038) >> 3);
+          mixer_b = ((layer2_rgb->rgb9 & 0x007) << 4) |  (mix_rgb->rgb9 & 0x007);
 
-        if (self.layer_priority == E_SLU_LAYER_PRIORITY_BLEND) {
-          if (mixer_r & 0x08) mixer_r = 7;
-          if (mixer_g & 0x08) mixer_g = 7;
-          if (mixer_b & 0x08) mixer_b = 7;
-        } else if (!mix_rgb_transparent) {
-          if (mixer_r <= 4) {
-            mixer_r = 0;
-          } else if ((mixer_r & 0x0C) == 0x0C) {
-            mixer_r = 7;
-          } else {
-            mixer_r = mixer_r - 5;
-          }
+          if (self.layer_priority == E_SLU_LAYER_PRIORITY_BLEND) {
+            if (mixer_r & 0x08) mixer_r = 7;
+            if (mixer_g & 0x08) mixer_g = 7;
+            if (mixer_b & 0x08) mixer_b = 7;
+          } else if (!mix_rgb_transparent) {
+            if (mixer_r <= 4) {
+              mixer_r = 0;
+            } else if ((mixer_r & 0x0C) == 0x0C) {
+              mixer_r = 7;
+            } else {
+              mixer_r = mixer_r - 5;
+            }
 
-          if (mixer_g <= 4) {
-            mixer_g = 0;
-          } else if ((mixer_g & 0x0C) == 0x0C) {
-            mixer_g = 7;
-          } else {
-            mixer_g = mixer_g - 5;
-          }
+            if (mixer_g <= 4) {
+              mixer_g = 0;
+            } else if ((mixer_g & 0x0C) == 0x0C) {
+              mixer_g = 7;
+            } else {
+              mixer_g = mixer_g - 5;
+            }
 
-          if (mixer_b <= 4) {
-            mixer_b = 0;
-          } else if ((mixer_b & 0x0C) == 0x0C) {
-            mixer_b = 7;
-          } else {
-            mixer_b = mixer_b - 5;
+            if (mixer_b <= 4) {
+              mixer_b = 0;
+            } else if ((mixer_b & 0x0C) == 0x0C) {
+              mixer_b = 7;
+            } else {
+              mixer_b = mixer_b - 5;
+            }
           }
         }
 
