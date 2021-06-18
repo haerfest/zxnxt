@@ -592,8 +592,6 @@ void ula_display_timing_set(ula_display_timing_t timing) {
 
 void ula_palette_set(int use_second) {
   self.palette = use_second ? E_PALETTE_ULA_SECOND : E_PALETTE_ULA_FIRST;
-
-  log_wrn("ula: palette %d\n", use_second ? 2 : 1);
 }
 
 
