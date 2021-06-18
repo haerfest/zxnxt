@@ -103,8 +103,8 @@ static int dma_get_address_delta(int group) {
 
 
 static void dma_load(void) {
-  const int   is_a_io         = self.group_value[1] & 0x80;
-  const int   is_b_io         = self.group_value[2] & 0x80;
+  const int   is_a_io         = self.group_value[1] & 0x08;
+  const int   is_b_io         = self.group_value[2] & 0x08;
   const int   a_address_delta = dma_get_address_delta(1);
   const int   b_address_delta = dma_get_address_delta(2);
   const u8_t  a_cycle_length  = self.a_variable_timing & 0x03;
