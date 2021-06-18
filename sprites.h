@@ -19,7 +19,6 @@ void sprites_enable_clipping_over_border_set(int enable);
 void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2);
 void sprites_attribute_set(u8_t slot, u8_t attribute, u8_t value);
 void sprites_transparency_index_write(u8_t value);
-void sprites_transparency_colour_write(u8_t rgb);
 u8_t sprites_slot_get(void);
 void sprites_slot_set(u8_t slot);
 void sprites_next_attribute_set(u8_t value);

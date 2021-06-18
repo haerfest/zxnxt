@@ -214,9 +214,6 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
       }
 
       entry = palette_read(self.palette, index);
-      if (entry->rgb16 == self.transparency_rgba) {
-        continue;
-      }
 
       /* Then figure out where to project it to. */
       for (magnified_row = sprite_row * magnification_y; magnified_row < (sprite_row + 1) * magnification_y; magnified_row++) {
@@ -282,9 +279,9 @@ void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb) {
     self.is_dirty = 0;
   }
 
-  *is_enabled = 1;
   offset      = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
   *rgb        = self.frame_buffer[offset];
+  *is_enabled = !self.is_transparent[offset];
 }
 
 
@@ -416,16 +413,6 @@ void sprites_transparency_index_write(u8_t value) {
   if (value != self.transparency_index) {
     self.transparency_index = value;
     self.is_dirty           = 1;
-  }
-}
-
-
-/* TODO: Not sure if sprites use the global transparency colour. */
-void sprites_transparency_colour_write(u8_t rgb) {
-  const u16_t rgba = palette_rgb8_rgb16(rgb);
-  if (rgba != self.transparency_rgba) {
-    self.transparency_rgba = rgba;
-    self.is_dirty          = 1;
   }
 }
 
