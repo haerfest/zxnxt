@@ -3,6 +3,7 @@
 
 
 #include "defs.h"
+#include "palette.h"
 
 
 int  layer2_init(u8_t* sram);
@@ -13,7 +14,7 @@ void layer2_access_write(u8_t value);
 void layer2_control_write(u8_t value);
 void layer2_active_bank_write(u8_t bank);
 void layer2_shadow_bank_write(u8_t bank);
-void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int* is_priority);
+void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t** rgb, int* is_priority);
 int  layer2_is_readable(int page);
 int  layer2_is_writable(int page);
 u8_t layer2_read(u16_t address);

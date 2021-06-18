@@ -110,19 +110,9 @@ static u8_t tilemap_attribute_get(u32_t row, u32_t column) {
 }
 
 
-void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_transparent, u16_t* rgba) {
-  *is_enabled     = self.is_enabled;
-  *is_transparent = 1;
-
+void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enabled, int* is_pixel_below, int* is_pixel_textmode, const palette_entry_t** rgb) {
   if (!self.is_enabled) {
-    return;
-  }
-
-  /* Honour the clipping area. */
-  if (row        < self.clip_y1
-   || row        > self.clip_y2
-   || column / 4 < self.clip_x1
-   || column / 4 > self.clip_x2) {
+    *is_enabled = 0;
     return;
   }
 
@@ -142,22 +132,12 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_transparent,
   const u8_t  palette_index  = palette_offset | (self.use_text_mode
                                                  ? ((pattern & (0x80 >> def_column)) ? 1 : 0)
                                                  : ((def_column & 0x01) ? (pattern & 0x0F) : (pattern >> 4)));
-  const palette_entry_t* entry = palette_read(self.palette, palette_index);
-
-  /**
-   * According to the VHDL, a check against the transparency colour is only
-   * performed when using text mode.
-   *
-   * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/zxnext.vhd
-   *
-   * > tm_transparent <= '1'
-   * >   when (tm_pixel_en_2 = '0') or
-   * >        (tm_pixel_textmode_2 = '1' and tm_rgb_2(8 downto 1) = transparent_rgb_2) or
-   * >        (tm_en_2 = '0')
-   * >   else '0';
-   */
-  *rgba           = entry->rgb16;
-  *is_transparent = self.use_text_mode && (entry->rgb8 == self.transparency_rgb8);
+  *is_enabled        = 1;
+  *is_pixel_enabled  = !(row        < self.clip_y1 || row        > self.clip_y2 ||
+                         column / 4 < self.clip_x1 || column / 4 > self.clip_x2);
+  *is_pixel_below    = self.use_512_tiles ? 0 : !(attribute & 1);
+  *is_pixel_textmode = self.use_text_mode;
+  *rgb               = palette_read(self.palette, palette_index);
 }
 
 

@@ -30,6 +30,7 @@ void                 slu_line_interrupt_control_write(u8_t value);
 u8_t                 slu_line_interrupt_value_lsb_read(void);
 void                 slu_line_interrupt_value_lsb_write(u8_t value);
 void                 slu_ula_control_write(u8_t value);
+void                 slu_transparent_rgb8_set(u8_t rgb);
 
 
 #endif  /* __SLU_H */

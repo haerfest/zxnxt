@@ -121,20 +121,18 @@ void layer2_shadow_bank_write(u8_t bank) {
 }
 
 
-void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int* is_priority) {
-  u8_t                   palette_index ;
-  const palette_entry_t* entry = NULL;
+void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t** rgb, int* is_priority) {
+  u8_t palette_index ;
 
   if (!self.is_visible) {
-    *is_transparent = 1;
+    *is_enabled = 0;
     return;
   }
 
   switch (self.resolution) {
     case E_RESOLUTION_256X192:
       if (row < 32 || row >= 32 + 192 || column < 32 * 2 || column >= (32 + 256) * 2) {
-        /* Border. */
-        *is_transparent = 1;
+        *is_enabled = 0;
         return;
       }
 
@@ -147,7 +145,7 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
        || row     > self.clip_y2
        || column  < self.clip_x1
        || column  > self.clip_x2) {
-        *is_transparent = 1;
+        *is_enabled = 0;
         return;
       }
 
@@ -155,7 +153,6 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
       column = (column + self.offset_x) % 256;
 
       palette_index = self.ram[self.active_bank * 16 * 1024 + row * 256 + column];
-      entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
       break;
 
     case E_RESOLUTION_320X256:
@@ -164,12 +161,11 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
        || row        > self.clip_y2
        || column / 2 < self.clip_x1
        || column / 2 > self.clip_x2) {
-        *is_transparent = 1;
+        *is_enabled = 0;
         return;
       }
 
       palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
-      entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
       break;
 
     default:
@@ -178,19 +174,18 @@ void layer2_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba, int*
        || row        > self.clip_y2
        || column / 2 < self.clip_x1
        || column / 2 > self.clip_x2) {
-        *is_transparent = 1;
+        *is_enabled = 0;
         return;
       }
 
       palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
       palette_index = (column & 1) ? (palette_index & 0x0F) : (palette_index >> 4);
-      entry         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
       break;
   }
 
-  *rgba           = entry->rgb16;
-  *is_priority    = entry->is_layer2_priority;
-  *is_transparent = entry->rgb8 == self.transparency_rgb8;
+  *is_enabled  = 1;
+  *rgb         = palette_read(self.palette, (self.palette_offset << 4) + palette_index);
+  *is_priority = (*rgb)->is_layer2_priority;
 }
 
 

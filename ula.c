@@ -378,7 +378,7 @@ void ula_did_complete_frame(void) {
  * Returns the ULA pixel colour for the frame buffer position, if any, and
  * whether it is transparent or not.
  */
-int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border, int* is_transparent, u16_t* rgba, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
+int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border, int* is_clipped, const palette_entry_t** rgb, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
   u8_t palette_index;
 
   self.ticks_14mhz_after_irq++;
@@ -392,6 +392,9 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border,
   } else if (self.ticks_14mhz_after_irq < N_IRQ_TSTATES * 4 && !self.disable_ula_irq) {
     cpu_irq();
   }
+
+  /* Need to know this for floating bus support. */
+  self.is_displaying_content = beam_row < 192 && beam_column / 2 < 256;
 
   /* Nothing to draw when beam is outside visible area. */
   if (beam_row >= self.display_spec->vblank_start && beam_row < self.display_spec->vblank_end) {
@@ -408,45 +411,24 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border,
   *frame_buffer_row    = (beam_row    >= self.display_spec->vblank_end) ? (beam_row    - self.display_spec->vblank_end) : (beam_row    + 32);
   *frame_buffer_column = (beam_column >= self.display_spec->hblank_end) ? (beam_column - self.display_spec->hblank_end) : (beam_column + 32 * 2);
 
-  *is_enabled     = self.is_enabled;
-  *is_border      = 0;
-  *is_transparent = 1;
-
   if (!self.is_enabled) {
+    *is_enabled = 0;
     return 1;
   }
 
-  /* Need to know this for floating bus support. */
-  self.is_displaying_content = beam_row < 192 && beam_column / 2 < 256;
-  *is_border                 = !self.is_displaying_content;
-
   if (self.is_displaying_content) {
-    /* Honour the clipping area. */
-    if (beam_row        < self.clip_y1
-     || beam_row        > self.clip_y2
-     || beam_column / 2 < self.clip_x1
-     || beam_column / 2 > self.clip_x2) {
-      return 1;
-    }
-
     /* Leave the pixel colour up to the specialized ULA mode handlers. */
-    if (!ula_display_handlers[self.display_mode](beam_row, beam_column, &palette_index)) {
-      return 1;
-    }
-  } else if (self.is_ula_next_mode) {
-    if (self.ula_next_mask_paper == 0) {
-      /* No background mask, border color is fallback color. */
-      return 1;
-    }
-    palette_index = 128 + self.border_colour;
+    (void) ula_display_handlers[self.display_mode](beam_row, beam_column, &palette_index);
   } else {
     /* Border is the same for all ULA modes. */
     palette_index = 16 + self.border_colour;
   }
 
-  const palette_entry_t* entry = palette_read(self.palette, palette_index);
-  *rgba           = entry->rgb16;
-  *is_transparent = entry->rgb8 == self.transparency_rgb8;
+  *is_enabled = 1;
+  *is_border  = !self.is_displaying_content;
+  *is_clipped = (beam_row        < self.clip_y1 || beam_row        > self.clip_y2 ||
+                 beam_column / 2 < self.clip_x1 || beam_column / 2 > self.clip_x2);
+  *rgb        = palette_read(self.palette, palette_index);
 
   return 1;
 }

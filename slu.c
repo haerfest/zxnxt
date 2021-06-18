@@ -12,156 +12,6 @@
 #include "ula.h"
 
 
-/**
- * A standard ULA screen (PAL) is generated like this, with pixels horizontally
- * and lines vertically:
- *
- * +-------------------------------------+
- * |                  ^                  |
- * |                 56                  |
- * |                  v                  |
- * |        +-------------------+        |
- * |        |                   |        |
- * |        |               ^   |        |
- * | < 32 > | < 256 >      192  | < 64 > | < 96 >
- * |        |               v   |        |
- * |        |                   |        |
- * |        +-------------------+        |
- * |                  ^                  |
- * |                 56                  |
- * |                  v                  |
- * +-------------------------------------+
- *                    ^
- *                    8
- *                    v
- *
- * In terms of timing, a single horizontal line takes:
- *
- *   32 + 256 + 64 + 96 = 448 pixels.
- *
- * And a single screen takes:
- *
- *   56 + 192 + 56 + 8 = 312 lines.
- *
- * At a 7 MHz pixel-clock, that gives 312 * 448 / 7 MHz = 19.968 msec
- * per frame, or a frame rate of 50.08 Hz.
- *
- * The Next uses a 14 MHz pixel-clock since it has video modes that double the
- * horizontal resolution. For a high-resolution ULA screen (PAL) which has a
- * content area 512 pixels wide, that becomes:
- *
- * +--------------------------------------+
- * |                  ^                   |
- * |                 56                   |
- * |                  v                   |
- * |        +-------------------+         |
- * |        |                   |         |
- * |        |               ^   |         |
- * | < 64 > | < 512 >      192  | < 128 > | < 192 >
- * |        |               v   |         |
- * |        |                   |         |
- * |        +-------------------+         |
- * |                  ^                   |
- * |                 56                   |
- * |                  v                   |
- * +--------------------------------------+
- *                    ^
- *                    8
- *                    v
- *
- * And for some of the other video modes the same total width, but slightly
- * different arrangement between borders and their content area of 640 pixels:
- *
- * +----------------------------+
- * |         ^                  |
- * |        56                  |
- * |         v                  |
- * +-------------------+        |
- * |                   |        |
- * |               ^   |        |
- * | < 640 >      192  | < 64 > | < 192 >
- * |               v   |        |
- * |                   |        |
- * +-------------------+        |
- * |         ^                  |
- * |        56                  |
- * |         v                  |
- * +----------------------------+
- *           ^
- *           8
- *           v
- *
- * These "layers" can be overlaid on top of one another. The resulting image
- * that is visible is 640 pixels x 256 lines, which is cut out as follows:
- *
- * For the default ULA screen:
- *
- * +----------------------------------------------+
- * |                 24                           |
- * +-------------------------------------+        |
- * |                 32                  |        |
- * |        +-------------------+        |        |
- * |        |                   |        |        |
- * |        |               ^   |        |        |
- * | < 32 > | < 256 >      192  | < 32 > | < 32 > | < 96 >
- * |        |               v   |        |        |
- * |        |                   |        |        |
- * |        +-------------------+        |        |
- * |                 32                  |        |
- * +-------------------------------------+        |
- * |                 24                           |
- * +----------------------------------------------+
- *                    ^
- *                    8
- *                    v
- *
- * For the high resolution ULA screen:
- *
- * +----------------------------------------------+
- * |                 24                           |
- * +-------------------------------------+        |
- * |                 32                  |        |
- * |        +-------------------+        |        |
- * |        |                   |        |        |
- * |        |               ^   |        |        |
- * | < 64 > | < 512 >      192  | < 64 > | < 64 > | < 192 >
- * |        |               v   |        |        |
- * |        |                   |        |        |
- * |        +-------------------+        |        |
- * |                 32                  |        |
- * +-------------------------------------+        |
- * |                 24                           |
- * +----------------------------------------------+
- *                    ^
- *                    8
- *                    v
- *
- * For the other video modes:
- *
- * +----------------------------------------------+
- * |                 24                           |
- * +-------------------------------------+        |
- * |                                     |        |
- * |                                     |        |
- * |                                     |        |
- * |                                 ^   |        |
- * | < 640 >                        256  | < 64 > | < 192 >
- * |                                 v   |        |
- * |                                     |        |
- * |                                     |        |
- * |                                     |        |
- * +-------------------------------------+        |
- * |                 24                           |
- * +----------------------------------------------+
- *                    ^
- *                    8
- *                    v
- *
- * The SLU blends all the layers together, so we need every layer to fill a
- * 640 x 256 frame buffer and return that so that the SLU can blend them.
- */
-
-
 #define HORIZONTAL_RETRACE  192  /* Pixels or clock ticks. */
 #define VERTICAL_RETRACE      8  /* Lines.                 */
 
@@ -188,6 +38,7 @@ typedef struct {
   u16_t                line_irq_row;
   int                  stencil_mode;
   blend_mode_t         blend_mode;
+  u8_t                 transparent_rgb8;
 } self_t;
 
 
@@ -203,8 +54,9 @@ int slu_init(SDL_Renderer* renderer, SDL_Texture* texture) {
     return -1;
   }
 
-  self.renderer = renderer;
-  self.texture  = texture;
+  self.renderer         = renderer;
+  self.texture          = texture;
+  self.transparent_rgb8 = 0xE3;
 
   return 0;
 }
@@ -277,175 +129,313 @@ static void slu_beam_advance(void) {
 }
 
 
+static void slu_irq(void) {
+  if (self.line_irq_enabled && self.beam_row == self.line_irq_row) {
+    if (self.beam_column == 0) {
+      self.line_irq_active = 1;
+      cpu_irq();
+    }
+  } else {
+    self.line_irq_active = 0;
+  }
+}
+
+
 u32_t slu_run(u32_t ticks_14mhz) {
+  const palette_entry_t black = {
+    .rgb8  = 0,
+    .rgb9  = 0,
+    .rgb16 = 0
+  };
+
   u32_t tick;
   u32_t frame_buffer_row;
   u32_t frame_buffer_column;
 
-  int   ula_is_enabled;
-  int   ula_is_border;
-  int   ula_is_transparent;
-  u16_t ula_rgba;
+  /* These are the same names as in the VHDL for consistency. */
+  int              ula_en;
+  int              ula_border;
+  int              ula_clipped;
+  int              ula_transparent;
+  const palette_entry_t* ula_rgb;
 
-  int   tilemap_is_enabled;
-  int   tilemap_is_transparent;
-  u16_t tilemap_rgba;
+  int              ulatm_transparent;
+  const palette_entry_t* ulatm_rgb;
 
-  int   sprites_is_transparent;
-  u16_t sprites_rgba;
+  int              ula_final_transparent;
+  const palette_entry_t* ula_final_rgb;
 
-  int   ula_final_is_transparent;
-  u16_t ula_final_rgba;
+  int              ula_mix_transparent;
+  const palette_entry_t* ula_mix_rgb;
 
-  int   layer2_is_transparent;
-  u16_t layer2_rgba;
-  int   layer2_is_priority;
+  int              tm_en;
+  int              tm_transparent;
+  const palette_entry_t* tm_rgb;
+  int              tm_pixel_en;
+  int              tm_pixel_textmode;
+  int              tm_pixel_below;
 
-  u16_t rgba;
+  int              sprite_transparent;
+  u16_t            sprite_rgb16;
+  int              sprite_pixel_en;
+
+  int              layer2_pixel_en;
+  int              layer2_priority;
+  int              layer2_transparent;
+  const palette_entry_t* layer2_rgb;
+
+  int              stencil_transparent;
+  palette_entry_t  stencil_rgb;
+
+  int              mix_rgb_transparent;
+  const palette_entry_t* mix_rgb;
+  int              mix_top_transparent;
+  const palette_entry_t* mix_top_rgb;
+  int              mix_bot_transparent;
+  const palette_entry_t* mix_bot_rgb;
+
+  u8_t             mixer_r;
+  u8_t             mixer_g;
+  u8_t             mixer_b;
+
+  u16_t            rgb_out;
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
     slu_beam_advance();
-
-    if (self.line_irq_enabled && self.beam_row == self.line_irq_row) {
-      if (self.beam_column == 0) {
-        self.line_irq_active = 1;
-        cpu_irq();
-      }
-    } else {
-      self.line_irq_active = 0;
-    }
+    slu_irq();
 
     /* Copper runs at 28 MHz. */
     copper_tick(self.beam_row, self.beam_column);
     copper_tick(self.beam_row, self.beam_column);
 
-    if (!ula_tick(self.beam_row, self.beam_column, &ula_is_enabled, &ula_is_border, &ula_is_transparent, &ula_rgba, &frame_buffer_row, &frame_buffer_column)) {
+    if (!ula_tick(self.beam_row, self.beam_column, &ula_en, &ula_border, &ula_clipped, &ula_rgb, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
       continue;
     }
 
-    tilemap_tick(frame_buffer_row, frame_buffer_column, &tilemap_is_enabled, &tilemap_is_transparent, &tilemap_rgba);
-    sprites_tick(frame_buffer_row, frame_buffer_column, &sprites_is_transparent, &sprites_rgba);
-    layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_is_transparent,  &layer2_rgba, &layer2_is_priority);
+    tilemap_tick(frame_buffer_row, frame_buffer_column, &tm_en, &tm_pixel_en, &tm_pixel_below, &tm_pixel_textmode, &tm_rgb);
+    sprites_tick(frame_buffer_row, frame_buffer_column, &sprite_pixel_en, &sprite_rgb16);
+    layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_pixel_en, &layer2_rgb, &layer2_priority);
 
-    /* Mix ULA and tilemap. */
-    if (ula_is_enabled && tilemap_is_enabled && self.stencil_mode) {
-      ula_final_is_transparent = ula_is_transparent || tilemap_is_transparent;
-      ula_final_rgba           = ula_rgba & tilemap_rgba;
-    } else {
-      ula_final_is_transparent = ula_is_transparent && tilemap_is_transparent;
-      if (!ula_final_is_transparent) {
-        ula_final_rgba = (!tilemap_is_transparent && (ula_is_transparent || tilemap_priority_over_ula_get(frame_buffer_row, frame_buffer_column)))
-          ? tilemap_rgba
-          : ula_rgba;
-      }
+    ula_mix_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
+    ula_mix_rgb         = ula_mix_transparent ? ula_rgb : &black;
+
+    ula_transparent = ula_mix_transparent || !ula_en;
+    if (ula_transparent) {
+      ula_rgb = &black;
     }
 
-    /* The default, when no layer specifies a colour. */
-    rgba = self.fallback_rgba;
+    tm_transparent = !tm_en || !tm_pixel_en || (tm_pixel_textmode && tm_rgb->rgb8 == self.transparent_rgb8);
+    if (tm_transparent) {
+      tm_rgb = &black;
+    }
+
+    stencil_transparent = ula_transparent || tm_transparent;
+    stencil_rgb.rgb16   = !stencil_transparent ? (ula_rgb->rgb16 & tm_rgb->rgb16) : 0;
+
+    ulatm_transparent = ula_transparent && tm_transparent;
+    ulatm_rgb         = (!tm_transparent && (!tm_pixel_below || ula_transparent)) ? tm_rgb : ula_rgb;
+
+    sprite_transparent = !sprite_pixel_en;
+    if (sprite_transparent) {
+      sprite_rgb16 = 0;
+    }
+
+    layer2_transparent = !layer2_pixel_en || (layer2_rgb->rgb8 == self.transparent_rgb8);
+    if (layer2_transparent) {
+      layer2_rgb      = &black;
+      layer2_priority = 0;
+    }
+
+    if (self.stencil_mode && ula_en && tm_en) {
+      ula_final_rgb         = &stencil_rgb;
+      ula_final_transparent = stencil_transparent;
+    } else {
+      ula_final_rgb         = ulatm_rgb;
+      ula_final_transparent = ulatm_transparent;
+    }
+
+    switch (self.blend_mode) {
+      case E_BLEND_MODE_ULA:
+        mix_rgb             = ula_mix_rgb;
+        mix_rgb_transparent = ula_mix_transparent;
+        mix_top_transparent = tm_transparent || tm_pixel_below;
+        mix_top_rgb         = tm_rgb;
+        mix_bot_transparent = tm_transparent || !tm_pixel_below;
+        mix_bot_rgb         = tm_rgb;
+        break;
+
+      case E_BLEND_MODE_ULA_TILEMAP_MIX:
+        mix_rgb             = ula_final_rgb;
+        mix_rgb_transparent = ula_final_transparent;
+        mix_top_transparent = 1;
+        mix_top_rgb         = tm_rgb;
+        mix_bot_transparent = 1;
+        mix_bot_rgb         = tm_rgb;
+        break;
+
+      case E_BLEND_MODE_TILEMAP:
+        mix_rgb             = tm_rgb;
+        mix_rgb_transparent = tm_transparent;
+        mix_top_transparent = ula_transparent || !tm_pixel_below;
+        mix_top_rgb         = ula_rgb;
+        mix_bot_transparent = ula_transparent || tm_pixel_below;
+        mix_bot_rgb         = ula_rgb;
+        break;
+
+      default:
+        mix_rgb             = 0;
+        mix_rgb_transparent = 1;
+        if (tm_pixel_below) {
+          mix_top_transparent = ula_transparent;
+          mix_top_rgb         = ula_rgb;
+          mix_bot_transparent = tm_transparent;
+          mix_bot_rgb         = tm_rgb;
+        } else {
+          mix_top_transparent = tm_transparent;
+          mix_top_rgb         = tm_rgb;
+          mix_bot_transparent = ula_transparent;
+          mix_bot_rgb         = ula_rgb;
+        }
+        break;
+    }
+
+    mixer_r = ((layer2_rgb->rgb9 & 0x1C0) >> 2) | ((mix_rgb->rgb9 & 0x1C0) >> 6);
+    mixer_g = ((layer2_rgb->rgb9 & 0x038) << 1) | ((mix_rgb->rgb9 & 0x038) >> 3);
+    mixer_b = ((layer2_rgb->rgb9 & 0x007) << 4) |  (mix_rgb->rgb9 & 0x007);
+
+    rgb_out = self.fallback_rgba;
 
     switch (self.layer_priority)
     {
       case E_SLU_LAYER_PRIORITY_SLU:
-        if (layer2_is_priority && !layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!sprites_is_transparent) {
-          rgba = sprites_rgba;
-        } else if (!layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!ula_final_is_transparent) {
-          rgba = ula_final_rgba;
+        if (layer2_priority) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
+        } else if (!layer2_transparent) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!ula_final_transparent) {
+          rgb_out = ula_final_rgb->rgb16;
         }
         break;
 
       case E_SLU_LAYER_PRIORITY_LSU:
-        if (!layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!sprites_is_transparent) {
-          rgba = sprites_rgba;
-        } else if (!ula_final_is_transparent) {
-          rgba = ula_final_rgba;
+        if (!layer2_transparent) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
+        } else if (!ula_final_transparent) {
+          rgb_out = ula_final_rgb->rgb16;
+        }
+        break;
+
+      case E_SLU_LAYER_PRIORITY_SUL:
+        if (layer2_priority) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
+        } else if (!ula_final_transparent) {
+          rgb_out = ula_final_rgb->rgb16;
+        } else if (!layer2_transparent) {
+          rgb_out = layer2_rgb->rgb16;
         }
         break;
 
       case E_SLU_LAYER_PRIORITY_LUS:
-        if (!layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!ula_final_is_transparent  && !(ula_is_border && tilemap_is_transparent && !sprites_is_transparent)) {
-          rgba = ula_final_rgba;
-        } else if (!sprites_is_transparent) {
-          rgba = sprites_rgba;
+        if (!layer2_transparent) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!ula_final_transparent && !(ula_border && tm_transparent && !sprite_transparent)) {
+          rgb_out = ula_final_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
         }
         break;
         
-      case E_SLU_LAYER_PRIORITY_SUL:
-        if (layer2_is_priority && !layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!sprites_is_transparent) {
-          rgba = sprites_rgba;
-        } else if (!ula_final_is_transparent) {
-          rgba = ula_final_rgba;
-        } else if (!layer2_is_transparent) {
-          rgba = layer2_rgba;
-        }
-        break;
- 
       case E_SLU_LAYER_PRIORITY_USL:
-        if (layer2_is_priority && !layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!ula_final_is_transparent && !(ula_is_border && tilemap_is_transparent && !sprites_is_transparent)) {
-          rgba = ula_final_rgba;
-        } else if (!sprites_is_transparent) {
-          rgba = sprites_rgba;
-        } else if (!layer2_is_transparent) {
-          rgba = layer2_rgba;
+        if (layer2_priority) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!ula_final_transparent && !(ula_border && tm_transparent && !sprite_transparent)) {
+          rgb_out = ula_final_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
+        } else if (!layer2_transparent) {
+          rgb_out = layer2_rgb->rgb16;
         }
         break;
 
       case E_SLU_LAYER_PRIORITY_ULS:
-        if (layer2_is_priority && !layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!ula_final_is_transparent && !(ula_is_border && tilemap_is_transparent && !sprites_is_transparent)) {
-          rgba = ula_final_rgba;
-        } else if (!layer2_is_transparent) {
-          rgba = layer2_rgba;
-        } else if (!sprites_is_transparent) {
-          rgba = sprites_rgba;
+        if (layer2_priority) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!ula_final_transparent && !(ula_border && tm_transparent && !sprite_transparent)) {
+          rgb_out = ula_final_rgb->rgb16;
+        } else if (!layer2_transparent) {
+          rgb_out = layer2_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
         }
         break;
 
-        /**
-         * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
-         *
-         * > 110 - (U|T)S(T|U)(B+L) Blending layer and Layer 2 combined, colours clamped to [0,7]
-         * > 111 - (U|T)S(T|U)(B+L-5) Blending layer and Layer 2 combined, colours clamped to [0,7]
-         *
-         * Manual:
-         *
-         * > 6 Sprites over (Layer 2 + ULA combined) – colours clamped to 7
-         * > 7 Sprites over (Layer 2 + ULA combined) – colours clamped to (0,7)
-         *
-         * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
-         *
-         * > 0x68 (104) => ULA Control
-         * >   bits 6:5 = Blending in SLU modes 6 & 7 (soft reset = 0)
-         * >    = 00 for ula as blend colour
-         * >    = 10 for ula/tilemap mix result as blend colour
-         * >    = 11 for tilemap as blend colour
-         * >    = 01 for no blending
-         *
-         * https://www.specnext.com/tilemap-mode/
-         *
-         * > Bit 6 determines what colour is used in SLU modes 6 & 7 where the
-         * > ULA is combined with Layer 2 to generate highlighting effects."
-         */
       case E_SLU_LAYER_PRIORITY_BLEND:
+        if (mixer_r & 0x08) mixer_r = 7;
+        if (mixer_g & 0x08) mixer_g = 7;
+        if (mixer_b & 0x08) mixer_b = 7;
+
+        if (layer2_priority) {
+          rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
+        } else if (!mix_top_transparent) {
+          rgb_out = mix_top_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
+        } else if (!mix_bot_transparent) {
+          rgb_out = mix_bot_rgb->rgb16;
+        } else if (!layer2_transparent) {
+          rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
+        }
+        break;
+
       case E_SLU_LAYER_PRIORITY_BLEND_5:
-        log_wrn("slu: unimplemented layer priority %d\n", self.layer_priority);
+        if (!mix_rgb_transparent) {
+          if (mixer_r <= 4) {
+            mixer_r = 0;
+          } else if ((mixer_r & 0x0C) == 0x0C) {
+            mixer_r = 7;
+          } else {
+            mixer_r = mixer_r - 5;
+          }
+
+          if (mixer_g <= 4) {
+            mixer_g = 0;
+          } else if ((mixer_g & 0x0C) == 0x0C) {
+            mixer_g = 7;
+          } else {
+            mixer_g = mixer_g - 5;
+          }
+
+          if (mixer_b <= 4) {
+            mixer_b = 0;
+          } else if ((mixer_b & 0x0C) == 0x0C) {
+            mixer_b = 7;
+          } else {
+            mixer_b = mixer_b - 5;
+          }
+        }
+
+        if (layer2_priority) {
+          rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
+        } else if (!mix_top_transparent) {
+          rgb_out = mix_top_rgb->rgb16;
+        } else if (!sprite_transparent) {
+          rgb_out = sprite_rgb16;
+        } else if (!mix_bot_transparent) {
+          rgb_out = mix_bot_rgb->rgb16;
+        } else if (!layer2_transparent) {
+          rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
+        }
         break;
     }
     
-    self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgba;
+    self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgb_out;
   }
 
   /* TODO Deal with ULA using 7 MHz clock, not always consuming all ticks. */
@@ -509,4 +499,9 @@ void slu_ula_control_write(u8_t value) {
   self.stencil_mode             = value & 0x01;
 
   log_wrn("slu: blend mode %d\n", self.blend_mode);
+}
+
+
+void slu_transparent_rgb8_set(u8_t rgb) {
+  self.transparent_rgb8 = rgb;
 }

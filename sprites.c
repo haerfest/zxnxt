@@ -269,11 +269,11 @@ static void draw_sprites(void) {
 }
 
 
-void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
+void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb) {
   size_t offset;
 
   if (!self.is_enabled) {
-    *is_transparent = 1;
+    *is_enabled = 0;
     return;
   }
 
@@ -282,9 +282,9 @@ void sprites_tick(u32_t row, u32_t column, int* is_transparent, u16_t* rgba) {
     self.is_dirty = 0;
   }
 
-  offset          = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
-  *is_transparent = !self.is_enabled || self.is_transparent[offset];
-  *rgba           = self.frame_buffer[offset];
+  *is_enabled = 1;
+  offset      = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
+  *rgb        = self.frame_buffer[offset];
 }
 
 
