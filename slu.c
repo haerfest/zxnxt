@@ -489,3 +489,8 @@ void slu_ula_control_write(u8_t value) {
 void slu_transparent_rgb8_set(u8_t rgb) {
   self.transparent_rgb8 = rgb;
 }
+
+
+u8_t slu_transparent_rgb8_get(void) {
+  return self.transparent_rgb8;
+}

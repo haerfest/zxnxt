@@ -768,6 +768,11 @@ void ula_attribute_byte_format_write(u8_t value) {
 }
 
 
+u8_t ula_attribute_byte_format_read(void) {
+  return self.ula_next_mask_ink;
+}
+
+
 void ula_next_mode_enable(int do_enable) {
   self.is_ula_next_mode = do_enable;
 }

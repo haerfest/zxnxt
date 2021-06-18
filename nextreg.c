@@ -399,11 +399,6 @@ static void nextreg_alternate_rom_write(u8_t value) {
 }
 
 
-static u8_t nextreg_clip_window_ula_read(void) {
-  return self.ula_clip.values[self.ula_clip.index];
-}
-
-
 static void nextreg_clip_window_ula_write(u8_t value) {
   self.ula_clip.values[self.ula_clip.index] = value;
 
@@ -866,7 +861,16 @@ u8_t nextreg_read_internal(u8_t reg) {
       return nextreg_sprite_layers_system_read();
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_ULA:
-      return nextreg_clip_window_ula_read();
+      return self.ula_clip.values[self.ula_clip.index];
+
+    case E_NEXTREG_REGISTER_CLIP_WINDOW_TILEMAP:
+      return self.tilemap_clip.values[self.tilemap_clip.index];
+
+    case E_NEXTREG_REGISTER_CLIP_WINDOW_SPRITES:
+      return self.sprites_clip.values[self.sprites_clip.index];
+
+    case E_NEXTREG_REGISTER_CLIP_WINDOW_LAYER2:
+      return self.layer2_clip.values[self.layer2_clip.index];
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_CONTROL:
       return nextreg_clip_window_control_read();
@@ -882,6 +886,12 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_PALETTE_VALUE_9BITS:
       return nextreg_palette_value_9bits_read();
+
+    case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR:
+      return slu_transparent_rgb8_get();
+
+    case E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT:
+      return ula_attribute_byte_format_read();
 
     case E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT1_CONTROL:
