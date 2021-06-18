@@ -10,9 +10,6 @@ all: zxnxt
 zxnxt: opcodes.c $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
-ula.o: ula.c ula_mode_x.c ula_hi_res.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
 cpu.o: cpu.c opcodes.c
 	$(CC) $(CFLAGS) -c $< -o $@
 

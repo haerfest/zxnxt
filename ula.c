@@ -295,14 +295,50 @@ typedef struct {
 static self_t self;
 
 
-#include "ula_mode_x.c"
-#include "ula_hi_res.c"
-
-
 #define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES - E_ULA_DISPLAY_MODE_SCREEN_0 + 1)
 
 
-typedef int (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column, u8_t* palette_index);
+static u8_t ula_display_mode_hi_res(u32_t row, u32_t column) {
+  const u8_t  mask             = 1 << (7 - (column & 0x07));
+  const u16_t display_offset   = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | (((column >> 1) / 8) & 0x1F);;
+  const u8_t* display_ram      = ((column / 8) & 0x01) ? self.display_ram_odd : self.display_ram;
+  const u8_t  display_byte     = display_ram[display_offset];
+
+  return (display_byte & mask)
+    ? 0  + 8 + self.hi_res_ink_colour
+    : 16 + 8 + (~self.hi_res_ink_colour & 0x07);
+}
+
+
+static u8_t ula_display_mode_screen_x(u32_t row, u32_t column) {
+  const u32_t halved_column    = column / 2;
+  const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
+  const u16_t attribute_offset = (row / 8) * 32 + halved_column / 8;
+  const u8_t  attribute_byte   = self.attribute_ram[attribute_offset];
+  const u16_t display_offset   = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | ((halved_column / 8) & 0x1F);
+  const u8_t  display_byte     = self.display_ram[display_offset];
+  const int   is_foreground    = display_byte & mask;
+
+  u8_t ink;
+  u8_t paper;
+  u8_t blink;
+  u8_t bright;
+
+  /* For floating-bus support. */
+  self.attribute_byte = attribute_byte;
+
+  bright = (attribute_byte & 0x40) >> 3;
+  ink    = 0  + bright + (attribute_byte & 0x07);
+  paper  = 16 + bright + ((attribute_byte >> 3) & 0x07);
+  blink  = attribute_byte & 0x80;
+
+  return is_foreground
+    ? ((blink && self.blink_state) ? paper : ink)
+    : ((blink && self.blink_state) ? ink : paper);
+}
+
+
+typedef u8_t (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
 
 const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES] = {  
   ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
@@ -418,7 +454,7 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border,
 
   if (self.is_displaying_content) {
     /* Leave the pixel colour up to the specialized ULA mode handlers. */
-    (void) ula_display_handlers[self.display_mode](beam_row, beam_column, &palette_index);
+    palette_index = ula_display_handlers[self.display_mode](beam_row, beam_column);
   } else {
     /* Border is the same for all ULA modes. */
     palette_index = 16 + self.border_colour;
