@@ -662,12 +662,6 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR:
-#if 0
-      ula_transparency_colour_write(value);
-      layer2_transparency_colour_write(value);
-      tilemap_transparency_colour_write(value);
-      sprites_transparency_colour_write(value);
-#endif
       slu_transparent_rgb8_set(value);
       break;
 
