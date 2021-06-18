@@ -19,7 +19,6 @@ void   tilemap_offset_x_lsb_write(u8_t value);
 void   tilemap_offset_y_write(u8_t value);
 int    tilemap_priority_over_ula_get(u32_t row, u32_t column);
 void   tilemap_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2);
-void   tilemap_transparency_colour_write(u8_t rgb);
 
 
 #endif  /* __TILEMAP_H */

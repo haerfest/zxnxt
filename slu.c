@@ -217,10 +217,10 @@ u32_t slu_run(u32_t ticks_14mhz) {
     sprites_tick(frame_buffer_row, frame_buffer_column, &sprite_pixel_en, &sprite_rgb16);
     layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_pixel_en, &layer2_rgb, &layer2_priority);
 
-    ula_mix_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
+    ula_mix_transparent = !ula_en || ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
     ula_mix_rgb         = ula_mix_transparent ? ula_rgb : &black;
 
-    ula_transparent = ula_mix_transparent || !ula_en;
+    ula_transparent = ula_mix_transparent;
     if (ula_transparent) {
       ula_rgb = &black;
     }

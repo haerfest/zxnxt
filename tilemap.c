@@ -17,8 +17,7 @@ typedef struct {
   u8_t      default_attribute;
   u16_t     definitions_base_address;
   u16_t     tilemap_base_address;
-  u16_t     transparency_rgb8;
-  u8_t      transparency_index;  /* How is this used? */
+  u8_t      transparency_index;
   int       is_enabled;
   int       use_80x32;
   int       use_default_attribute;
@@ -119,6 +118,10 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enable
   row    = (row    + self.offset_y) % FRAME_BUFFER_HEIGHT;
   column = (column + self.offset_x) % FRAME_BUFFER_WIDTH;
 
+  const int is_clipped = \
+    row        < self.clip_y1 || row        > self.clip_y2 ||
+    column / 4 < self.clip_x1 || column / 4 > self.clip_x2;
+
   const u16_t map_offset     = tilemap_map_offset_get(row, column);
   const u8_t  attribute      = tilemap_attribute_get(row, column);
   const u8_t  tile           = self.bank5[map_offset] | (self.use_512_tiles ? (attribute & 0x01) << 8 : 0);
@@ -132,9 +135,10 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enable
   const u8_t  palette_index  = palette_offset | (self.use_text_mode
                                                  ? ((pattern & (0x80 >> def_column)) ? 1 : 0)
                                                  : ((def_column & 0x01) ? (pattern & 0x0F) : (pattern >> 4)));
+  const int   is_transparent = palette_index == self.transparency_index;
+
   *is_enabled        = 1;
-  *is_pixel_enabled  = !(row        < self.clip_y1 || row        > self.clip_y2 ||
-                         column / 4 < self.clip_x1 || column / 4 > self.clip_x2);
+  *is_pixel_enabled  = !(is_clipped || is_transparent);
   *is_pixel_below    = self.use_512_tiles ? 0 : !(attribute & 1);
   *is_pixel_textmode = self.use_text_mode;
   *rgb               = palette_read(self.palette, palette_index);
@@ -183,9 +187,4 @@ void tilemap_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
   self.clip_x2 = x2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
-}
-
-
-void tilemap_transparency_colour_write(u8_t rgb) {
-  self.transparency_rgb8 = rgb;
 }

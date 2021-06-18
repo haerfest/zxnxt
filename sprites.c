@@ -412,7 +412,6 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
 }
 
 
-/* TODO: What if the colour behind this index changes behind our back? */
 void sprites_transparency_index_write(u8_t value) {
   if (value != self.transparency_index) {
     self.transparency_index = value;
