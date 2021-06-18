@@ -452,19 +452,18 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border,
     return 1;
   }
 
-  if (self.is_displaying_content) {
-    /* Leave the pixel colour up to the specialized ULA mode handlers. */
-    palette_index = ula_display_handlers[self.display_mode](beam_row, beam_column);
-  } else {
-    /* Border is the same for all ULA modes. */
-    palette_index = 16 + self.border_colour;
-  }
+  palette_index = self.is_displaying_content
+    ? ula_display_handlers[self.display_mode](beam_row, beam_column)
+    : 16 + self.border_colour;
 
+  *rgb        = palette_read(self.palette, palette_index);
   *is_enabled = 1;
   *is_border  = !self.is_displaying_content;
-  *is_clipped = (beam_row        < self.clip_y1 || beam_row        > self.clip_y2 ||
-                 beam_column / 2 < self.clip_x1 || beam_column / 2 > self.clip_x2);
-  *rgb        = palette_read(self.palette, palette_index);
+
+  *is_clipped = self.is_displaying_content
+    ? (beam_row        < self.clip_y1 || beam_row        > self.clip_y2 ||
+       beam_column / 2 < self.clip_x1 || beam_column / 2 > self.clip_x2)
+    : 0;
 
   return 1;
 }
@@ -593,6 +592,8 @@ void ula_display_timing_set(ula_display_timing_t timing) {
 
 void ula_palette_set(int use_second) {
   self.palette = use_second ? E_PALETTE_ULA_SECOND : E_PALETTE_ULA_FIRST;
+
+  log_wrn("ula: palette %d\n", use_second ? 2 : 1);
 }
 
 
