@@ -217,92 +217,30 @@ u32_t slu_run(u32_t ticks_14mhz) {
     sprites_tick(frame_buffer_row, frame_buffer_column, &sprite_pixel_en, &sprite_rgb16);
     layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_pixel_en, &layer2_rgb, &layer2_priority);
 
-    ula_mix_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
-    ula_mix_rgb         = ula_mix_transparent ? ula_rgb : &black;
-
-    ula_transparent = ula_mix_transparent || !ula_en;
-    if (ula_transparent) {
-      ula_rgb = &black;
-    }
-
+    ula_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8) || !ula_en;
     tm_transparent = !tm_en || !tm_pixel_en || (tm_pixel_textmode && tm_rgb->rgb8 == self.transparent_rgb8);
-    if (tm_transparent) {
-      tm_rgb = &black;
-    }
-
-    stencil_transparent = ula_transparent || tm_transparent;
-    stencil_rgb.rgb16   = !stencil_transparent ? (ula_rgb->rgb16 & tm_rgb->rgb16) : 0;
-
-    ulatm_transparent = ula_transparent && tm_transparent;
-    ulatm_rgb         = (!tm_transparent && (!tm_pixel_below || ula_transparent)) ? tm_rgb : ula_rgb;
 
     sprite_transparent = !sprite_pixel_en;
-    if (sprite_transparent) {
-      sprite_rgb16 = 0;
-    }
 
     layer2_transparent = !layer2_pixel_en || (layer2_rgb->rgb8 == self.transparent_rgb8);
     if (layer2_transparent) {
-      layer2_rgb      = &black;
       layer2_priority = 0;
     }
 
     if (self.stencil_mode && ula_en && tm_en) {
+      stencil_transparent   = ula_transparent || tm_transparent;
+      stencil_rgb.rgb16     = !stencil_transparent ? (ula_rgb->rgb16 & tm_rgb->rgb16) : 0;
       ula_final_rgb         = &stencil_rgb;
       ula_final_transparent = stencil_transparent;
     } else {
+      if (ula_transparent) ula_rgb = &black;
+      if (tm_transparent)  tm_rgb  = &black;
+
+      ulatm_transparent     = ula_transparent && tm_transparent;
+      ulatm_rgb             = (!tm_transparent && (!tm_pixel_below || ula_transparent)) ? tm_rgb : ula_rgb;
       ula_final_rgb         = ulatm_rgb;
       ula_final_transparent = ulatm_transparent;
     }
-
-    switch (self.blend_mode) {
-      case E_BLEND_MODE_ULA:
-        mix_rgb             = ula_mix_rgb;
-        mix_rgb_transparent = ula_mix_transparent;
-        mix_top_transparent = tm_transparent || tm_pixel_below;
-        mix_top_rgb         = tm_rgb;
-        mix_bot_transparent = tm_transparent || !tm_pixel_below;
-        mix_bot_rgb         = tm_rgb;
-        break;
-
-      case E_BLEND_MODE_ULA_TILEMAP_MIX:
-        mix_rgb             = ula_final_rgb;
-        mix_rgb_transparent = ula_final_transparent;
-        mix_top_transparent = 1;
-        mix_top_rgb         = tm_rgb;
-        mix_bot_transparent = 1;
-        mix_bot_rgb         = tm_rgb;
-        break;
-
-      case E_BLEND_MODE_TILEMAP:
-        mix_rgb             = tm_rgb;
-        mix_rgb_transparent = tm_transparent;
-        mix_top_transparent = ula_transparent || !tm_pixel_below;
-        mix_top_rgb         = ula_rgb;
-        mix_bot_transparent = ula_transparent || tm_pixel_below;
-        mix_bot_rgb         = ula_rgb;
-        break;
-
-      default:
-        mix_rgb             = 0;
-        mix_rgb_transparent = 1;
-        if (tm_pixel_below) {
-          mix_top_transparent = ula_transparent;
-          mix_top_rgb         = ula_rgb;
-          mix_bot_transparent = tm_transparent;
-          mix_bot_rgb         = tm_rgb;
-        } else {
-          mix_top_transparent = tm_transparent;
-          mix_top_rgb         = tm_rgb;
-          mix_bot_transparent = ula_transparent;
-          mix_bot_rgb         = ula_rgb;
-        }
-        break;
-    }
-
-    mixer_r = ((layer2_rgb->rgb9 & 0x1C0) >> 2) | ((mix_rgb->rgb9 & 0x1C0) >> 6);
-    mixer_g = ((layer2_rgb->rgb9 & 0x038) << 1) | ((mix_rgb->rgb9 & 0x038) >> 3);
-    mixer_b = ((layer2_rgb->rgb9 & 0x007) << 4) |  (mix_rgb->rgb9 & 0x007);
 
     rgb_out = self.fallback_rgba;
 
@@ -377,25 +315,64 @@ u32_t slu_run(u32_t ticks_14mhz) {
         break;
 
       case E_SLU_LAYER_PRIORITY_BLEND:
-        if (mixer_r & 0x08) mixer_r = 7;
-        if (mixer_g & 0x08) mixer_g = 7;
-        if (mixer_b & 0x08) mixer_b = 7;
-
-        if (layer2_priority) {
-          rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
-        } else if (!mix_top_transparent) {
-          rgb_out = mix_top_rgb->rgb16;
-        } else if (!sprite_transparent) {
-          rgb_out = sprite_rgb16;
-        } else if (!mix_bot_transparent) {
-          rgb_out = mix_bot_rgb->rgb16;
-        } else if (!layer2_transparent) {
-          rgb_out = (mixer_r << 13) | (mixer_g << 9) | (mixer_b << 5);
-        }
-        break;
-
       case E_SLU_LAYER_PRIORITY_BLEND_5:
-        if (!mix_rgb_transparent) {
+        ula_mix_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
+        ula_mix_rgb         = ula_mix_transparent ? ula_rgb : &black;
+
+        switch (self.blend_mode) {
+          case E_BLEND_MODE_ULA:
+            mix_rgb             = ula_mix_rgb;
+            mix_rgb_transparent = ula_mix_transparent;
+            mix_top_transparent = tm_transparent || tm_pixel_below;
+            mix_top_rgb         = tm_rgb;
+            mix_bot_transparent = tm_transparent || !tm_pixel_below;
+            mix_bot_rgb         = tm_rgb;
+            break;
+
+          case E_BLEND_MODE_ULA_TILEMAP_MIX:
+            mix_rgb             = ula_final_rgb;
+            mix_rgb_transparent = ula_final_transparent;
+            mix_top_transparent = 1;
+            mix_top_rgb         = tm_rgb;
+            mix_bot_transparent = 1;
+            mix_bot_rgb         = tm_rgb;
+            break;
+
+          case E_BLEND_MODE_TILEMAP:
+            mix_rgb             = tm_rgb;
+            mix_rgb_transparent = tm_transparent;
+            mix_top_transparent = ula_transparent || !tm_pixel_below;
+            mix_top_rgb         = ula_rgb;
+            mix_bot_transparent = ula_transparent || tm_pixel_below;
+            mix_bot_rgb         = ula_rgb;
+            break;
+
+          default:
+            mix_rgb             = 0;
+            mix_rgb_transparent = 1;
+            if (tm_pixel_below) {
+              mix_top_transparent = ula_transparent;
+              mix_top_rgb         = ula_rgb;
+              mix_bot_transparent = tm_transparent;
+              mix_bot_rgb         = tm_rgb;
+            } else {
+              mix_top_transparent = tm_transparent;
+              mix_top_rgb         = tm_rgb;
+              mix_bot_transparent = ula_transparent;
+              mix_bot_rgb         = ula_rgb;
+            }
+            break;
+        }
+
+        mixer_r = ((layer2_rgb->rgb9 & 0x1C0) >> 2) | ((mix_rgb->rgb9 & 0x1C0) >> 6);
+        mixer_g = ((layer2_rgb->rgb9 & 0x038) << 1) | ((mix_rgb->rgb9 & 0x038) >> 3);
+        mixer_b = ((layer2_rgb->rgb9 & 0x007) << 4) |  (mix_rgb->rgb9 & 0x007);
+
+        if (self.layer_priority == E_SLU_LAYER_PRIORITY_BLEND) {
+          if (mixer_r & 0x08) mixer_r = 7;
+          if (mixer_g & 0x08) mixer_g = 7;
+          if (mixer_b & 0x08) mixer_b = 7;
+        } else if (!mix_rgb_transparent) {
           if (mixer_r <= 4) {
             mixer_r = 0;
           } else if ((mixer_r & 0x0C) == 0x0C) {
@@ -450,8 +427,6 @@ u32_t slu_active_video_line_get(void) {
 
 void slu_layer_priority_set(slu_layer_priority_t priority) {
   self.layer_priority = priority & 0x07;
-
-  log_wrn("slu: layer priority %d\n", self.layer_priority);
 }
 
 
@@ -499,8 +474,6 @@ void slu_ula_control_write(u8_t value) {
   ula_enable_set((value & 0x80) == 0);
   self.blend_mode               = (value & 0x60) >> 5;
   self.stencil_mode             = value & 0x01;
-
-  log_wrn("slu: blend mode %d\n", self.blend_mode);
 }
 
 
