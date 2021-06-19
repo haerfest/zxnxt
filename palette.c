@@ -7,17 +7,11 @@
 #define RGB9_TO_RGB16(rgb9) ((((rgb9) & 0x1C0) << 7) | (((rgb9) & 0x38) << 6) | (((rgb9) & 0x07) << 5))
 
 
-/**
- * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/src/zxnext.vhd
- *
- * > The ula / tilemap share one 1k x 9 memory to save on bram resources.
- * > Sprites / layer 2 share one 1k x 16 memory to accommodate layer order promotion bits.
- */
+#define N_PALETTES  (E_PALETTE_TILEMAP_SECOND - E_PALETTE_ULA_FIRST + 1)
 
 
 typedef struct {
-  palette_entry_t  palette[2][2][256];
-  palette_entry_t* palette_ptr[8];
+  palette_entry_t palette[N_PALETTES][256];
 } self_t;
 
 
@@ -25,16 +19,6 @@ static self_t self;
 
 
 int palette_init(void) {
-  self.palette_ptr[E_PALETTE_ULA_FIRST     ] = self.palette[0][0];
-  self.palette_ptr[E_PALETTE_ULA_SECOND    ] = self.palette[0][1];
-  self.palette_ptr[E_PALETTE_TILEMAP_FIRST ] = self.palette[0][0];
-  self.palette_ptr[E_PALETTE_TILEMAP_SECOND] = self.palette[0][1];
-  
-  self.palette_ptr[E_PALETTE_LAYER2_FIRST  ] = self.palette[1][0];
-  self.palette_ptr[E_PALETTE_LAYER2_SECOND ] = self.palette[1][1];
-  self.palette_ptr[E_PALETTE_SPRITES_FIRST ] = self.palette[1][0];
-  self.palette_ptr[E_PALETTE_SPRITES_SECOND] = self.palette[1][1];
-
   return 0;
 }
 
@@ -44,12 +28,12 @@ void palette_finit(void) {
 
 
 const palette_entry_t* palette_read(palette_t palette, u8_t index) {
-  return &self.palette_ptr[palette][index];
+  return &self.palette[palette][index];
 }
 
 
 void palette_write_rgb8(palette_t palette, u8_t index, u8_t value) {
-  palette_entry_t* entry = &self.palette_ptr[palette][index];
+  palette_entry_t* entry = &self.palette[palette][index];
 
   /**
    * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
@@ -65,7 +49,7 @@ void palette_write_rgb8(palette_t palette, u8_t index, u8_t value) {
 
 
 void palette_write_rgb9(palette_t palette, u8_t index, u8_t value) {
-  palette_entry_t* entry = &self.palette_ptr[palette][index];
+  palette_entry_t* entry = &self.palette[palette][index];
 
   entry->rgb9               = (entry->rgb9 & 0x1FE) | (value & 1);
   entry->rgb16              = RGB9_TO_RGB16(entry->rgb9);
