@@ -495,8 +495,6 @@ static u8_t nextreg_palette_value_8bits_read(void) {
 
 
 static void nextreg_palette_value_8bits_write(u8_t value) {
-  log_wrn("nextreg: palette[%d,%d] = $%02X\n", self.palette_selected, self.palette_index, value);
-
   palette_write_rgb8(self.palette_selected, self.palette_index, value);
   if (!self.palette_disable_auto_increment) {
     self.palette_index++;
