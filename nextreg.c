@@ -456,7 +456,6 @@ static void nextreg_clip_window_control_write(u8_t value) {
 
 
 static u8_t nextreg_palette_control_read(void) {
-  log_wrn("nextreg: read palete control\n");
   return self.palette_disable_auto_increment << 7
        | self.palette_selected               << 4
        | self.is_palette_sprites_second      << 3
@@ -467,8 +466,6 @@ static u8_t nextreg_palette_control_read(void) {
 
 
 static void nextreg_palette_control_write(u8_t value) {
-  log_wrn("nextreg: write palette control $%02X\n", value);
-  
   self.palette_disable_auto_increment = value >> 7;
   self.palette_selected               = (value & 0x70) >> 4;
   self.is_palette_sprites_second      = (value & 0x08) >> 3;
