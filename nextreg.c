@@ -54,9 +54,9 @@ typedef struct {
   u8_t                     selected_register;
   int                      is_hard_reset;
   int                      palette_disable_auto_increment;
-  palette_t                palette_sprites;
-  palette_t                palette_layer2;
-  palette_t                palette_ula;
+  int                      is_palette_sprites_second;
+  int                      is_palette_layer2_second;
+  int                      is_palette_ula_second;
   palette_t                palette_selected;
   u8_t                     palette_index;
   int                      palette_index_9bit_is_first_write;
@@ -89,9 +89,9 @@ static void nextreg_reset_soft(void) {
   self.palette_selected                  = E_PALETTE_ULA_FIRST;
   self.palette_index                     = 0;
   self.palette_index_9bit_is_first_write = 1;
-  self.palette_sprites                   = E_PALETTE_SPRITES_FIRST;
-  self.palette_layer2                    = E_PALETTE_LAYER2_FIRST;
-  self.palette_ula                       = E_PALETTE_ULA_FIRST;
+  self.is_palette_sprites_second         = 0;
+  self.is_palette_layer2_second          = 0;
+  self.is_palette_ula_second             = 0;
   self.ula_next_mode                     = 0;
   self.is_hotkey_cpu_speed_enabled       = 1;
 
@@ -113,7 +113,7 @@ static void nextreg_reset_soft(void) {
   tilemap_clip_set(self.tilemap_clip.values[0], self.tilemap_clip.values[1], self.tilemap_clip.values[2], self.tilemap_clip.values[3]);
 
   ula_clip_set(self.ula_clip.values[0], self.ula_clip.values[1], self.ula_clip.values[2], self.ula_clip.values[3]);
-  ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
+  ula_palette_set(self.is_palette_ula_second);
   ula_contention_set(1);
 
   ay_reset();
@@ -456,27 +456,30 @@ static void nextreg_clip_window_control_write(u8_t value) {
 
 
 static u8_t nextreg_palette_control_read(void) {
-  return self.palette_disable_auto_increment                << 7
-       | self.palette_selected                              << 4
-       | (self.palette_sprites == E_PALETTE_SPRITES_SECOND) << 3
-       | (self.palette_layer2  == E_PALETTE_LAYER2_SECOND)  << 2
-       | (self.palette_ula     == E_PALETTE_ULA_SECOND)     << 1
+  log_wrn("nextreg: read palete control\n");
+  return self.palette_disable_auto_increment << 7
+       | self.palette_selected               << 4
+       | self.is_palette_sprites_second      << 3
+       | self.is_palette_layer2_second       << 2
+       | self.is_palette_ula_second          << 1
        | self.ula_next_mode;
 }
 
 
 static void nextreg_palette_control_write(u8_t value) {
+  log_wrn("nextreg: write palette control $%02X\n", value);
+  
   self.palette_disable_auto_increment = value >> 7;
   self.palette_selected               = (value & 0x70) >> 4;
-  self.palette_sprites                = (value & 0x08) ? E_PALETTE_SPRITES_SECOND : E_PALETTE_SPRITES_FIRST;
-  self.palette_layer2                 = (value & 0x04) ? E_PALETTE_LAYER2_SECOND  : E_PALETTE_LAYER2_FIRST;
-  self.palette_ula                    = (value & 0x02) ? E_PALETTE_ULA_SECOND     : E_PALETTE_ULA_FIRST;
+  self.is_palette_sprites_second      = (value & 0x08) >> 3;
+  self.is_palette_layer2_second       = (value & 0x04) >> 2;
+  self.is_palette_ula_second          = (value & 0x02) >> 1;
   self.ula_next_mode                  = value & 0x01;
 
   ula_next_mode_enable(self.ula_next_mode);
-  ula_palette_set(self.palette_ula == E_PALETTE_ULA_SECOND);
-  layer2_palette_set(self.palette_layer2 == E_PALETTE_LAYER2_SECOND);
-  sprites_palette_set(self.palette_sprites == E_PALETTE_SPRITES_SECOND);
+  ula_palette_set(self.is_palette_ula_second);
+  layer2_palette_set(self.is_palette_layer2_second);
+  sprites_palette_set(self.is_palette_sprites_second);
 }
 
 
@@ -492,6 +495,8 @@ static u8_t nextreg_palette_value_8bits_read(void) {
 
 
 static void nextreg_palette_value_8bits_write(u8_t value) {
+  log_wrn("nextreg: palette[%d,%d] = $%02X\n", self.palette_selected, self.palette_index, value);
+
   palette_write_rgb8(self.palette_selected, self.palette_index, value);
   if (!self.palette_disable_auto_increment) {
     self.palette_index++;
