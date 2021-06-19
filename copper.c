@@ -7,6 +7,9 @@
 #include "nextreg.h"
 
 
+/* #define DUMP_PROGRAM */
+
+
 /* Instructions are stored in big-endian format. */
 typedef struct {
   u8_t msb;
@@ -64,6 +67,36 @@ void copper_address_write(u8_t value)  {
 }
 
 
+#ifdef DUMP_PROGRAM
+
+static void copper_dump_program(void) {
+  int i;
+
+  for (i = 0; i < 1024; i++) {
+    const u16_t instr = (self.instruction[i].msb << 8) | self.instruction[i].lsb;
+
+    log_wrn("copper: %4d: $%04X ", i, instr);
+
+    if (instr == 0x0000) {
+      log_wrn("NOOP\n");
+    } else if (instr & 0x8000) {
+      const u32_t row = instr & 0x01FF;
+      const u32_t col = (instr & 0x7E00) >> 6;
+      log_wrn("WAIT row=%u col=%u\n", row, col);
+      if (instr == 0xFFFF) {
+        break;
+      }
+    } else {
+      const u8_t reg   = (instr & 0x7F00) >> 8;
+      const u8_t value = instr & 0x00FF;
+      log_wrn("MOVE reg=$%02X,value=$%02X\n", reg, value);
+    }
+  }
+}
+
+#endif  /* DUMP_PROGRAM */
+
+
 void copper_control_write(u8_t value) {
   self.address = ((value & 0x07) << 8) | (self.address & 0x00FF);
 
@@ -89,6 +122,12 @@ void copper_control_write(u8_t value) {
       self.is_running         = 1;
       break;
   }
+
+#ifdef DUMP_PROGRAM
+  if (self.is_running) {
+    copper_dump_program();
+  }
+#endif
 }
 
 
