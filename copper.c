@@ -93,47 +93,36 @@ void copper_control_write(u8_t value) {
 
 
 void copper_tick(u32_t beam_row, u32_t beam_column) {
-  u16_t instruction;
-  int   do_advance_cpc = 1;
-
   if (!self.is_running) {
     return;
   }
 
-  instruction = (self.instruction[self.cpc].msb << 8) | self.instruction[self.cpc].lsb;
+  const u16_t instruction = (self.instruction[self.cpc].msb << 8) | self.instruction[self.cpc].lsb;
 
-  switch (instruction) {
-    case 0x0000:
-      /* NOOP: 1 cycle. */
-      break;
-
-    case 0xFFFF:
-      /* HALT: 1 cycle. */
-      self.is_running = 0;
-      break;
-
-    default:
-      if (instruction & 0x8000) {
-        /* WAIT: 1 cycle. */
-        const u32_t wait_row    = instruction & 0x01FF;
-        const u32_t wait_column = (instruction & 0x7E00) >> 6;
-        do_advance_cpc          = (beam_row == wait_row && beam_column >= wait_column);
-      } else {
-        /* MOVE: 2 cycles. */
-        self.do_move_wait_one_cycle = !self.do_move_wait_one_cycle;
-        do_advance_cpc              = !self.do_move_wait_one_cycle;
-        if (!self.do_move_wait_one_cycle) {
-          const u8_t reg   = (instruction & 0x7F00) >> 8;
-          const u8_t value = instruction & 0x00FF;
-          nextreg_write_internal(reg, value);
-        }
-      }
-      break;
+  if (instruction == 0x0000) {
+    /* NOOP: 1 cycle. */
+    self.cpc = (self.cpc + 1) & 0x3FF;
+    return;
   }
 
-  if (do_advance_cpc) {
+  if (instruction & 0x8000) {
+    /* WAIT: 1 cycle. */
+    const u32_t wait_row    = instruction & 0x01FF;
+    const u32_t wait_column = (instruction & 0x7E00) >> 6;
+    if (beam_row == wait_row && beam_column >= wait_column) {
+      self.cpc = (self.cpc + 1) & 0x3FF;
+    }
+    return;
+  }
+  
+  /* MOVE: 2 cycles. */
+  if (self.do_move_wait_one_cycle) {
+    const u8_t reg   = (instruction & 0x7F00) >> 8;
+    const u8_t value = instruction & 0x00FF;
+    nextreg_write_internal(reg, value);
     self.cpc = (self.cpc + 1) & 0x3FF;
   }
+  self.do_move_wait_one_cycle = !self.do_move_wait_one_cycle;
 }
 
 
