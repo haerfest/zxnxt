@@ -7,6 +7,22 @@
 #include "nextreg.h"
 
 
+/**
+ * TODO:
+ *
+ * https://gitlab.com/thesmog358/tbblue/blob/a0d25589bd28b05c510e528332bcd192bc414ebb/docs/extra-hw/copper/COPPER-v0.1c.TXT
+ *
+ * > The horizontal dot clock position compare includes an adjustment meaning
+ * > that the compare completes three dot clocks early in standard 256x192
+ * > resolution and two dot clocks early in Timex HIRES 512x192 resolution. In
+ * > practice, a pixel position can be specified with clocks to spare to write a
+ * > register value before the pixel is displayed. This saves software having to
+ * > auto-adjust positions to arrive early. It also means that a wait for 0,0 can
+ * > affect the first pixel of the frame buffer before it is displayed and set
+ * > the scroll registers without visual artefacts.
+ */
+
+
 /* #define DUMP_PROGRAM */
 
 
@@ -21,8 +37,7 @@ typedef struct {
   u16_t         cpc;      /** 0 - 1023 */
   u16_t         address;  /** 0 - 2047 */
   instruction_t instruction[1024];
-  u8_t          lsb;
-  int           is_lsb;
+  u8_t          cached;
   int           is_running;
   int           do_reset_pc_on_irq;
   int           do_move_wait_one_cycle;
@@ -49,16 +64,15 @@ void copper_data_8bit_write(u8_t value) {
 
 
 void copper_data_16bit_write(u8_t value)  {
-  if (self.is_lsb) {
-    self.lsb = value;
+  if (self.address & 1) {
+    const u16_t even = self.address - 1;
+    self.instruction[even].msb = self.cached;
+    self.instruction[even].lsb = value;
   } else {
-    const u16_t even = self.address & 0x7FE;
-    self.instruction[even].msb = value;
-    self.instruction[even].lsb = self.lsb;
-    self.address = (even + 2) & 0x7FF;
+    self.cached = value;
   }
 
-  self.is_lsb = !self.is_lsb;
+  self.address = (self.address + 1) & 0x7FF;
 }
 
 
