@@ -211,13 +211,12 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
       } else {
         index = *pattern++;
       }
-      index += palette_offset;
 
       if (index == self.transparency_index) {
         continue;
       }
 
-      entry = palette_read(self.palette, index);
+      entry = palette_read(self.palette, palette_offset + index);
 
       /* Then figure out where to project it to. */
       for (magnified_row = sprite_row * magnification_y; magnified_row < (sprite_row + 1) * magnification_y; magnified_row++) {
