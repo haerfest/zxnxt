@@ -111,7 +111,7 @@ void sprites_finit(void) {
 }
 
 
-static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
+static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor, u16_t clip_x1, u16_t clip_x2, u16_t clip_y1, u16_t clip_y2) {
   u8_t*                  pattern;
   u8_t                   sprite_row;
   u8_t                   sprite_column;
@@ -235,6 +235,10 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
           if (final_y >= FRAME_BUFFER_HEIGHT) {
             continue;
           }
+          if (final_x < clip_x1 || final_x > clip_x2 || final_y < clip_y1 || final_y > clip_y2) {
+            continue;
+          }
+
           offset = final_y * FRAME_BUFFER_WIDTH / 2 + final_x;
 
           self.frame_buffer[offset]   = entry->rgb16;
@@ -250,6 +254,27 @@ static void draw_sprites(void) {
   sprite_t* sprite;
   sprite_t* anchor;
   size_t    i;
+  u16_t     clip_x1 = self.clip_x1;
+  u16_t     clip_x2 = self.clip_x2;
+  u16_t     clip_y1 = self.clip_y1;
+  u16_t     clip_y2 = self.clip_y2;
+
+  /**
+   * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
+   *
+   * > When the clip window is enabled for sprites in "over border" mode,
+   * > the X coords are internally doubled and the clip window origin is
+   * > moved to the sprite origin inside the border.
+   */
+  if (self.is_enabled_over_border) {
+    clip_x1 *= 2;
+    clip_x2 *= 2;
+  } else {
+    clip_x1 += 32;
+    clip_x2 += 32;
+    clip_y1 += 32;
+    clip_y2 += 32;
+  }
 
   /* Assume no sprites visible. */
   memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
@@ -261,7 +286,7 @@ static void draw_sprites(void) {
     if (sprite->is_anchor) {
       anchor = sprite;
     }
-    draw_sprite(sprite, anchor);
+    draw_sprite(sprite, anchor, clip_x1, clip_x2, clip_y1, clip_y2);
   }
 }
 
