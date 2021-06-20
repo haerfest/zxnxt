@@ -449,13 +449,8 @@ void ula_did_complete_frame(void) {
  * Only if it returns non-zero does it also return the frame buffer position,
  * (0, 0) is the first pixel of the border, such that we can align the other
  * layers which use the 320x256 or 640x256 resolutions.
- *
- * Returns the ULA pixel colour for the frame buffer position, if any, and
- * whether it is transparent or not.
  */
-int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border, int* is_clipped, const palette_entry_t** rgb, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
-  u8_t palette_index;
-
+int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
   self.ticks_14mhz_after_irq++;
 
   if (beam_row == self.display_spec->vsync_row && beam_column == self.display_spec->vsync_column) {
@@ -486,33 +481,49 @@ int ula_tick(u32_t beam_row, u32_t beam_column, int* is_enabled, int* is_border,
   *frame_buffer_row    = (beam_row    >= self.display_spec->vblank_end) ? (beam_row    - self.display_spec->vblank_end) : (beam_row    + 32);
   *frame_buffer_column = (beam_column >= self.display_spec->hblank_end) ? (beam_column - self.display_spec->hblank_end) : (beam_column + 32 * 2);
 
+  return 1;
+}
+
+
+/**
+ * Returns the ULA pixel colour for the frame buffer position, if any, and
+ * whether it is transparent or not.
+ */
+void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_clipped, const palette_entry_t** rgb) {
+  u8_t palette_index;
+
   if (!self.is_enabled) {
     *is_enabled = 0;
-    return 1;
+    return;
   }
 
-  palette_index = \
-    self.is_displaying_content ? ula_display_handlers[self.display_mode](beam_row, beam_column) :
-    self.is_ula_next_mode      ? 128 + self.border_colour :
-    /* else */                    16 + self.border_colour;
+  if (self.is_displaying_content) {
+    row    -= 32;
+    column -= 32 * 2;
+
+    *is_border  = 0;
+    *is_clipped = (row        < self.clip_y1 || row        > self.clip_y2 ||
+                   column / 2 < self.clip_x1 || column / 2 > self.clip_x2);
+
+    palette_index = ula_display_handlers[self.display_mode](row, column);
+  } else {
+    *is_border  = 1;
+    *is_clipped = 0;
+
+    palette_index = (self.is_ula_next_mode ? 128 : 16) + self.border_colour;
+  }
 
 #if 0
     if (self.ula_next_mask_paper == 0) {
       /* No background mask, border color is fallback color. */
-      return 1;
+      return;
     }
 #endif
 
   *rgb        = palette_read(self.palette, palette_index);
   *is_enabled = 1;
-  *is_border  = !self.is_displaying_content;
 
-  *is_clipped = self.is_displaying_content
-    ? (beam_row        < self.clip_y1 || beam_row        > self.clip_y2 ||
-       beam_column / 2 < self.clip_x1 || beam_column / 2 > self.clip_x2)
-    : 0;
-
-  return 1;
+  return;
 }
 
 

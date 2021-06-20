@@ -189,57 +189,57 @@ u32_t slu_run(u32_t ticks_14mhz) {
     .rgb16 = 0
   };
 
-  u32_t tick;
-  u32_t frame_buffer_row;
-  u32_t frame_buffer_column;
+  u32_t                  tick;
+  u32_t                  frame_buffer_row;
+  u32_t                  frame_buffer_column;
 
   /* These are the same names as in the VHDL for consistency. */
-  int              ula_en;
-  int              ula_border;
-  int              ula_clipped;
-  int              ula_transparent;
+  int                    ula_en;
+  int                    ula_border;
+  int                    ula_clipped;
+  int                    ula_transparent;
   const palette_entry_t* ula_rgb;
 
-  int              ulatm_transparent;
+  int                    ulatm_transparent;
   const palette_entry_t* ulatm_rgb;
 
-  int              ula_final_transparent;
+  int                    ula_final_transparent;
   const palette_entry_t* ula_final_rgb;
 
-  int              ula_mix_transparent;
+  int                    ula_mix_transparent;
   const palette_entry_t* ula_mix_rgb;
 
-  int              tm_en;
-  int              tm_transparent;
+  int                    tm_en;
+  int                    tm_transparent;
   const palette_entry_t* tm_rgb;
-  int              tm_pixel_en;
-  int              tm_pixel_textmode;
-  int              tm_pixel_below;
+  int                    tm_pixel_en;
+  int                    tm_pixel_textmode;
+  int                    tm_pixel_below;
 
-  int              sprite_transparent;
-  u16_t            sprite_rgb16;
-  int              sprite_pixel_en;
+  int                    sprite_transparent;
+  u16_t                  sprite_rgb16;
+  int                    sprite_pixel_en;
 
-  int              layer2_pixel_en;
-  int              layer2_priority;
-  int              layer2_transparent;
+  int                    layer2_pixel_en;
+  int                    layer2_priority;
+  int                    layer2_transparent;
   const palette_entry_t* layer2_rgb;
 
-  int              stencil_transparent;
-  palette_entry_t  stencil_rgb;
+  int                    stencil_transparent;
+  palette_entry_t        stencil_rgb;
 
-  int              mix_rgb_transparent;
+  int                    mix_rgb_transparent;
   const palette_entry_t* mix_rgb;
-  int              mix_top_transparent;
+  int                    mix_top_transparent;
   const palette_entry_t* mix_top_rgb;
-  int              mix_bot_transparent;
+  int                    mix_bot_transparent;
   const palette_entry_t* mix_bot_rgb;
 
-  u8_t             mixer_r;
-  u8_t             mixer_g;
-  u8_t             mixer_b;
+  u8_t                   mixer_r;
+  u8_t                   mixer_g;
+  u8_t                   mixer_b;
 
-  u16_t            rgb_out;
+  u16_t                  rgb_out;
 
   for (tick = 0; tick < ticks_14mhz; tick++) {
     slu_beam_advance();
@@ -249,11 +249,12 @@ u32_t slu_run(u32_t ticks_14mhz) {
     copper_tick(self.beam_row, self.beam_column);
     copper_tick(self.beam_row, self.beam_column);
 
-    if (!ula_tick(self.beam_row, self.beam_column, &ula_en, &ula_border, &ula_clipped, &ula_rgb, &frame_buffer_row, &frame_buffer_column)) {
+    if (!ula_beam_to_frame_buffer(self.beam_row, self.beam_column, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
       continue;
     }
 
+    ula_tick(    frame_buffer_row, frame_buffer_column, &ula_en, &ula_border, &ula_clipped, &ula_rgb);
     tilemap_tick(frame_buffer_row, frame_buffer_column, &tm_en, &tm_pixel_en, &tm_pixel_below, &tm_pixel_textmode, &tm_rgb);
     sprites_tick(frame_buffer_row, frame_buffer_column, &sprite_pixel_en, &sprite_rgb16);
     layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_pixel_en, &layer2_rgb, &layer2_priority);
