@@ -292,6 +292,7 @@ typedef struct {
   int                        is_ula_next_mode;
   int                        is_60hz;
   int                        is_60hz_requested;
+  int                        is_lo_res_enabled;
   u8_t                       lo_res_offset_x;
   u8_t                       lo_res_offset_y;
 } self_t;
@@ -392,10 +393,13 @@ static void ula_display_reconfigure(void) {
    * It doesn't specify _which_ standard display, so I assume either is
    * supported.
    */
-  const ula_display_mode_t mode = (self.screen_bank == E_ULA_SCREEN_BANK_7) ? (self.display_mode_requested & 1) : self.display_mode_requested;
+  const ula_display_mode_t mode = \
+    self.is_lo_res_enabled                    ? E_ULA_DISPLAY_MODE_LO_RES :
+    (self.screen_bank == E_ULA_SCREEN_BANK_7) ? (self.display_mode_requested & 1) :
+    /* else */                                  self.display_mode_requested;
 
   /* Remember the requested mode in case we honor it in bank 5. */
-  self.display_mode = self.display_mode_requested;
+  self.display_mode = mode;
   self.is_60hz      = self.is_60hz_requested;
   self.display_spec = &ula_display_spec[self.display_timing][self.is_60hz & 1];
 
@@ -527,12 +531,6 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
 }
 
 
-static void ula_set_display_mode(ula_display_mode_t mode) {
-  self.display_mode_requested  = mode;
-  self.did_display_spec_change = 1;
-}
-
-
 int ula_init(u8_t* sram) {
   self.sram                = sram;
   self.screen_bank         = E_ULA_SCREEN_BANK_5;
@@ -554,7 +552,8 @@ int ula_init(u8_t* sram) {
   self.ula_next_mask_ink   = 7;
   self.ula_next_mask_paper = ~7;
 
-  ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
+  self.display_mode_requested  = E_ULA_DISPLAY_MODE_SCREEN_0;
+  self.did_display_spec_change = 1;
   ula_display_reconfigure();
 
   return 0;
@@ -611,19 +610,23 @@ void ula_timex_write(u16_t address, u8_t value) {
 
   switch (value & 0x07) {
     case 0x00:
-      ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_0);
+      self.display_mode_requested  = E_ULA_DISPLAY_MODE_SCREEN_0;
+      self.did_display_spec_change = 1;
       break;
 
     case 0x01:
-      ula_set_display_mode(E_ULA_DISPLAY_MODE_SCREEN_1);
+      self.display_mode_requested  = E_ULA_DISPLAY_MODE_SCREEN_1;
+      self.did_display_spec_change = 1;
       break;
 
     case 0x02:
-      ula_set_display_mode(E_ULA_DISPLAY_MODE_HI_COLOUR);
+      self.display_mode_requested  = E_ULA_DISPLAY_MODE_HI_COLOUR;
+      self.did_display_spec_change = 1;
       break;
 
     case 0x06:
-      ula_set_display_mode(E_ULA_DISPLAY_MODE_HI_RES);
+      self.display_mode_requested  = E_ULA_DISPLAY_MODE_HI_RES;
+      self.did_display_spec_change = 1;
       break;
 
     default:
@@ -837,8 +840,10 @@ void ula_irq_enable_set(int enable) {
 
 
 void ula_lo_res_enable_set(int enable) {
-  /* TODO: Which mode to return to when lo-res disabled? */
-  ula_set_display_mode(enable ? E_ULA_DISPLAY_MODE_LO_RES : E_ULA_DISPLAY_MODE_SCREEN_0);
+  if (self.is_lo_res_enabled != enable) {
+    self.is_lo_res_enabled       = enable;
+    self.did_display_spec_change = 1;
+  }
 }
 
 
