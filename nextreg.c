@@ -672,7 +672,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
     case E_NEXTREG_REGISTER_MMU_SLOT5_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT6_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL:
-      mmu_page_set(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL, value);
+      mmu_page_set(reg - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL, value);
       break;
 
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
@@ -771,7 +771,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       if (self.is_sprites_lockstepped) {
         io_write(0x57, value);
       } else {
-        sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0, value);
+        sprites_attribute_set(self.sprite_number, reg - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0, value);
       }
       break;
 
@@ -784,7 +784,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
         io_write(0x57, value);
         io_write(0x303B, self.sprite_number + 1);
       } else {
-        sprites_attribute_set(self.sprite_number, self.selected_register - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
+        sprites_attribute_set(self.sprite_number, reg - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
         self.sprite_number = (self.sprite_number + 1) & 0x7F;
       }
       break;
