@@ -599,15 +599,13 @@ def nop() -> C:
 
 def nreg_reg_A() -> C:
     return '''
-        io_write(0x243B, memory_read(PC++));
-        io_write(0x253B, A);
+        nextreg_write_internal(memory_read(PC++), A);
         T(4);
     '''
 
 def nreg_reg_value() -> C:
     return '''
-        io_write(0x243B, memory_read(PC++));
-        io_write(0x253B, memory_read(PC++));
+        nextreg_write_internal(memory_read(PC++), memory_read(PC++));
         T(8);
     '''
 

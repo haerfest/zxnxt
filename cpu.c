@@ -8,6 +8,7 @@
 #include "log.h"
 #include "memory.h"
 #include "mf.h"
+#include "nextreg.h"
 
 #ifdef TRACE
 #include "bootrom.h"
