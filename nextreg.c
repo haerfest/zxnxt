@@ -549,6 +549,7 @@ static u8_t nextreg_sprite_layers_system_read(void) {
 
 
 void nextreg_sprite_layers_system_write(u8_t value) {
+  ula_lo_res_enable_set(value & 0x80);
   slu_layer_priority_set((value & 0x1C) >> 2);
   sprites_priority_set(value & 0x40);
   sprites_enable_clipping_over_border_set(value & 0x20);
@@ -749,6 +750,14 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_LAYER2_Y_SCROLL:
       layer2_offset_y_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LO_RES_X_SCROLL:
+      ula_lo_res_offset_x_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_LO_RES_Y_SCROLL:
+      ula_lo_res_offset_y_write(value);
       break;
 
     case E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT:

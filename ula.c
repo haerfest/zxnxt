@@ -12,10 +12,13 @@
 
 
 typedef enum {
-  E_ULA_DISPLAY_MODE_SCREEN_0,
+  E_ULA_DISPLAY_MODE_FIRST = 0,
+  E_ULA_DISPLAY_MODE_SCREEN_0 = E_ULA_DISPLAY_MODE_FIRST,
   E_ULA_DISPLAY_MODE_SCREEN_1,
   E_ULA_DISPLAY_MODE_HI_COLOUR,
-  E_ULA_DISPLAY_MODE_HI_RES
+  E_ULA_DISPLAY_MODE_HI_RES,
+  E_ULA_DISPLAY_MODE_LO_RES,
+  E_ULA_DISPLAY_MODE_LAST = E_ULA_DISPLAY_MODE_LO_RES
 } ula_display_mode_t;
 
 
@@ -258,7 +261,7 @@ typedef struct {
   const ula_display_spec_t*  display_spec;
   int                        did_display_spec_change;
   u8_t*                      display_ram;
-  u8_t*                      display_ram_odd;
+  u8_t*                      display_ram_alt;
   ula_display_timing_t       display_timing;
   ula_display_mode_t         display_mode;
   ula_display_mode_t         display_mode_requested;
@@ -289,19 +292,34 @@ typedef struct {
   int                        is_ula_next_mode;
   int                        is_60hz;
   int                        is_60hz_requested;
+  u8_t                       lo_res_offset_x;
+  u8_t                       lo_res_offset_y;
 } self_t;
 
 
 static self_t self;
 
 
-#define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_HI_RES - E_ULA_DISPLAY_MODE_SCREEN_0 + 1)
+#define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_LAST - E_ULA_DISPLAY_MODE_FIRST + 1)
+
+
+static u8_t ula_display_mode_lo_res(u32_t row, u32_t column) {
+  column = (self.lo_res_offset_x + column) % 256;
+  row    = (self.lo_res_offset_y + row   ) % 192;
+
+  column /= 2;
+  row    /= 2;
+
+  return (row < 48)
+    ? self.display_ram[row * 128 + column]
+    : self.display_ram_alt[(row - 48) * 128 + column];
+}
 
 
 static u8_t ula_display_mode_hi_res(u32_t row, u32_t column) {
   const u8_t  mask             = 1 << (7 - (column & 0x07));
   const u16_t display_offset   = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | (((column >> 1) / 8) & 0x1F);;
-  const u8_t* display_ram      = ((column / 8) & 0x01) ? self.display_ram_odd : self.display_ram;
+  const u8_t* display_ram      = ((column / 8) & 0x01) ? self.display_ram_alt : self.display_ram;
   const u8_t  display_byte     = display_ram[display_offset];
 
   return (display_byte & mask)
@@ -359,7 +377,8 @@ const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES] = {
   ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
   ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_1 */
   ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_HI_COLOUR (TODO) */
-  ula_display_mode_hi_res     /* E_ULA_DISPLAY_MODE_HI_RES */
+  ula_display_mode_hi_res,    /* E_ULA_DISPLAY_MODE_HI_RES */
+  ula_display_mode_lo_res     /* E_ULA_DISPLAY_MODE_LO_RES */
 };
 
 
@@ -399,7 +418,12 @@ static void ula_display_reconfigure(void) {
       
     case E_ULA_DISPLAY_MODE_HI_RES:
       self.display_ram     = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + self.screen_bank * 16 * 1024];
-      self.display_ram_odd = &self.display_ram[0x2000];
+      self.display_ram_alt = &self.display_ram[0x2000];
+      break;
+
+    case E_ULA_DISPLAY_MODE_LO_RES:
+      self.display_ram     = &self.sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];
+      self.display_ram_alt = &self.display_ram[0x2000];
       break;
   }
 }
@@ -798,4 +822,20 @@ int ula_irq_enable_get(void) {
 
 void ula_irq_enable_set(int enable) {
   self.disable_ula_irq = !enable;
+}
+
+
+void ula_lo_res_enable_set(int enable) {
+  /* TODO: Which mode to return to when lo-res disabled? */
+  ula_set_display_mode(enable ? E_ULA_DISPLAY_MODE_LO_RES : E_ULA_DISPLAY_MODE_SCREEN_0);
+}
+
+
+void ula_lo_res_offset_x_write(u8_t value) {
+  self.lo_res_offset_x = value;
+}
+
+
+void ula_lo_res_offset_y_write(u8_t value) {
+  self.lo_res_offset_y = value;
 }

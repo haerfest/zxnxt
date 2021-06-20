@@ -43,6 +43,8 @@ typedef enum {
   E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_MSB                  = 0x2F,
   E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_LSB                  = 0x30,
   E_NEXTREG_REGISTER_TILEMAP_Y_SCROLL                      = 0x31,
+  E_NEXTREG_REGISTER_LO_RES_X_SCROLL                       = 0x32,
+  E_NEXTREG_REGISTER_LO_RES_Y_SCROLL                       = 0x33,
   E_NEXTREG_REGISTER_SPRITE_NUMBER                         = 0x34,
   E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0                    = 0x35,
   E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_1                    = 0x36,
