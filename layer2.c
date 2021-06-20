@@ -165,6 +165,9 @@ void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t
         return;
       }
 
+      row    = (row    + self.offset_y) % 192;
+      column = (column + self.offset_x) % 256;
+
       palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
       break;
 
@@ -177,6 +180,9 @@ void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t
         *is_enabled = 0;
         return;
       }
+
+      row    = (row    + self.offset_y) % 192;
+      column = (column + self.offset_x) % 256;
 
       palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
       palette_index = (column & 1) ? (palette_index & 0x0F) : (palette_index >> 4);
