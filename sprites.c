@@ -54,6 +54,10 @@ typedef struct {
   int       clip_x2;
   int       clip_y1;
   int       clip_y2;
+  int       clip_x1_eff;
+  int       clip_x2_eff;
+  int       clip_y1_eff;
+  int       clip_y2_eff;  
   u8_t      transparency_index;
   u16_t     transparency_rgba;
   u8_t      sprite_index;
@@ -111,7 +115,7 @@ void sprites_finit(void) {
 }
 
 
-static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor, u16_t clip_x1, u16_t clip_x2, u16_t clip_y1, u16_t clip_y2) {
+static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
   u8_t*                  pattern;
   u8_t                   sprite_row;
   u8_t                   sprite_column;
@@ -235,7 +239,7 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor, u16_t cl
           if (final_y >= FRAME_BUFFER_HEIGHT) {
             continue;
           }
-          if (final_x < clip_x1 || final_x > clip_x2 || final_y < clip_y1 || final_y > clip_y2) {
+          if (final_x < self.clip_x1_eff || final_x > self.clip_x2_eff || final_y < self.clip_y1_eff || final_y > self.clip_y2_eff) {
             continue;
           }
 
@@ -254,27 +258,6 @@ static void draw_sprites(void) {
   sprite_t* sprite;
   sprite_t* anchor;
   size_t    i;
-  u16_t     clip_x1 = self.clip_x1;
-  u16_t     clip_x2 = self.clip_x2;
-  u16_t     clip_y1 = self.clip_y1;
-  u16_t     clip_y2 = self.clip_y2;
-
-  /**
-   * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
-   *
-   * > When the clip window is enabled for sprites in "over border" mode,
-   * > the X coords are internally doubled and the clip window origin is
-   * > moved to the sprite origin inside the border.
-   */
-  if (self.is_enabled_over_border) {
-    clip_x1 *= 2;
-    clip_x2 *= 2;
-  } else {
-    clip_x1 += 32;
-    clip_x2 += 32;
-    clip_y1 += 32;
-    clip_y2 += 32;
-  }
 
   /* Assume no sprites visible. */
   memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
@@ -286,7 +269,7 @@ static void draw_sprites(void) {
     if (sprite->is_anchor) {
       anchor = sprite;
     }
-    draw_sprite(sprite, anchor, clip_x1, clip_x2, clip_y1, clip_y2);
+    draw_sprite(sprite, anchor);
   }
 }
 
@@ -299,7 +282,7 @@ void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb) {
     return;
   }
 
-  if (self.is_dirty) {
+  if (self.is_dirty && row == self.clip_y1_eff && column == self.clip_x1_eff) {
     draw_sprites();
     self.is_dirty = 0;
   }
@@ -307,6 +290,31 @@ void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb) {
   offset      = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
   *rgb        = self.frame_buffer[offset];
   *is_enabled = !self.is_transparent[offset];
+}
+
+
+static void sprites_update_effective_clipping_area(void) {
+  /**
+   * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/nextreg.txt
+   *
+   * > When the clip window is enabled for sprites in "over border" mode,
+   * > the X coords are internally doubled and the clip window origin is
+   * > moved to the sprite origin inside the border.
+   */
+  self.clip_x1_eff = self.clip_x1;
+  self.clip_x2_eff = self.clip_x2;
+  self.clip_y1_eff = self.clip_y1;
+  self.clip_y2_eff = self.clip_y2;
+
+  if (self.is_enabled_over_border) {
+    self.clip_x1_eff *= 2;
+    self.clip_x2_eff *= 2;
+  } else {
+    self.clip_x1_eff += 32;
+    self.clip_x2_eff += 32;
+    self.clip_y1_eff += 32;
+    self.clip_y2_eff += 32;
+  }
 }
 
 
@@ -318,7 +326,7 @@ int sprites_priority_get(void) {
 void sprites_priority_set(int is_zero_on_top) {
   if (is_zero_on_top != self.is_zero_on_top) {
     self.is_zero_on_top = is_zero_on_top;
-    self.is_dirty       = 1;
+    self.is_dirty       = self.is_enabled;
   }
 }
 
@@ -344,7 +352,9 @@ int sprites_enable_over_border_get(void) {
 void sprites_enable_over_border_set(int enable) {
   if (enable != self.is_enabled_over_border) {
     self.is_enabled_over_border = enable;
-    self.is_dirty               = 1;
+    self.is_dirty               = self.is_enabled;
+
+    sprites_update_effective_clipping_area();
   }
 }
 
@@ -357,17 +367,18 @@ int sprites_enable_clipping_over_border_get(void) {
 void sprites_enable_clipping_over_border_set(int enable) {
   if (enable != self.is_enabled_clipping_over_border) {
     self.is_enabled_clipping_over_border = enable;
-    self.is_dirty                        = 1;
+    self.is_dirty                        = self.is_enabled;
   }
 }
 
 
 void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
-  /* TODO Implement clipping window. */
   self.clip_x1 = x1;
   self.clip_x2 = x2;
   self.clip_y1 = y1;
   self.clip_y2 = y2;
+
+  sprites_update_effective_clipping_area();
 }
 
 
@@ -379,7 +390,7 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
   }
 
   sprite->attribute[attribute_index] = value;
-  self.is_dirty                      = 1;
+  self.is_dirty                      = self.is_enabled;
 
   switch (attribute_index) {
     case 0:
@@ -437,7 +448,7 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
 void sprites_transparency_index_write(u8_t value) {
   if (value != self.transparency_index) {
     self.transparency_index = value;
-    self.is_dirty           = 1;
+    self.is_dirty           = self.is_enabled;
   }
 }
 
@@ -465,12 +476,18 @@ void sprites_next_attribute_set(u8_t value) {
 
 
 void sprites_next_pattern_set(u8_t value) {
-  self.patterns[self.pattern_index] = value;
+  if (self.patterns[self.pattern_index] != value) {
+    self.patterns[self.pattern_index] = value;
+    self.is_dirty                     = self.is_enabled;
+  }
   self.pattern_index = (self.pattern_index + 1) & 0x3FFF;
-  self.is_dirty      = 1;
 }
 
 
 void sprites_palette_set(int use_second) {
-  self.palette = use_second ? E_PALETTE_SPRITES_SECOND : E_PALETTE_SPRITES_FIRST;
+  const palette_t palette = use_second ? E_PALETTE_SPRITES_SECOND : E_PALETTE_SPRITES_FIRST;
+  if (self.palette != palette) {
+    self.palette  = palette;
+    self.is_dirty = self.is_enabled;
+  }
 }
