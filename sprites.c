@@ -238,7 +238,17 @@ static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
           if (final_y >= FRAME_BUFFER_HEIGHT) {
             continue;
           }
-          if (final_x < self.clip_x1_eff || final_x > self.clip_x2_eff || final_y < self.clip_y1_eff || final_y > self.clip_y2_eff) {
+
+          if (final_x < 32 || final_x >= 32 + 256 || final_y < 32 || final_y >= 32 + 192) {
+            if (!self.is_enabled_over_border) {
+              continue;
+            }
+            if (self.is_enabled_clipping_over_border) {
+              if (final_x < self.clip_x1_eff || final_x > self.clip_x2_eff || final_y < self.clip_y1_eff || final_y > self.clip_y2_eff) {
+                continue;
+              }
+            }
+          } else if (final_x < self.clip_x1_eff || final_x > self.clip_x2_eff || final_y < self.clip_y1_eff || final_y > self.clip_y2_eff) {
             continue;
           }
 
@@ -325,7 +335,7 @@ int sprites_priority_get(void) {
 void sprites_priority_set(int is_zero_on_top) {
   if (is_zero_on_top != self.is_zero_on_top) {
     self.is_zero_on_top = is_zero_on_top;
-    self.is_dirty       = self.is_enabled;
+    self.is_dirty       = 1;
   }
 }
 
@@ -338,7 +348,6 @@ int sprites_enable_get(void) {
 void sprites_enable_set(int enable) {
   if (enable != self.is_enabled) {
     self.is_enabled = enable;
-    self.is_dirty   = enable;
   }
 }
 
@@ -351,7 +360,7 @@ int sprites_enable_over_border_get(void) {
 void sprites_enable_over_border_set(int enable) {
   if (enable != self.is_enabled_over_border) {
     self.is_enabled_over_border = enable;
-    self.is_dirty               = self.is_enabled;
+    self.is_dirty               = 1;
 
     sprites_update_effective_clipping_area();
   }
@@ -366,18 +375,23 @@ int sprites_enable_clipping_over_border_get(void) {
 void sprites_enable_clipping_over_border_set(int enable) {
   if (enable != self.is_enabled_clipping_over_border) {
     self.is_enabled_clipping_over_border = enable;
-    self.is_dirty                        = self.is_enabled;
+    self.is_dirty                        = 1;
+
+    sprites_update_effective_clipping_area();
   }
 }
 
 
 void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
-  self.clip_x1 = x1;
-  self.clip_x2 = x2;
-  self.clip_y1 = y1;
-  self.clip_y2 = y2;
+  if (x1 != self.clip_x1 || x2 != self.clip_x2 || y1 != self.clip_y1 || y2 != self.clip_y2) {
+    self.clip_x1  = x1;
+    self.clip_x2  = x2;
+    self.clip_y1  = y1;
+    self.clip_y2  = y2;
+    self.is_dirty = 1;
 
-  sprites_update_effective_clipping_area();
+    sprites_update_effective_clipping_area();
+  }
 }
 
 
@@ -389,7 +403,7 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
   }
 
   sprite->attribute[attribute_index] = value;
-  self.is_dirty                      = self.is_enabled;
+  self.is_dirty                      = 1;
 
   switch (attribute_index) {
     case 0:
@@ -447,7 +461,7 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
 void sprites_transparency_index_write(u8_t value) {
   if (value != self.transparency_index) {
     self.transparency_index = value;
-    self.is_dirty           = self.is_enabled;
+    self.is_dirty           = 1;
   }
 }
 
@@ -477,7 +491,7 @@ void sprites_next_attribute_set(u8_t value) {
 void sprites_next_pattern_set(u8_t value) {
   if (self.patterns[self.pattern_index] != value) {
     self.patterns[self.pattern_index] = value;
-    self.is_dirty                     = self.is_enabled;
+    self.is_dirty                     = 1;
   }
   self.pattern_index = (self.pattern_index + 1) & 0x3FFF;
 }
@@ -487,6 +501,6 @@ void sprites_palette_set(int use_second) {
   const palette_t palette = use_second ? E_PALETTE_SPRITES_SECOND : E_PALETTE_SPRITES_FIRST;
   if (self.palette != palette) {
     self.palette  = palette;
-    self.is_dirty = self.is_enabled;
+    self.is_dirty = 1;
   }
 }
