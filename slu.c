@@ -39,6 +39,7 @@ typedef struct {
   int                  stencil_mode;
   blend_mode_t         blend_mode;
   u8_t                 transparent_rgb8;
+  int                  do_skip_frame;
 } self_t;
 
 
@@ -122,7 +123,10 @@ static void slu_beam_advance(void) {
   self.beam_row = 0;
 
   /* Update display. */
-  slu_blit();
+  if (!self.do_skip_frame) {
+    slu_blit();
+  }
+  self.do_skip_frame = !self.do_skip_frame;
 
   /* Notify the ULA that we completed a frame. */
   ula_did_complete_frame();  
@@ -251,6 +255,10 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
     if (!ula_beam_to_frame_buffer(self.beam_row, self.beam_column, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
+      continue;
+    }
+
+    if (self.do_skip_frame) {
       continue;
     }
 
