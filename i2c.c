@@ -1,5 +1,6 @@
 #include <string.h>
 #include "defs.h"
+#include "i2c.h"
 #include "log.h"
 #include "rtc.h"
 
@@ -45,16 +46,27 @@ static i2c_t self;
 
 int i2c_init(void) {
   memset(&self, 0, sizeof(self));
-
-  /* Not busy. */
-  self.sda = 1;
-  self.scl = 1;
-
+  i2c_reset(E_RESET_HARD);
   return 0;
 }
 
 
 void i2c_finit(void) {
+}
+
+
+void i2c_reset(reset_t reset) {
+  self.state             = E_STATE_IDLE;
+  self.slave_read        = NULL;
+  self.slave_write       = NULL;
+  self.bit_count         = 0;
+  self.does_master_write = 0;
+  self.address           = 0;
+  self.data              = 0;
+
+  /* Not busy. */
+  self.sda = 1;
+  self.scl = 1;
 }
 
 

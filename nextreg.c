@@ -8,6 +8,7 @@
 #include "cpu.h"
 #include "defs.h"
 #include "dma.h"
+#include "i2c.h"
 #include "io.h"
 #include "keyboard.h"
 #include "layer2.h"
@@ -131,6 +132,7 @@ static void nextreg_reset(reset_t reset) {
   ay_reset(reset);
   copper_reset(reset);
   dma_reset(reset);
+  i2c_reset(reset);
   io_reset(reset);
   layer2_reset(reset);
   mmu_reset(reset);
