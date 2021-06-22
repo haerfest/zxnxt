@@ -562,6 +562,7 @@ void ula_reset(reset_t reset) {
   self.ula_next_mask_ink   = 7;
   self.ula_next_mask_paper = ~7;
   self.screen_bank         = E_ULA_SCREEN_BANK_5;
+  self.do_contend          = 1;
 
   if (reset == E_RESET_HARD) {
     self.is_timex_enabled = 0;
