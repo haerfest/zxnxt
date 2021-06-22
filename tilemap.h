@@ -8,6 +8,7 @@
 
 int    tilemap_init(u8_t* sram);
 void   tilemap_finit(void);
+void   tilemap_reset(reset_t reset);
 void   tilemap_tilemap_control_write(u8_t value);
 void   tilemap_default_tilemap_attribute_write(u8_t value);
 void   tilemap_tilemap_base_address_write(u8_t value);

@@ -1,6 +1,7 @@
 #include <strings.h>
 #include "clock.h"
 #include "defs.h"
+#include "dma.h"
 #include "io.h"
 #include "log.h"
 #include "memory.h"
@@ -74,15 +75,22 @@ static dma_t self;
 int dma_init(u8_t* sram) {
   memset(&self, 0, sizeof(self));
 
-  self.sram      = sram;
-  self.group     = NO_GROUP;
-  self.read_mask = 0x7F;
+  self.sram = sram;
+
+  dma_reset(E_RESET_HARD);
 
   return 0;
 }
 
 
 void dma_finit(void) {
+}
+
+
+void dma_reset(reset_t reset) {
+  self.group      = NO_GROUP;
+  self.read_mask  = 0x7F;
+  self.is_enabled = 0;
 }
 
 

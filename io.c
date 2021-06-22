@@ -31,12 +31,12 @@ static self_t self;
 
 
 int io_init(void) {
-  io_reset();
+  io_reset(E_RESET_HARD);
   return 0;
 }
 
 
-void io_reset(void) {
+void io_reset(reset_t reset) {
   self.is_port_7FFD_enabled        = 1;
   self.is_port_BFFD_enabled        = 1;
   self.is_port_FFFD_enabled        = 1;

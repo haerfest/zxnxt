@@ -49,11 +49,18 @@ static copper_t self;
 
 int copper_init(void) {
   memset(&self, 0, sizeof(self));
+  copper_reset(E_RESET_HARD);
   return 0;
 }
 
 
 void copper_finit(void) {
+}
+
+
+void copper_reset(reset_t reset) {
+  self.address    = 0;
+  self.is_running = 0;
 }
 
 
@@ -120,9 +127,10 @@ void copper_control_write(u8_t value) {
       break;
 
     case 1:
-      self.cpc                = 0;
-      self.do_reset_pc_on_irq = 0;
-      self.is_running         = 1;
+      self.cpc                    = 0;
+      self.do_move_wait_one_cycle = 0;
+      self.do_reset_pc_on_irq     = 0;
+      self.is_running             = 1;
       break;
 
     case 2:
@@ -131,9 +139,10 @@ void copper_control_write(u8_t value) {
       break;
 
     case 3:
-      self.cpc                = 0;
-      self.do_reset_pc_on_irq = 1;
-      self.is_running         = 1;
+      self.cpc                    = 0;
+      self.do_move_wait_one_cycle = 0;
+      self.do_reset_pc_on_irq     = 1;
+      self.is_running             = 1;
       break;
   }
 
@@ -181,6 +190,7 @@ void copper_tick(u32_t beam_row, u32_t beam_column) {
 
 void copper_irq(void) {
   if (self.do_reset_pc_on_irq) {
-    self.cpc = 0;
+    self.cpc                    = 0;
+    self.do_move_wait_one_cycle = 0;
   }
 }

@@ -21,13 +21,13 @@ static mmu_t self;
 int mmu_init(u8_t* sram) {
   self.ram = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM];
 
-  mmu_reset();
+  mmu_reset(E_RESET_HARD);
 
   return 0;
 }
 
 
-void mmu_reset(void) {
+void mmu_reset(reset_t reset) {
   mmu_page_set(0, MMU_ROM_PAGE);
   mmu_page_set(1, MMU_ROM_PAGE);
   mmu_page_set(2, 10);

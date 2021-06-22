@@ -36,7 +36,6 @@ typedef struct {
   resolution_t resolution;
   palette_t    palette;
   u8_t         palette_offset;
-  u16_t        transparency_rgb8;
   int          clip_x1;
   int          clip_x2;
   int          clip_y1;
@@ -54,7 +53,7 @@ int layer2_init(u8_t* sram) {
 
   self.ram = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM];
 
-  layer2_reset();
+  layer2_reset(E_RESET_HARD);
 
   return 0;
 }
@@ -64,16 +63,28 @@ void layer2_finit(void) {
 }
 
 
-void layer2_reset(void) {
+void layer2_reset(reset_t reset) {
   layer2_access_write(0x00);
   layer2_access_write(0x10);
   layer2_active_bank_write(8);
   layer2_shadow_bank_write(11);
 
-  self.clip_x1 = 0;
-  self.clip_x2 = 255;
-  self.clip_y1 = 0;
-  self.clip_y2 = 191;
+  self.clip_x1       = 0;
+  self.clip_x2       = 255;
+  self.clip_y1       = 0;
+  self.clip_y2       = 191;
+  self.offset_x      = 0;
+  self.offset_y      = 0;
+  self.palette       = E_PALETTE_LAYER2_FIRST;
+  self.resolution    = E_RESOLUTION_256X192;
+  self.is_visible    = 0;
+  self.is_readable   = 0;
+  self.is_writable   = 0;
+  self.mapping       = E_MAPPING_FIRST_16K;
+  self.do_map_shadow = 0;
+  self.bank_offset   = 0;
+
+  memory_refresh_accessors(0, 6);
 }
 
 
@@ -264,11 +275,6 @@ void layer2_write(u16_t address, u8_t value) {
 
 void layer2_palette_set(int use_second) {
   self.palette = use_second ? E_PALETTE_LAYER2_SECOND : E_PALETTE_LAYER2_FIRST;
-}
-
-
-void layer2_transparency_colour_write(u8_t rgb) {
-  self.transparency_rgb8 = rgb;
 }
 
 

@@ -7,6 +7,7 @@
 #include "copper.h"
 #include "cpu.h"
 #include "defs.h"
+#include "dma.h"
 #include "io.h"
 #include "keyboard.h"
 #include "layer2.h"
@@ -84,52 +85,6 @@ static nextreg_t self;
 static void nextreg_cpu_speed_write(u8_t value);
 
 
-static void nextreg_reset_soft(void) {
-  self.palette_disable_auto_increment    = 0;
-  self.palette_selected                  = E_PALETTE_ULA_FIRST;
-  self.palette_index                     = 0;
-  self.palette_index_9bit_is_first_write = 1;
-  self.is_palette_sprites_second         = 0;
-  self.is_palette_layer2_second          = 0;
-  self.is_palette_ula_second             = 0;
-  self.ula_next_mode                     = 0;
-  self.is_hotkey_cpu_speed_enabled       = 1;
-
-  self.tilemap_clip.index     = 0;
-  self.tilemap_clip.values[0] = 0;
-  self.tilemap_clip.values[1] = 159;
-  self.tilemap_clip.values[2] = 0;
-  self.tilemap_clip.values[3] = 255;
-
-  self.ula_clip.index         = 0;
-  self.ula_clip.values[0]     = 0;
-  self.ula_clip.values[1]     = 255;
-  self.ula_clip.values[2]     = 0;
-  self.ula_clip.values[3]     = 191;
-
-  self.sprites_clip = self.ula_clip;
-  self.layer2_clip  = self.ula_clip;
-
-  tilemap_clip_set(self.tilemap_clip.values[0], self.tilemap_clip.values[1], self.tilemap_clip.values[2], self.tilemap_clip.values[3]);
-
-  ula_clip_set(self.ula_clip.values[0], self.ula_clip.values[1], self.ula_clip.values[2], self.ula_clip.values[3]);
-  ula_palette_set(self.is_palette_ula_second);
-  ula_contention_set(1);
-
-  ay_reset();
-  io_reset();
-  mmu_reset();
-  paging_reset();
-
-  rom_select(0);
-  rom_lock(self.altrom_soft_reset_lock);
-  altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
-
-  nextreg_cpu_speed_write(E_CLOCK_CPU_SPEED_3MHZ);
-  layer2_reset();
-}
-
-
 static void nextreg_ay_configure(nextreg_ay_t ay) {
   const audio_channel_t a      =  self.is_ay_mono[ay] ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_LEFT;
   const audio_channel_t b      = (self.is_ay_mono[ay] || self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ABC) ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_RIGHT;
@@ -142,31 +97,59 @@ static void nextreg_ay_configure(nextreg_ay_t ay) {
 }
 
 
-static void nextreg_reset_hard(void) {
-  memset(&self, 0, sizeof(self));
 
-  self.is_hard_reset                   = 1;
-  self.altrom_soft_reset_during_writes = 1;
-  self.ay_stereo_mode                  = E_NEXTREG_AY_STEREO_MODE_ABC;
-  self.is_hotkey_nmi_multiface_enabled = 0;
-  self.is_hotkey_nmi_divmmc_enabled    = 0;
+static void nextreg_reset(reset_t reset) {
+  if (reset == E_RESET_HARD) {
+    memset(&self, 0, sizeof(self));
 
-  nextreg_reset_soft();
+    self.is_hard_reset                   = 1;
+    self.altrom_soft_reset_during_writes = 1;
+    self.ay_stereo_mode                  = E_NEXTREG_AY_STEREO_MODE_ABC;
+    self.is_hotkey_nmi_multiface_enabled = 0;
+    self.is_hotkey_nmi_divmmc_enabled    = 0;
 
-  bootrom_activate();
-  config_set_rom_ram_bank(0);
-  config_activate();
+    bootrom_activate();
+    config_set_rom_ram_bank(0);
+    config_activate();
 
-  nextreg_ay_configure(E_NEXTREG_AY_1);
-  nextreg_ay_configure(E_NEXTREG_AY_2);
-  nextreg_ay_configure(E_NEXTREG_AY_3);
+    nextreg_ay_configure(E_NEXTREG_AY_1);
+    nextreg_ay_configure(E_NEXTREG_AY_2);
+    nextreg_ay_configure(E_NEXTREG_AY_3);
+  }
 
-  ula_timex_video_mode_read_enable(0);
+  /* Both hard and soft resets. */
+  self.palette_disable_auto_increment    = 0;
+  self.palette_selected                  = E_PALETTE_ULA_FIRST;
+  self.palette_index                     = 0;
+  self.palette_index_9bit_is_first_write = 1;
+  self.is_palette_sprites_second         = 0;
+  self.is_palette_layer2_second          = 0;
+  self.is_palette_ula_second             = 0;
+  self.ula_next_mode                     = 0;
+  self.is_hotkey_cpu_speed_enabled       = 1;
+
+  ay_reset(reset);
+  copper_reset(reset);
+  dma_reset(reset);
+  io_reset(reset);
+  layer2_reset(reset);
+  mmu_reset(reset);
+  paging_reset(reset);
+  slu_reset(reset);
+  sprites_reset(reset);
+  tilemap_reset(reset);
+  ula_reset(reset);
+
+  rom_select(0);
+  rom_lock(self.altrom_soft_reset_lock);
+  altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
+
+  nextreg_cpu_speed_write(E_CLOCK_CPU_SPEED_3MHZ);
 }
 
 
 int nextreg_init(void) {
-  nextreg_reset_hard();
+  nextreg_reset(E_RESET_HARD);
   return 0;
 }
 
@@ -189,12 +172,7 @@ static void nextreg_reset_write(u8_t value) {
   if (value & 0x03) {
     /* Hard or soft reset. */
     self.is_hard_reset = value & 0x02;
-    if (self.is_hard_reset) {
-      nextreg_reset_hard();
-    } else {
-      nextreg_reset_soft();
-    }
-
+    nextreg_reset(self.is_hard_reset ? E_RESET_HARD : E_RESET_SOFT);
     cpu_reset();
     return;
   }

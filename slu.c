@@ -12,10 +12,6 @@
 #include "ula.h"
 
 
-#define HORIZONTAL_RETRACE  192  /* Pixels or clock ticks. */
-#define VERTICAL_RETRACE      8  /* Lines.                 */
-
-
 typedef enum {
   E_BLEND_MODE_ULA = 0,
   E_BLEND_MODE_NONE,
@@ -28,18 +24,20 @@ typedef struct {
   SDL_Renderer*        renderer;
   SDL_Texture*         texture;
   u16_t*               frame_buffer;
-  slu_layer_priority_t layer_priority;
   u32_t                beam_row;
   u32_t                beam_column;
   int                  is_beam_visible;
-  u16_t                fallback_rgba;
+  int                  do_skip_frame;
+
+  /* Resettable. */
+  slu_layer_priority_t layer_priority;
   int                  line_irq_active;
   int                  line_irq_enabled;
   u16_t                line_irq_row;
   int                  stencil_mode;
   blend_mode_t         blend_mode;
   u8_t                 transparent_rgb8;
-  int                  do_skip_frame;
+  u16_t                fallback_rgba;
 } self_t;
 
 
@@ -55,9 +53,10 @@ int slu_init(SDL_Renderer* renderer, SDL_Texture* texture) {
     return -1;
   }
 
-  self.renderer         = renderer;
-  self.texture          = texture;
-  self.transparent_rgb8 = 0xE3;
+  self.renderer = renderer;
+  self.texture  = texture;
+
+  slu_reset(E_RESET_HARD);
 
   return 0;
 }
@@ -68,6 +67,18 @@ void slu_finit(void) {
     free(self.frame_buffer);
     self.frame_buffer = NULL;
   }
+}
+
+
+void slu_reset(reset_t reset) {
+  self.layer_priority   = E_SLU_LAYER_PRIORITY_SLU;
+  self.blend_mode       = E_BLEND_MODE_ULA;
+  self.stencil_mode     = 0;
+  self.transparent_rgb8 = 0xE3;
+  self.line_irq_active  = 0;
+  self.line_irq_enabled = 0;
+  self.line_irq_row     = 0;
+  self.fallback_rgba    = palette_rgb8_rgb16(0xE3);
 }
 
 

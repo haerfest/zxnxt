@@ -113,7 +113,7 @@ static self_t self;
 
 
 int ay_init(void) {
-  ay_reset();
+  ay_reset(E_RESET_HARD);
   return 0;
 }
 
@@ -122,7 +122,7 @@ void ay_finit(void) {
 }
 
 
-void ay_reset(void) {
+void ay_reset(reset_t reset) {
   int i;
 
   memset(&self, 0, sizeof(self));

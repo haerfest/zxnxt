@@ -40,7 +40,19 @@ static tilemap_t self;
 int tilemap_init(u8_t* sram) {
   memset(&self, 0, sizeof(self));
 
-  self.bank5                    = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];
+  self.bank5 = &sram[MEMORY_RAM_OFFSET_ZX_SPECTRUM_RAM + 5 * 16 * 1024];
+
+  tilemap_reset(E_RESET_HARD);
+
+  return 0;
+}
+
+
+void tilemap_finit(void) {
+}
+
+
+void tilemap_reset(reset_t reset) {
   self.definitions_base_address = 0x0C00;
   self.tilemap_base_address     = 0x2C00;
   self.transparency_index       = 0x0F;
@@ -48,12 +60,16 @@ int tilemap_init(u8_t* sram) {
   self.clip_x2                  = 159;
   self.clip_y1                  = 0;
   self.clip_y2                  = 255;
-
-  return 0;
-}
-
-
-void tilemap_finit(void) {
+  self.offset_x                 = 0;
+  self.offset_y                 = 0;
+  self.is_enabled               = 0;
+  self.use_80x32                = 0;
+  self.use_default_attribute    = 0;
+  self.palette                  = E_PALETTE_TILEMAP_FIRST;
+  self.use_text_mode            = 0;
+  self.use_512_tiles            = 0;
+  self.tilemap_over_ula         = 0;
+  self.default_attribute        = 0x00;
 }
 
 

@@ -49,6 +49,12 @@
 
 
 typedef enum {
+  E_RESET_SOFT = 0,
+  E_RESET_HARD
+} reset_t;
+
+
+typedef enum {
   E_MACHINE_TYPE_CONFIG_MODE = 0,
   E_MACHINE_TYPE_ZX_48K,
   E_MACHINE_TYPE_ZX_128K_PLUS2,

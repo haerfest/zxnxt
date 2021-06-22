@@ -7,6 +7,7 @@
 
 int  copper_init(void);
 void copper_finit(void);
+void copper_reset(reset_t reset);
 void copper_data_8bit_write(u8_t value);
 void copper_data_16bit_write(u8_t value);
 void copper_address_write(u8_t value);

@@ -17,7 +17,7 @@ static self_t self;
 
 
 int paging_init(void) {
-  paging_reset();
+  paging_reset(E_RESET_HARD);
   return 0;
 }
 
@@ -26,7 +26,7 @@ void paging_finit(void) {
 }
 
 
-void paging_reset(void) {
+void paging_reset(reset_t reset) {
   self.is_spectrum_128k_paging_locked = 0;
   self.bank_slot_4                    = 0;
 }

@@ -533,34 +533,43 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
 
 int ula_init(u8_t* sram) {
   self.sram                = sram;
-  self.screen_bank         = E_ULA_SCREEN_BANK_5;
-  self.display_timing      = E_ULA_DISPLAY_TIMING_ZX_48K;
-  self.border_colour       = 0;
   self.speaker_state       = 0;
-  self.palette             = E_PALETTE_ULA_FIRST;
-  self.clip_x1             = 0;
-  self.clip_x2             = 255;
-  self.clip_y1             = 0;
-  self.clip_y2             = 191;
   self.audio_last_sample   = 0;
-  self.disable_ula_irq     = 0;
-  self.hi_res_ink_colour   = 0;
-  self.is_timex_enabled    = 0;
   self.is_7mhz_tick        = 1;
-  self.is_enabled          = 1;
-  self.is_ula_next_mode    = 0;
-  self.ula_next_mask_ink   = 7;
-  self.ula_next_mask_paper = ~7;
+  self.display_timing      = E_ULA_DISPLAY_TIMING_ZX_48K;
 
-  self.display_mode_requested  = E_ULA_DISPLAY_MODE_SCREEN_0;
-  self.did_display_spec_change = 1;
-  ula_display_reconfigure();
+  ula_reset(E_RESET_HARD);
 
   return 0;
 }
 
 
 void ula_finit(void) {
+}
+
+
+void ula_reset(reset_t reset) {
+  self.clip_x1             = 0;
+  self.clip_x2             = 255;
+  self.clip_y1             = 0;
+  self.clip_y2             = 191;
+  self.disable_ula_irq     = 0;
+  self.palette             = E_PALETTE_ULA_FIRST;
+  self.is_ula_next_mode    = 0;
+  self.is_enabled          = 1;
+  self.border_colour       = 0;
+  self.hi_res_ink_colour   = 0;
+  self.ula_next_mask_ink   = 7;
+  self.ula_next_mask_paper = ~7;
+  self.screen_bank         = E_ULA_SCREEN_BANK_5;
+
+  if (reset == E_RESET_HARD) {
+    self.is_timex_enabled = 0;
+  }
+
+  self.display_mode_requested  = E_ULA_DISPLAY_MODE_SCREEN_0;
+  self.did_display_spec_change = 1;
+  ula_display_reconfigure();
 }
 
 

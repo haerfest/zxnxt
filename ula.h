@@ -28,6 +28,7 @@ typedef enum {
 
 int                  ula_init(u8_t* sram);
 void                 ula_finit(void);
+void                 ula_reset(reset_t reset);
 u8_t                 ula_read(u16_t address);
 void                 ula_write(u16_t address, u8_t value);
 void                 ula_timex_video_mode_read_enable(int do_enable);
