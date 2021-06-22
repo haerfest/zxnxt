@@ -156,19 +156,21 @@ void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t
       break;
 
     case E_RESOLUTION_320X256:
+      column /= 2;
+
       /* Honour the clipping area. */
       if (row        < self.clip_y1
        || row        > self.clip_y2
-       || column / 2 < self.clip_x1
-       || column / 2 > self.clip_x2) {
+       || column     < self.clip_x1 * 2
+       || column     > self.clip_x2 * 2) {
         *is_enabled = 0;
         return;
       }
 
-      row    = (row    + self.offset_y) % 192;
-      column = (column + self.offset_x) % 256;
+      row    = (row    + self.offset_y) % 256;
+      column = (column + self.offset_x) % 320;
 
-      palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
+      palette_index = self.ram[self.active_bank * 16 * 1024 + column * 256 + row];
       break;
 
     default:
@@ -181,8 +183,8 @@ void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t
         return;
       }
 
-      row    = (row    + self.offset_y) % 192;
-      column = (column + self.offset_x) % 256;
+      row    = (row    + self.offset_y) % 256;
+      column = (column + self.offset_x) % 640;
 
       palette_index = self.ram[self.active_bank * 16 * 1024 + column / 2 * 256 + row];
       palette_index = (column & 1) ? (palette_index & 0x0F) : (palette_index >> 4);
