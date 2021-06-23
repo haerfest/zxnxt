@@ -721,6 +721,14 @@ static void ula_contend_48k(void) {
 
 
 static void ula_contend_128k(void) {
+  if (self.is_displaying_content) {
+    const u32_t delay[8] = {
+      6, 5, 4, 3, 2, 1, 0, 0
+    };
+    const u32_t t_states = self.ticks_14mhz_after_irq / 4;
+
+    clock_run(delay[(t_states % 228) % 8]);
+  }
 }
 
 
