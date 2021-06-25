@@ -284,39 +284,40 @@ static void cpu_irq_pending(void) {
     return;
   }
 
-  if (IM == 0) {
-    log_wrn("cpu: interrupt mode 0 not implemented\n");
-    return;
-  }
-
   /* Disable further interrupts. */
   IFF1 = IFF2 = 0;
-
-  /* Acknowledge interrupt. */
-  T(7);
 
   /* Save the program counter. */
   memory_write(--SP, PCH); T(3);
   memory_write(--SP, PCL); T(3);
 
-  if (IM == 1) {
-    PC = 0x0038;
-  } else {
-    /* Ghouls 'n Ghosts depends on very specific behavior of IM 2. It sets the
-     * I register to $81, but places the vector it wants to be jumped to at
-     * $81FF and $8200. Lower locations contain either code or all zeros.
-     *
-     * Hence:
-     * - The byte read from the bus must be $FF. If you get this wrong, the
-     *   game will freeze at the intro screen, or the Spectrum will reset.
-     * - The vector to jump to must be read from $81FF and $8200, not from
-     *   $81FE and $81FF as per Zilog's documentation.  If you get this wrong,
-     *   music will play but no high scores are shown and you cannot start the
-     *   game.
-     */
-    const u16_t vector = I << 8 | 0xFF;
-    PC = memory_read(vector + 1) << 8 | memory_read(vector);
-    T(6);
+  switch (IM) {
+    case 0:
+      /* Pretend $FF on the bus, which is RST $38, effectively IM 1. */
+    case 1:
+      PC = 0x0038;
+      T(13);
+      break;
+
+    default:
+    {
+      /* Ghouls 'n Ghosts depends on very specific behavior of IM 2. It sets the
+       * I register to $81, but places the vector it wants to be jumped to at
+       * $81FF and $8200. Lower locations contain either code or all zeros.
+       *
+       * Hence:
+       * - The byte read from the bus must be $FF. If you get this wrong, the
+       *   game will freeze at the intro screen, or the Spectrum will reset.
+       * - The vector to jump to must be read from $81FF and $8200, not from
+       *   $81FE and $81FF as per Zilog's documentation.  If you get this wrong,
+       *   music will play but no high scores are shown and you cannot start the
+       *   game.
+       */
+      const u16_t vector = I << 8 | 0xFF;
+      PC = memory_read(vector + 1) << 8 | memory_read(vector);
+      T(19);
+    }
+    break;
   }
 }
 
