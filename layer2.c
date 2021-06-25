@@ -299,3 +299,8 @@ void layer2_offset_x_lsb_write(u8_t value) {
 void layer2_offset_y_write(u8_t value) {
   self.offset_y = value;
 }
+
+
+void layer2_enable(int enable) {
+  self.is_visible = enable;
+}

@@ -708,6 +708,11 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       slu_ula_control_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_DISPLAY_CONTROL_1:
+      layer2_enable(value >> 7);
+      /* TODO: other bits in this register. */
+      break;
+
     case E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_MSB:
       tilemap_offset_x_msb_write(value);
       break;

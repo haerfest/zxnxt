@@ -24,6 +24,7 @@ void layer2_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2);
 void layer2_offset_x_msb_write(u8_t value);
 void layer2_offset_x_lsb_write(u8_t value);
 void layer2_offset_y_write(u8_t value);
+void layer2_enable(int enable);
 
 
 #endif  /* __LAYER2_H */
