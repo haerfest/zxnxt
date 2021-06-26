@@ -169,7 +169,7 @@ static void rotate(pattern_t pattern) {
 
   for (row = 0; row < 16; row++) {
     for (col = 0; col < 16; col++) {
-      rotated[row * 16 + col] = pattern[col * 16 + (15 - row)];
+      rotated[row * 16 + col] = pattern[(15 - col) * 16 + row];
     }
   }
 
@@ -249,11 +249,9 @@ static void draw_anchor(const sprite_t* sprite) {
 
   fetch_pattern(sprite, pattern);
 
-#if 0
   if (sprite->r)  rotate(pattern);
   if (sprite->xm) mirror_x(pattern);
   if (sprite->ym) mirror_y(pattern);
-#endif
 
   sprite_x = (sprite->x8_pr << 8) | sprite->x70;
   sprite_y = (sprite->y8    << 8) | sprite->y70;
@@ -282,6 +280,8 @@ static void draw_unified(const sprite_t* sprite, int anchor_v, int anchor_x, int
 
 
 static int draw_sprite(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h, int anchor_t) {
+
+#if 0
   log_wrn("sprites: %03d $%02X %02X %02X %02X %02X v=%d e=%d\n",
           sprite->number,
           sprite->attr[0],
@@ -291,7 +291,8 @@ static int draw_sprite(const sprite_t* sprite, int anchor_v, int anchor_x, int a
           sprite->attr[4],
           sprite->v,
           sprite->e);
-  
+#endif
+
   if (!sprite->e || (sprite->attr[4] & 0xC0) != 0x40) {
     draw_anchor(sprite);
     return 1;
