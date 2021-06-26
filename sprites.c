@@ -233,15 +233,45 @@ static void fetch_pattern(const sprite_t* sprite, pattern_t pattern) {
 }
 
 
-static void draw_anchor(const sprite_t* sprite) {
-  pattern_t              pattern;
+static void draw_pixel(u16_t rgb, int x, int y, int xf, int yf) {
+  const int dr = (yf < 0) ? -1 : +1;
+  const int dc = (xf < 0) ? -1 : +1;
+  int       row;
+  int       col;
+  int       offset;
+
+  for (row = 0; row != yf; row += dr) {
+    for (col = 0; col != xf; col += dc) {
+      offset = ((y + row + 256) % 256) * 320 + ((x + col + 320) % 320);
+      self.frame_buffer[  offset] = rgb;
+      self.is_transparent[offset] = 0;
+    }
+  }
+}
+
+
+static void draw_pattern(const sprite_t* sprite, const pattern_t pattern, int x, int y, int xf, int yf) {
+  const palette_entry_t* entry;
   int                    row;
   int                    col;
   u8_t                   index;
-  const palette_entry_t* entry;
-  int                    sprite_x;
-  int                    sprite_y;
-  int                    offset;
+
+  for (row = 0; row < 16; row++) {
+    for (col = 0; col < 16; col++) {
+      index = pattern[row * 16 + col];
+      if (index != self.transparency_index) {
+        entry  = palette_read(self.palette, (sprite->p << 4) + index);
+        draw_pixel(entry->rgb16, x + col * xf, y + row * yf, xf, yf);
+      }
+    }
+  }
+}
+
+
+static void draw_anchor(const sprite_t* sprite) {
+  pattern_t pattern;
+  int       x;
+  int       y;
 
   if (!sprite->v) {
     return;
@@ -253,20 +283,10 @@ static void draw_anchor(const sprite_t* sprite) {
   if (sprite->xm) mirror_x(pattern);
   if (sprite->ym) mirror_y(pattern);
 
-  sprite_x = (sprite->x8_pr << 8) | sprite->x70;
-  sprite_y = (sprite->y8    << 8) | sprite->y70;
+  x = (sprite->x8_pr << 8) | sprite->x70;
+  y = (sprite->y8    << 8) | sprite->y70;
 
-  for (row = 0; row < 16; row++) {
-    for (col = 0; col < 16; col++) {
-      index = pattern[row * 16 + col];
-      if (index != self.transparency_index) {
-        entry  = palette_read(self.palette, (sprite->p << 4) + index);
-        offset = ((sprite_y + row) % 256) * 320 + ((sprite_x + col) % 320);
-        self.frame_buffer[  offset] = entry->rgb16;
-        self.is_transparent[offset] = 0;
-      }
-    }
-  }
+  draw_pattern(sprite, pattern, x, y, 1 << sprite->xx, 1 << sprite->yy);
 }
 
 
