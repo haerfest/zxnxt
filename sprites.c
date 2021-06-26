@@ -9,25 +9,29 @@
 
 
 typedef struct {
-  u8_t          number;
-  u8_t          attribute[5];
-  u8_t          pattern_index;
-  u8_t          n6;
-  int           is_pattern_index_relative;
-  u16_t         x;
-  u16_t         y;
-  int           palette_offset;
-  int           is_palette_offset_relative;
-  int           is_rotated;
-  int           is_mirrored_x;
-  int           is_mirrored_y;
-  int           is_visible;
-  int           has_fifth_attribute;
-  int           is_4bpp;
-  int           is_anchor;
-  int           are_relative_unified;
-  int           magnification_x;
-  int           magnification_y;
+  u8_t number;
+
+  /* Set. */
+  u8_t attr[5];
+
+  /* Extracted while set. */
+  u8_t x70;
+  u8_t y70;
+  int  p;
+  int  xm;
+  int  ym;
+  int  r;
+  int  x8_pr;
+  int  v;
+  int  e;
+  u8_t n50;
+  int  h;
+  int  n6;
+  int  t;
+  int  xx;
+  int  yy;
+  int  y8;
+  int  po;
 } sprite_t;
 
 
@@ -155,170 +159,181 @@ void sprites_reset(reset_t reset) {
 }
 
 
-static void draw_sprite(const sprite_t* sprite, const sprite_t* anchor) {
-  u8_t*                  pattern;
-  u8_t                   sprite_row;
-  u8_t                   sprite_column;
-  u8_t                   projected_row;
-  u8_t                   projected_column;
-  u8_t                   index;
-  const palette_entry_t* entry;
-  size_t                 offset;
-  s16_t                  sprite_x;
-  s16_t                  sprite_y;
-  u8_t                   palette_offset;
-  u8_t                   pattern_index;
-  u16_t                  final_x;
-  u16_t                  final_y;
-  int                    is_4bpp;
-  u8_t                   magnified_row;
-  u8_t                   magnified_column;
-  u8_t                   magnification_x;
-  u8_t                   magnification_y;
-  int                    is_rotated;
-  int                    is_mirrored_x;
-  int                    is_mirrored_y;
+typedef u8_t pattern_t[256];
 
-  if (!sprite->is_visible) {
-    return;
+
+static void rotate(pattern_t pattern) {
+  pattern_t rotated;
+  int       row;
+  int       col;
+
+  for (row = 0; row < 16; row++) {
+    for (col = 0; col < 16; col++) {
+      rotated[row * 16 + col] = pattern[col * 16 + (15 - row)];
+    }
   }
 
-  if (!sprite->is_anchor && anchor && !anchor->is_visible) {
-    return;
-  }
+  memcpy(pattern, rotated, 256);
+}
 
-  if (!sprite->is_anchor && anchor) {
-    sprite_x       = ((anchor->is_palette_offset_relative << 8) | (anchor->x & 0x00FF)) + (s8_t) sprite->x;
-    sprite_y       = anchor->y + (s8_t) sprite->y;
-    palette_offset = sprite->is_palette_offset_relative ? (anchor->palette_offset + sprite->palette_offset) : sprite->palette_offset;
-    pattern_index  = sprite->is_pattern_index_relative  ? (anchor->pattern_index  + sprite->pattern_index ) : sprite->pattern_index;
-    is_4bpp        = anchor->is_4bpp;
-    if (anchor->are_relative_unified) {
-      is_rotated      = anchor->is_rotated;
-      is_mirrored_x   = anchor->is_mirrored_x;
-      is_mirrored_y   = anchor->is_mirrored_y;
-      magnification_x = 1 << anchor->magnification_x;
-      magnification_y = 1 << anchor->magnification_y;
-    } else {
-      is_rotated      = sprite->is_rotated;
-      is_mirrored_x   = sprite->is_mirrored_x;
-      is_mirrored_y   = sprite->is_mirrored_y;
-      magnification_x = 1 << sprite->magnification_x;
-      magnification_y = 1 << sprite->magnification_y;
+
+static void mirror_x(pattern_t pattern) {
+  int   row;
+  int   col;
+  u8_t* a;
+  u8_t* b;
+  u8_t  tmp;
+
+  for (row = 0; row < 16; row++) {
+    for (col = 0; col < 8; col++) {
+      a = &pattern[row * 16 + col];
+      b = &pattern[row * 16 + (15 - col)];
+
+      tmp = *a;
+      *a  = *b;
+      *b  = tmp;
+    }
+  }
+}
+
+
+static void mirror_y(pattern_t pattern) {
+  int   row;
+  int   col;
+  u8_t* a;
+  u8_t* b;
+  u8_t  tmp;
+
+  for (col = 0; col < 16; col++) {
+    for (row = 0; row < 8; row++) {
+      a = &pattern[row        * 16 + col];
+      b = &pattern[(15 - row) * 16 + col];
+
+      tmp = *a;
+      *a  = *b;
+      *b  = tmp;
+    }
+  }
+}
+
+
+static void fetch_pattern(const sprite_t* sprite, pattern_t pattern) {
+  if (sprite->h) {
+    const u8_t* src = &self.patterns[((sprite->n50 << 1) | sprite->n6) * 128];
+    u8_t*       dst = pattern;
+    int         i;
+
+    for (i = 0; i < 128; i++) {
+      *dst++ = (*src  ) >> 4;
+      *dst++ = (*src++) & 0x0F;
     }
   } else {
-    sprite_x        = (sprite->is_palette_offset_relative << 8) | (sprite->x & 0x00FF);
-    sprite_y        = sprite->y;
-    palette_offset  = sprite->palette_offset;
-    pattern_index   = sprite->pattern_index;
-    is_4bpp         = sprite->is_4bpp;
-    is_rotated      = sprite->is_rotated;
-    is_mirrored_x   = sprite->is_mirrored_x;
-    is_mirrored_y   = sprite->is_mirrored_y;
-    magnification_x = 1 << sprite->magnification_x;
-    magnification_y = 1 << sprite->magnification_y;
+    memcpy(pattern, &self.patterns[sprite->n50 * 256], 256);
   }
+}
+
+
+static void draw_anchor(const sprite_t* sprite) {
+  pattern_t              pattern;
+  int                    row;
+  int                    col;
+  u8_t                   index;
+  const palette_entry_t* entry;
+  int                    sprite_x;
+  int                    sprite_y;
+  int                    offset;
+
+  if (!sprite->v) {
+    return;
+  }
+
+  fetch_pattern(sprite, pattern);
 
 #if 0
-  log_wrn("sprites: sprite #%03d %02X %02X %02X %02X %02X type=%s pattern_index=%03d\n",
-          sprite->number,
-          sprite->attribute[0],
-          sprite->attribute[1],
-          sprite->attribute[2],
-          sprite->attribute[3],
-          sprite->attribute[4],
-          (sprite->is_anchor ? "anchor" : (!anchor ? "?" : (anchor->are_relative_unified ? "unified" : "composite"))),
-          pattern_index);
+  if (sprite->r)  rotate(pattern);
+  if (sprite->xm) mirror_x(pattern);
+  if (sprite->ym) mirror_y(pattern);
 #endif
 
-  if (is_4bpp) {
-    pattern_index = (pattern_index << 1) | sprite->n6;
-    pattern       = &self.patterns[pattern_index * 128];
-  } else {
-    pattern       = &self.patterns[pattern_index * 256];
-  }
+  sprite_x = (sprite->x8_pr << 8) | sprite->x70;
+  sprite_y = (sprite->y8    << 8) | sprite->y70;
 
-  for (sprite_row = 0; sprite_row < 16; sprite_row++) {
-    for (sprite_column = 0; sprite_column < 16; sprite_column++) {
-
-      /* Read the colour value from the pattern. */
-      if (is_4bpp) {
-        if (sprite_row & 1) {
-          index = (*pattern++) & 0x0F;
-        } else {
-          index = (*pattern) >> 4;
-        }
-      } else {
-        index = *pattern++;
-      }
-
-      if (index == self.transparency_index) {
-        continue;
-      }
-
-      entry = palette_read(self.palette, palette_offset + index);
-
-      /* Then figure out where to project it to. */
-      for (magnified_row = sprite_row * magnification_y; magnified_row < (sprite_row + 1) * magnification_y; magnified_row++) {
-        for (magnified_column = sprite_column * magnification_x; magnified_column < (sprite_column + 1) * magnification_x; magnified_column++) {
-
-          /* Apply rotation first. */
-          projected_column = is_rotated ? magnified_row    : magnified_column;
-          projected_row    = is_rotated ? magnified_column : magnified_row;
-
-          /* Then mirroring. */
-          projected_column = is_mirrored_x ? (16 * magnification_x - 1 - projected_column) : projected_column;
-          projected_row    = is_mirrored_y ? (16 * magnification_y - 1 - projected_row)    : projected_row;
-
-          final_x = sprite_x + projected_column;
-          final_y = sprite_y + projected_row;
-          if (final_x >= FRAME_BUFFER_WIDTH / 2) {
-            continue;
-          }
-          if (final_y >= FRAME_BUFFER_HEIGHT) {
-            continue;
-          }
-
-          if (final_x < 32 || final_x >= 32 + 256 || final_y < 32 || final_y >= 32 + 192) {
-            if (!self.is_enabled_over_border) {
-              continue;
-            }
-            if (self.is_enabled_clipping_over_border) {
-              if (final_x < self.clip_x1_eff || final_x > self.clip_x2_eff || final_y < self.clip_y1_eff || final_y > self.clip_y2_eff) {
-                continue;
-              }
-            }
-          } else if (final_x < self.clip_x1_eff || final_x > self.clip_x2_eff || final_y < self.clip_y1_eff || final_y > self.clip_y2_eff) {
-            continue;
-          }
-
-          offset = final_y * FRAME_BUFFER_WIDTH / 2 + final_x;
-
-          self.frame_buffer[offset]   = entry->rgb16;
-          self.is_transparent[offset] = 0;
-        }
+  for (row = 0; row < 16; row++) {
+    for (col = 0; col < 16; col++) {
+      index = pattern[row * 16 + col];
+      if (index != self.transparency_index) {
+        entry  = palette_read(self.palette, (sprite->p << 4) + index);
+        offset = ((sprite_y + row) % 256) * 320 + ((sprite_x + col) % 320);
+        self.frame_buffer[  offset] = entry->rgb16;
+        self.is_transparent[offset] = 0;
       }
     }
   }
 }
 
 
+static void draw_composite(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
+}
+
+
+
+static void draw_unified(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
+}
+
+
+static int draw_sprite(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h, int anchor_t) {
+  log_wrn("sprites: %03d $%02X %02X %02X %02X %02X v=%d e=%d\n",
+          sprite->number,
+          sprite->attr[0],
+          sprite->attr[1],
+          sprite->attr[2],
+          sprite->attr[3],
+          sprite->attr[4],
+          sprite->v,
+          sprite->e);
+  
+  if (!sprite->e || (sprite->attr[4] & 0xC0) != 0x40) {
+    draw_anchor(sprite);
+    return 1;
+  }
+
+  if (anchor_t) {
+    draw_unified(sprite, anchor_v, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
+  } else {
+    draw_composite(sprite, anchor_v, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
+  }
+
+  return 0;
+}
+
+
 static void draw_sprites(void) {
+  int       anchor_v = 0;
+  int       anchor_x = 0;
+  int       anchor_y = 0;
+  int       anchor_p = 0;
+  int       anchor_n = 0;
+  int       anchor_h = 0;
+  int       anchor_t = 0;
+
   sprite_t* sprite;
-  sprite_t* anchor;
   size_t    i;
 
   /* Assume no sprites visible. */
   memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
 
   /* Draw the sprites in order. */
-  anchor = NULL;
   for (i = 0; i < 128; i++) {
     sprite = &self.sprites[i];
-    if (sprite->is_anchor) {
-      anchor = sprite;
+    if (draw_sprite(sprite, anchor_v, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h, anchor_t)) {
+      anchor_v = sprite->v;
+      anchor_x = (sprite->x8_pr << 8) | sprite->x70;
+      anchor_y = (sprite->y8    << 8) | sprite->y70;
+      anchor_p = sprite->p;
+      anchor_n = (sprite->n50 << 1) | sprite->n6;
+      anchor_h = sprite->h;
+      anchor_t = sprite->t;
     }
-    draw_sprite(sprite, anchor);
   }
 }
 
@@ -417,55 +432,59 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
     return;
   }
 
-  sprite->attribute[attribute_index] = value;
-  self.is_dirty                      = 1;
+  sprite->attr[attribute_index] = value;
+  self.is_dirty                 = 1;
 
   switch (attribute_index) {
     case 0:
-      sprite->x = (sprite->x & 0xFF00) | value;
+      sprite->x70 = value;
       break;
 
     case 1:
-      sprite->y = (sprite->y & 0xFF00) | value;
+      sprite->y70 = value;
       break;
 
     case 2:
-      sprite->palette_offset             = value & 0xF0;
-      sprite->is_mirrored_x              = value & 0x08;
-      sprite->is_mirrored_y              = value & 0x04;
-      sprite->is_rotated                 = value & 0x02;
-      sprite->is_palette_offset_relative = value & 0x01;
+      sprite->p     = (value & 0xF0) >> 4;
+      sprite->xm    = (value & 0x08) >> 3;
+      sprite->ym    = (value & 0x04) >> 2;
+      sprite->r     = (value & 0x02) >> 1;
+      sprite->x8_pr =  value & 0x01;
       break;
 
     case 3:
-      sprite->is_visible          = value & 0x80;
-      sprite->has_fifth_attribute = value & 0x40;
-      sprite->pattern_index       = value & 0x3F;
-
-      if (!sprite->has_fifth_attribute) {
-        sprite->is_4bpp              = 0;
-        sprite->is_anchor            = 1;
-        sprite->are_relative_unified = 0;
+      sprite->v   = value >> 7;
+      sprite->e   = (value & 0x40) >> 6;
+      sprite->n50 = value & 0x3F;
+      if (!sprite->e) {
+        sprite->h  = 0;
+        sprite->n6 = 0;
+        sprite->t  = 0;
+        sprite->xx = 0;
+        sprite->yy = 0;
+        sprite->y8 = 0;
+        sprite->po = 0;
       }
       break;
 
     case 4:
-      if (sprite->has_fifth_attribute) {
-        sprite->is_anchor = ((value >> 6) != 0x01);
-        if (sprite->is_anchor) {
-          sprite->is_4bpp = value & 0x80;
-          if (sprite->is_4bpp) {
-            sprite->n6 = (value & 0x40) >> 6;
-          }
-          sprite->are_relative_unified = value & 0x20;
-          sprite->magnification_x      = (value & 0x18) >> 3;
-          sprite->magnification_y      = (value & 0x06) >> 1;
-          sprite->y                    = ((value & 0x01) << 8) | (sprite->y & 0x00FF);
+      if (sprite->e) {
+        if ((value & 0xC0) != 0x40) {
+          sprite->h  = value >> 7;
+          sprite->n6 = (value & 0x40) >> 6;
+          sprite->t  = (value & 0x20) >> 5;
+          sprite->xx = (value & 0x18) >> 3;
+          sprite->yy = (value & 0x06) >> 1;
+          sprite->y8 =  value & 0x01;
+          sprite->po = 0;
         } else {
-          sprite->n6                        = (value & 0x20) >> 5;
-          sprite->magnification_x           = (value & 0x18) >> 3;
-          sprite->magnification_y           = (value & 0x06) >> 1;
-          sprite->is_pattern_index_relative = value & 0x01;
+          sprite->h  = 0;
+          sprite->n6 = (value & 0x20) >> 5;
+          sprite->t  = 0;
+          sprite->xx = (value & 0x18) >> 3;
+          sprite->yy = (value & 0x06) >> 1;
+          sprite->y8 = 0;
+          sprite->po =  value & 0x01;
         }
       }
       break;
@@ -493,10 +512,12 @@ void sprites_slot_set(u8_t slot) {
 
 
 void sprites_next_attribute_set(u8_t value) {
+  const sprite_t* sprite = &self.sprites[self.sprite_index];
+
   sprites_attribute_set(self.sprite_index, self.attribute_index, value);
 
   self.attribute_index++;
-  if (self.attribute_index == 5 || (self.attribute_index == 4 && !self.sprites[self.sprite_index].has_fifth_attribute)) {
+  if (self.attribute_index == 5 || (self.attribute_index == 4 && !sprite->e)) {
     self.attribute_index = 0;
     self.sprite_index    = (self.sprite_index + 1) & 0x7F;
   }
