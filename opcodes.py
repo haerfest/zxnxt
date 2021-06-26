@@ -503,8 +503,8 @@ def ld_r_r(r1: str, r2: str) -> C:
 
 def ldws() -> C:
     return '''
-        TMP = memory_read(DE); T(3);
-        memory_write(HL, TMP); T(3);
+        TMP = memory_read(HL); T(3);
+        memory_write(DE, TMP); T(3);
         L++; D++;
         F = SZ53(D) | HF_ADD(D - 1, 1, D) | (D == 0x80) << VF_SHIFT | (F & CF_MASK);
     '''
