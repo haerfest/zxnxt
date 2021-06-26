@@ -19,7 +19,6 @@
  */
 
 
-#define RAM_SIZE            (2 * 1024 * 1024)
 #define ADDRESS_SPACE_SIZE  0x10000
 #define ADDRESS_PAGE_SIZE   0x2000
 
@@ -41,13 +40,13 @@ static memory_t self;
 int memory_init(void) {
   size_t i;
 
-  self.sram = malloc(RAM_SIZE);
+  self.sram = malloc(MEMORY_SRAM_SIZE);
   if (self.sram == NULL) {
     log_err("memory: out of memory\n");
     return -1;
   }
 
-  for (i = 0; i < RAM_SIZE; i++) {
+  for (i = 0; i < MEMORY_SRAM_SIZE; i++) {
     self.sram[i] = rand() % 256;
   }
 

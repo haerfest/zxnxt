@@ -5,6 +5,8 @@
 #include "defs.h"
 
 
+#define MEMORY_SRAM_SIZE                    (2 * 1024 * 1024)
+
 #define MEMORY_RAM_OFFSET_ZX_SPECTRUM_ROM   0x00000
 #define MEMORY_RAM_OFFSET_DIVMMC_ROM        0x10000
 #define MEMORY_RAM_OFFSET_MF_ROM            0x14000

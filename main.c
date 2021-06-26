@@ -441,7 +441,7 @@ static void main_nmi_multiface(void) {
 }
 
 
-static void main_dump_memory(void) {
+static void main_dump_64k(void) {
   const u16_t pc = cpu_pc_get();
   FILE*       fp;
   u32_t       address;
@@ -459,7 +459,30 @@ static void main_dump_memory(void) {
   }
 
   fclose(fp);
-  log_dbg("main: %s written\n", filename);
+  log_wrn("main: %s written\n", filename);
+}
+
+
+static void main_dump_all(void) {
+  const u16_t pc   = cpu_pc_get();
+  const u8_t* sram = memory_sram();
+  FILE*       fp;
+  u32_t       address;
+  char        filename[18 + 1];
+
+  (void) snprintf(filename, sizeof(filename), "memory-PC=%04X.bin", pc);
+  fp = fopen(filename, "wb");
+  if (fp == NULL) {
+    log_err("main: could not open %s for writing\n", filename);
+    return;
+  }
+
+  for (address = 0; address < MEMORY_SRAM_SIZE; address++) {
+    fputc(sram[address], fp);
+  }
+
+  fclose(fp);
+  log_wrn("main: %s written\n", filename);
 }
 
 
@@ -482,7 +505,9 @@ static void main_handle_function_keys(void) {
       if (f11)             mouse_toggle();
       if (f12) {
         if (self.keyboard_state[SDL_SCANCODE_LSHIFT]) {
-          main_dump_memory();
+          main_dump_64k();
+        } else if (self.keyboard_state[SDL_SCANCODE_RSHIFT]) {
+          main_dump_all();
         } else {
           main_toggle_fullscreen();
         }
