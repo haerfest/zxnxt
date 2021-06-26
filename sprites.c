@@ -217,9 +217,9 @@ static void mirror_y(pattern_t pattern) {
 }
 
 
-static void fetch_pattern(const sprite_t* sprite, pattern_t pattern) {
-  if (sprite->h) {
-    const u8_t* src = &self.patterns[((sprite->n50 << 1) | sprite->n6) * 128];
+static void fetch_pattern(int n, int h, pattern_t pattern) {
+  if (h) {
+    const u8_t* src = &self.patterns[n * 128];
     u8_t*       dst = pattern;
     int         i;
 
@@ -228,7 +228,7 @@ static void fetch_pattern(const sprite_t* sprite, pattern_t pattern) {
       *dst++ = (*src++) & 0x0F;
     }
   } else {
-    memcpy(pattern, &self.patterns[sprite->n50 * 256], 256);
+    memcpy(pattern, &self.patterns[(n & 0xFE) * 128], 256);
   }
 }
 
@@ -250,7 +250,7 @@ static void draw_pixel(u16_t rgb, int x, int y, int xf, int yf) {
 }
 
 
-static void draw_pattern(const sprite_t* sprite, const pattern_t pattern, int x, int y, int xf, int yf) {
+static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, int yf) {
   const palette_entry_t* entry;
   int                    row;
   int                    col;
@@ -260,7 +260,7 @@ static void draw_pattern(const sprite_t* sprite, const pattern_t pattern, int x,
     for (col = 0; col < 16; col++) {
       index = pattern[row * 16 + col];
       if (index != self.transparency_index) {
-        entry  = palette_read(self.palette, (sprite->p << 4) + index);
+        entry  = palette_read(self.palette, (p << 4) + index);
         draw_pixel(entry->rgb16, x + col * xf, y + row * yf, xf, yf);
       }
     }
@@ -277,7 +277,7 @@ static void draw_anchor(const sprite_t* sprite) {
     return;
   }
 
-  fetch_pattern(sprite, pattern);
+  fetch_pattern((sprite->n50 << 1) | sprite->n6, sprite->h, pattern);
 
   if (sprite->r)  rotate(pattern);
   if (sprite->xm) mirror_x(pattern);
@@ -286,13 +286,36 @@ static void draw_anchor(const sprite_t* sprite) {
   x = (sprite->x8_pr << 8) | sprite->x70;
   y = (sprite->y8    << 8) | sprite->y70;
 
-  draw_pattern(sprite, pattern, x, y, 1 << sprite->xx, 1 << sprite->yy);
+  draw_pattern(pattern, sprite->p, x, y, 1 << sprite->xx, 1 << sprite->yy);
 }
 
 
 static void draw_composite(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
-}
+  pattern_t pattern;
+  int       x;
+  int       y;
+  int       n;
+  int       p;
 
+  if (!anchor_v || !sprite->v) {
+    return;
+  }
+
+  n = (sprite->n50 << 1) | sprite->n6;
+  if (sprite->po) n += anchor_n;
+
+  fetch_pattern(n, anchor_h, pattern);
+
+  if (sprite->r)  rotate(pattern);
+  if (sprite->xm) mirror_x(pattern);
+  if (sprite->ym) mirror_y(pattern);
+
+  x = anchor_x + (s8_t) sprite->x70;
+  y = anchor_y + (s8_t) sprite->y70;
+  p = sprite->x8_pr ? (anchor_p + sprite->p) : sprite->p;
+
+  draw_pattern(pattern, p, x, y, 1 << sprite->xx, 1 << sprite->yy);
+}
 
 
 static void draw_unified(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
