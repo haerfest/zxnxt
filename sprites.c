@@ -290,16 +290,12 @@ static void draw_anchor(const sprite_t* sprite) {
 }
 
 
-static void draw_composite(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
+static void draw_composite(const sprite_t* sprite, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
   pattern_t pattern;
   int       x;
   int       y;
   int       n;
   int       p;
-
-  if (!anchor_v || !sprite->v) {
-    return;
-  }
 
   n = (sprite->n50 << 1) | sprite->n6;
   if (sprite->po) n += anchor_n;
@@ -318,7 +314,7 @@ static void draw_composite(const sprite_t* sprite, int anchor_v, int anchor_x, i
 }
 
 
-static void draw_unified(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
+static void draw_unified(const sprite_t* sprite, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
 }
 
 
@@ -341,10 +337,14 @@ static int draw_sprite(const sprite_t* sprite, int anchor_v, int anchor_x, int a
     return 1;
   }
 
+  if (!anchor_v || !sprite->v) {
+    return 0;
+  }
+
   if (anchor_t) {
-    draw_unified(sprite, anchor_v, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
+    draw_unified(sprite, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
   } else {
-    draw_composite(sprite, anchor_v, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
+    draw_composite(sprite, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
   }
 
   return 0;
