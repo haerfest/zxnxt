@@ -159,7 +159,7 @@ static void sprites_update_effective_clipping_area(void) {
   self.clip_y1_eff = self.clip_y1;
   self.clip_y2_eff = self.clip_y2;
 
-  if (self.is_enabled_over_border) {
+  if (self.is_enabled_over_border && self.is_enabled_clipping_over_border) {
     self.clip_x1_eff *= 2;
     self.clip_x2_eff *= 2;
   } else {
@@ -260,18 +260,46 @@ static void fetch_pattern(int n, int h, pattern_t pattern) {
 }
 
 
+static int is_pixel_visible(int x, int y) {
+  if (x < 0 || x >= 320 || y < 0 || y >= 256) {
+    /* Outside 320x256 area. */
+    return 0;
+  }
+
+  if (x < 32 || x >= 320 - 32 || y < 32 || y >= 256 - 32) {
+    /* Over border. */
+    if (!self.is_enabled_over_border) {
+      /* Not enabled over border. */
+      return 0;
+    }
+    if (!self.is_enabled_clipping_over_border) {
+      /* Not clipped over border, only in 256x192 interior. */
+      return 1;
+    }
+  }
+
+  return (x >= self.clip_x1_eff) && (x <= self.clip_x2_eff) && (y >= self.clip_y1_eff) && (y <= self.clip_y2_eff);
+}
+
+
 static void draw_pixel(u16_t rgb, int x, int y, int xf, int yf) {
   const int dr = (yf < 0) ? -1 : +1;
   const int dc = (xf < 0) ? -1 : +1;
   int       row;
   int       col;
   int       offset;
+  int       xs;
+  int       ys;
 
   for (row = 0; row != yf; row += dr) {
+    ys = y + row;
     for (col = 0; col != xf; col += dc) {
-      offset = ((y + row + 256) % 256) * 320 + ((x + col + 320) % 320);
-      self.frame_buffer[  offset] = rgb;
-      self.is_transparent[offset] = 0;
+      xs = x + col;
+      if (is_pixel_visible(xs, ys)) {
+        offset = ys * 320 + xs;
+        self.frame_buffer[  offset] = rgb;
+        self.is_transparent[offset] = 0;
+      }
     }
   }
 }
@@ -287,7 +315,7 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
     for (col = 0; col < 16; col++) {
       index = pattern[row * 16 + col];
       if (index != self.transparency_index) {
-        entry  = palette_read(self.palette, (p << 4) + index);
+        entry = palette_read(self.palette, (p << 4) + index);
         draw_pixel(entry->rgb16, x + col * xf, y + row * yf, xf, yf);
       }
     }
@@ -341,9 +369,6 @@ static void draw_composite(sprite_t* sprite, const sprite_t* anchor) {
 
 
 static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
-  const int xc = anchor->x80 + 8;
-  const int yc = anchor->y80 + 8;
-
   pattern_t pattern;
   int       x;
   int       y;
@@ -351,8 +376,8 @@ static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
   int       p;
   int       xf = 1 << anchor->xx;
   int       yf = 1 << anchor->yy;
-  int       xd = (s8_t) sprite->x70;
-  int       yd = (s8_t) sprite->y70;
+  int       xd = (int) sprite->x70;
+  int       yd = (int) sprite->y70;
   int       tmp;
   int       xm;
   int       ym;
