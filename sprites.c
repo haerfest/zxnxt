@@ -305,7 +305,134 @@ static void draw_pixel(u16_t rgb, int x, int y, int xf, int yf) {
 }
 
 
-static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, int yf) {
+static void draw_hex1(u8_t number, u16_t rgb, int x, int y) {
+  char patterns[16][5 * 3] = {
+    "xxx"
+    "x x"
+    "x x"
+    "x x"
+    "xxx",
+
+    "  x"
+    "  x"
+    "  x"
+    "  x"
+    "  x",
+
+    "xxx"
+    "  x"
+    "xxx"
+    "x  "
+    "xxx",
+
+    "xxx"
+    "  x"
+    "xxx"
+    "  x"
+    "xxx",
+
+    "  x"
+    "x x"
+    "xxx"
+    "  x"
+    "  x",
+
+    "xxx"
+    "x  "
+    "xxx"
+    "  x"
+    "xxx",
+
+    "x  "
+    "x  "
+    "xxx"
+    "x x"
+    "xxx",
+
+    "xxx"
+    "  x"
+    "  x"
+    "  x"
+    "  x",
+
+    "xxx"
+    "x x"
+    "xxx"
+    "x x"
+    "xxx",
+
+    "xxx"
+    "x x"
+    "xxx"
+    "  x"
+    "  x",
+
+    "xxx"
+    "x x"
+    "xxx"
+    "x x"
+    "x x",
+
+    "xx "
+    "x x"
+    "xx "
+    "x x"
+    "xx ",
+
+    "xxx"
+    "x  "
+    "x  "
+    "x  "
+    "xxx",
+
+    "xx "
+    "x x"
+    "x x"
+    "x x"
+    "xx ",
+
+    "xxx"
+    "x  "
+    "xxx"
+    "x  "
+    "xxx",
+
+    "xxx"
+    "x  "
+    "xxx"
+    "x  "
+    "x  "
+  };
+
+  int   row;
+  int   col;
+  int   ys;
+  int   xs;
+  u32_t offset;
+  char* ptr = patterns[number];
+
+  for (row = 0; row < 5; row++) {
+    ys = y + row;
+    for (col = 0; col < 3; col++) {
+      xs = x + col;
+      if (*ptr++ == 'x') {
+        if (is_pixel_visible(xs, ys)) {
+          offset = ys * 320 + xs;
+          self.frame_buffer[  offset] = rgb;
+          self.is_transparent[offset] = 0;
+        }
+      }
+    }
+  }
+}
+
+static void draw_hex2(u8_t number, u16_t rgb, int x, int y) {
+  draw_hex1(number >> 4  , rgb, x,     y);
+  draw_hex1(number & 0x0F, rgb, x + 4, y);
+}
+
+
+static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, int yf, u8_t sprite_number, u8_t pattern_number, u16_t dbg_rgb) {
   const palette_entry_t* entry;
   int                    row;
   int                    col;
@@ -319,6 +446,15 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
         draw_pixel(entry->rgb16, x + col * xf, y + row * yf, xf, yf);
       }
     }
+  }
+
+  if (is_pixel_visible(x, y)) {
+    const u32_t offset = y * 320 + x;
+    self.frame_buffer[  offset] = dbg_rgb;
+    self.is_transparent[offset] = 0;
+
+    draw_hex2(sprite_number,  dbg_rgb, x + 2, y + 2);
+    draw_hex2(pattern_number, dbg_rgb, x + 2, y + 8);
   }
 }
 
@@ -340,7 +476,7 @@ static void draw_anchor(sprite_t* sprite) {
   if (sprite->xm) mirror_x(pattern);
   if (sprite->ym) mirror_y(pattern);
 
-  draw_pattern(pattern, sprite->p, sprite->x80, sprite->y80, 1 << sprite->xx, 1 << sprite->yy);
+  draw_pattern(pattern, sprite->p, sprite->x80, sprite->y80, 1 << sprite->xx, 1 << sprite->yy, sprite->number, sprite->n60, 0xE000);
 }
 
 
@@ -364,7 +500,7 @@ static void draw_composite(sprite_t* sprite, const sprite_t* anchor) {
   y = anchor->y80 + (s8_t) sprite->y70;
   p = sprite->x8_pr ? (anchor->p + sprite->p) : sprite->p;
 
-  draw_pattern(pattern, p, x, y, 1 << sprite->xx, 1 << sprite->yy);
+  draw_pattern(pattern, p, x, y, 1 << sprite->xx, 1 << sprite->yy, sprite->number, n, 0x0E00);
 }
 
 
@@ -411,29 +547,17 @@ static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
   y = anchor->y80 + yd * yf;
   p = sprite->x8_pr ? (anchor->p + sprite->p) : sprite->p;
 
-  draw_pattern(pattern, p, x, y, xf, yf);
+  draw_pattern(pattern, p, x, y, xf, yf, sprite->number, n, 0x00E0);
 }
 
 
 static int draw_sprite(sprite_t* sprite, const sprite_t* anchor) {
-
-#if 0
-  log_wrn("sprites: %03d $%02X %02X %02X %02X %02X v=%d e=%d\n",
-          sprite->number,
-          sprite->attr[0],
-          sprite->attr[1],
-          sprite->attr[2],
-          sprite->attr[3],
-          sprite->attr[4],
-          sprite->v,
-          sprite->e);
-#endif
-
   if (!sprite->e || (sprite->attr[4] & 0xC0) != 0x40) {
     draw_anchor(sprite);
     return 1;
   }
 
+#if 0
   if (!anchor->v || !sprite->v) {
     return 0;
   }
@@ -443,6 +567,7 @@ static int draw_sprite(sprite_t* sprite, const sprite_t* anchor) {
   } else {
     draw_composite(sprite, anchor);
   }
+#endif
 
   return 0;
 }
@@ -457,7 +582,7 @@ static void draw_sprites(void) {
   memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
 
   /* Draw the sprites in order. */
-  for (i = 0; i < 128; i++) {
+  for (i = 0; i < N_SPRITES; i++) {
     sprite = &self.sprites[i];
     if (draw_sprite(sprite, anchor)) {
       anchor = sprite;
