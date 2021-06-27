@@ -341,6 +341,52 @@ static void draw_composite(sprite_t* sprite, const sprite_t* anchor) {
 
 
 static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
+  const int xc = anchor->x80 + 8;
+  const int yc = anchor->y80 + 8;
+
+  pattern_t pattern;
+  int       x;
+  int       y;
+  int       n;
+  int       p;
+  int       xf = 1 << anchor->xx;
+  int       yf = 1 << anchor->yy;
+  int       xd = (s8_t) sprite->x70;
+  int       yd = (s8_t) sprite->y70;
+  int       tmp;
+  int       xm;
+  int       ym;
+
+  n = (sprite->n50 << 1) | sprite->n6;
+  if (sprite->po) n += anchor->n60;
+
+  fetch_pattern(n, anchor->h, pattern);
+
+  if (anchor->r) {
+    rotate(pattern);
+    tmp = xd;
+    xd  = -yd;
+    yd  = tmp;
+  }
+
+  xm = (!anchor->r && anchor->xm) || (anchor->r && anchor->ym);
+  ym = (!anchor->r && anchor->ym) || (anchor->r && anchor->xm);
+
+  if (anchor->xm) {
+    mirror_x(pattern);
+    xd = -xd;
+  }
+
+  if (anchor->ym) {
+    mirror_y(pattern);
+    yd = -yd;
+  }
+
+  x = anchor->x80 + xd * xf;
+  y = anchor->y80 + yd * yf;
+  p = sprite->x8_pr ? (anchor->p + sprite->p) : sprite->p;
+
+  draw_pattern(pattern, p, x, y, xf, yf);
 }
 
 
