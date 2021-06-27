@@ -90,7 +90,8 @@ typedef struct {
   int       clip_y2_eff;  
   u8_t      transparency_index;
   u8_t      sprite_index;
-  u16_t     pattern_index;
+  u8_t      pattern_index;
+  u16_t     pattern_address;
   u8_t      attribute_index;
   int       is_dirty;
   palette_t palette;
@@ -305,6 +306,8 @@ static void draw_pixel(u16_t rgb, int x, int y, int xf, int yf) {
 }
 
 
+#if 0
+
 static void draw_hex1(u8_t number, u16_t rgb, int x, int y) {
   char patterns[16][5 * 3] = {
     "xxx"
@@ -431,6 +434,8 @@ static void draw_hex2(u8_t number, u16_t rgb, int x, int y) {
   draw_hex1(number & 0x0F, rgb, x + 4, y);
 }
 
+#endif
+
 
 static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, int yf, u8_t sprite_number, u8_t pattern_number, u16_t dbg_rgb) {
   const palette_entry_t* entry;
@@ -448,6 +453,7 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
     }
   }
 
+#if 0
   if (is_pixel_visible(x, y)) {
     const u32_t offset = y * 320 + x;
     self.frame_buffer[  offset] = dbg_rgb;
@@ -456,6 +462,7 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
     draw_hex2(sprite_number,  dbg_rgb, x + 2, y + 2);
     draw_hex2(pattern_number, dbg_rgb, x + 2, y + 8);
   }
+#endif
 }
 
 
@@ -512,8 +519,8 @@ static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
   int       p;
   int       xf = 1 << anchor->xx;
   int       yf = 1 << anchor->yy;
-  int       xd = (int) sprite->x70;
-  int       yd = (int) sprite->y70;
+  s8_t      xd = (s8_t) sprite->x70;
+  s8_t      yd = (s8_t) sprite->y70;
   int       tmp;
   int       xm;
   int       ym;
@@ -557,7 +564,6 @@ static int draw_sprite(sprite_t* sprite, const sprite_t* anchor) {
     return 1;
   }
 
-#if 0
   if (!anchor->v || !sprite->v) {
     return 0;
   }
@@ -567,7 +573,6 @@ static int draw_sprite(sprite_t* sprite, const sprite_t* anchor) {
   } else {
     draw_composite(sprite, anchor);
   }
-#endif
 
   return 0;
 }
@@ -759,8 +764,10 @@ u8_t sprites_slot_get(void) {
 
 
 void sprites_slot_set(u8_t slot) {
-  self.sprite_index  = slot & 0x7F;
-  self.pattern_index = (slot & 0x3F) * 256 + (slot & 0x80);
+  self.sprite_index    = slot & 0x7F;
+  self.attribute_index = 0;
+  self.pattern_index   = ((slot & 0x3F) << 1) | ((slot & 0x80) >> 7);
+  self.pattern_address = self.pattern_index * 128;
 }
 
 
@@ -778,11 +785,11 @@ void sprites_next_attribute_set(u8_t value) {
 
 
 void sprites_next_pattern_set(u8_t value) {
-  if (self.patterns[self.pattern_index] != value) {
-    self.patterns[self.pattern_index] = value;
-    self.is_dirty                     = 1;
+  if (self.patterns[self.pattern_address] != value) {
+    self.patterns[self.pattern_address] = value;
+    self.is_dirty                       = 1;
   }
-  self.pattern_index = (self.pattern_index + 1) & 0x3FFF;
+  self.pattern_address = (self.pattern_address + 1) & 0x3FFF;
 }
 
 
