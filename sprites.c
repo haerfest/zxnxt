@@ -32,7 +32,34 @@ typedef struct {
   int  yy;
   int  y8;
   int  po;
+
+  /* Calculated for anchors. */
+  int  x80;
+  int  y80;
+  int  n60;
 } sprite_t;
+
+
+const sprite_t initial_anchor = {
+  .attr  = {0, 0, 0, 0, 0},
+  .x70   = 0,
+  .y70   = 0,
+  .p     = 0,
+  .xm    = 0,
+  .ym    = 0,
+  .r     = 0,
+  .x8_pr = 0,
+  .v     = 0,
+  .e     = 0,
+  .n50   = 0,
+  .h     = 0,
+  .n6    = 0,
+  .t     = 0,
+  .xx    = 0,
+  .yy    = 0,
+  .y8    = 0,
+  .po    = 0
+};
 
 
 /**
@@ -268,29 +295,28 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
 }
 
 
-static void draw_anchor(const sprite_t* sprite) {
+static void draw_anchor(sprite_t* sprite) {
   pattern_t pattern;
-  int       x;
-  int       y;
 
   if (!sprite->v) {
     return;
   }
 
-  fetch_pattern((sprite->n50 << 1) | sprite->n6, sprite->h, pattern);
+  sprite->n60 = (sprite->n50 << 1) | sprite->n6;
+  sprite->x80 = (sprite->x8_pr << 8) | sprite->x70;
+  sprite->y80 = (sprite->y8    << 8) | sprite->y70;
+
+  fetch_pattern(sprite->n60, sprite->h, pattern);
 
   if (sprite->r)  rotate(pattern);
   if (sprite->xm) mirror_x(pattern);
   if (sprite->ym) mirror_y(pattern);
 
-  x = (sprite->x8_pr << 8) | sprite->x70;
-  y = (sprite->y8    << 8) | sprite->y70;
-
-  draw_pattern(pattern, sprite->p, x, y, 1 << sprite->xx, 1 << sprite->yy);
+  draw_pattern(pattern, sprite->p, sprite->x80, sprite->y80, 1 << sprite->xx, 1 << sprite->yy);
 }
 
 
-static void draw_composite(const sprite_t* sprite, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
+static void draw_composite(sprite_t* sprite, const sprite_t* anchor) {
   pattern_t pattern;
   int       x;
   int       y;
@@ -298,27 +324,27 @@ static void draw_composite(const sprite_t* sprite, int anchor_x, int anchor_y, i
   int       p;
 
   n = (sprite->n50 << 1) | sprite->n6;
-  if (sprite->po) n += anchor_n;
+  if (sprite->po) n += anchor->n60;
 
-  fetch_pattern(n, anchor_h, pattern);
+  fetch_pattern(n, anchor->h, pattern);
 
   if (sprite->r)  rotate(pattern);
   if (sprite->xm) mirror_x(pattern);
   if (sprite->ym) mirror_y(pattern);
 
-  x = anchor_x + (s8_t) sprite->x70;
-  y = anchor_y + (s8_t) sprite->y70;
-  p = sprite->x8_pr ? (anchor_p + sprite->p) : sprite->p;
+  x = anchor->x80 + (s8_t) sprite->x70;
+  y = anchor->y80 + (s8_t) sprite->y70;
+  p = sprite->x8_pr ? (anchor->p + sprite->p) : sprite->p;
 
   draw_pattern(pattern, p, x, y, 1 << sprite->xx, 1 << sprite->yy);
 }
 
 
-static void draw_unified(const sprite_t* sprite, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h) {
+static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
 }
 
 
-static int draw_sprite(const sprite_t* sprite, int anchor_v, int anchor_x, int anchor_y, int anchor_p, int anchor_n, int anchor_h, int anchor_t) {
+static int draw_sprite(sprite_t* sprite, const sprite_t* anchor) {
 
 #if 0
   log_wrn("sprites: %03d $%02X %02X %02X %02X %02X v=%d e=%d\n",
@@ -337,14 +363,14 @@ static int draw_sprite(const sprite_t* sprite, int anchor_v, int anchor_x, int a
     return 1;
   }
 
-  if (!anchor_v || !sprite->v) {
+  if (!anchor->v || !sprite->v) {
     return 0;
   }
 
-  if (anchor_t) {
-    draw_unified(sprite, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
+  if (anchor->t) {
+    draw_unified(sprite, anchor);
   } else {
-    draw_composite(sprite, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h);
+    draw_composite(sprite, anchor);
   }
 
   return 0;
@@ -352,16 +378,9 @@ static int draw_sprite(const sprite_t* sprite, int anchor_v, int anchor_x, int a
 
 
 static void draw_sprites(void) {
-  int       anchor_v = 0;
-  int       anchor_x = 0;
-  int       anchor_y = 0;
-  int       anchor_p = 0;
-  int       anchor_n = 0;
-  int       anchor_h = 0;
-  int       anchor_t = 0;
-
-  sprite_t* sprite;
-  size_t    i;
+  const sprite_t* anchor = &initial_anchor;
+  sprite_t*       sprite;
+  size_t          i;
 
   /* Assume no sprites visible. */
   memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
@@ -369,14 +388,8 @@ static void draw_sprites(void) {
   /* Draw the sprites in order. */
   for (i = 0; i < 128; i++) {
     sprite = &self.sprites[i];
-    if (draw_sprite(sprite, anchor_v, anchor_x, anchor_y, anchor_p, anchor_n, anchor_h, anchor_t)) {
-      anchor_v = sprite->v;
-      anchor_x = (sprite->x8_pr << 8) | sprite->x70;
-      anchor_y = (sprite->y8    << 8) | sprite->y70;
-      anchor_p = sprite->p;
-      anchor_n = (sprite->n50 << 1) | sprite->n6;
-      anchor_h = sprite->h;
-      anchor_t = sprite->t;
+    if (draw_sprite(sprite, anchor)) {
+      anchor = sprite;
     }
   }
 }
