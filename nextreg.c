@@ -300,10 +300,7 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
   nextreg_ay_configure(E_NEXTREG_AY_2);
   nextreg_ay_configure(E_NEXTREG_AY_3);
 
-  self.is_sprites_lockstepped = value & 0x10;
-  if (self.is_sprites_lockstepped) {
-    self.sprite_number = sprites_slot_get();
-  }
+  self.is_sprites_lockstepped = (value & 0x10) >> 4;
 }
 
 
@@ -751,7 +748,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_SPRITE_NUMBER:
       if (self.is_sprites_lockstepped) {
-        io_write(0x303B, value);
+        sprites_slot_set(value);
       } else {
         self.sprite_number = value & 0x7F;
       }
@@ -762,26 +759,27 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4:
-      if (self.is_sprites_lockstepped) {
-        io_write(0x57, value);
-      } else {
-        sprites_attribute_set(self.sprite_number, reg - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0, value);
-      }
-      break;
+    {
+      const u8_t sprite_number = self.is_sprites_lockstepped ? sprites_slot_get() : self.sprite_number;
+      sprites_attribute_set(sprite_number, reg - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0, value);
+    }
+    break;
 
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_1_POST_INCREMENT:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2_POST_INCREMENT:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3_POST_INCREMENT:
     case E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4_POST_INCREMENT:
+    {
+      const u8_t sprite_number = self.is_sprites_lockstepped ? sprites_slot_get() : self.sprite_number;
+      sprites_attribute_set(sprite_number, reg - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
       if (self.is_sprites_lockstepped) {
-        io_write(0x57, value);
-        io_write(0x303B, self.sprite_number + 1);
+        sprites_slot_set(sprite_number + 1);
       } else {
-        sprites_attribute_set(self.sprite_number, reg - E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT, value);
         self.sprite_number = (self.sprite_number + 1) & 0x7F;
       }
-      break;
+    }
+    break;
 
     case E_NEXTREG_REGISTER_COPPER_DATA_8BIT:
       copper_data_8bit_write(value);
