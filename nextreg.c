@@ -287,7 +287,8 @@ static void nextreg_peripheral_3_setting_write(u8_t value) {
 static u8_t nextreg_peripheral_4_setting_read(void) {
   return self.is_ay_mono[E_NEXTREG_AY_3] << 7
        | self.is_ay_mono[E_NEXTREG_AY_2] << 6
-       | self.is_ay_mono[E_NEXTREG_AY_1] << 5;
+       | self.is_ay_mono[E_NEXTREG_AY_1] << 5
+       | self.is_sprites_lockstepped     << 4;
 }
 
 
