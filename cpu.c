@@ -179,13 +179,13 @@ typedef struct {
   u8_t r;
 
   /* IRQ. */
-  u8_t  im;                   /* Interrupt mode.                              */
-  int   irq_pending;          /* Non-zero if IRQ pending.                     */
-  int   irq_delay;            /* Non-zero if any pending IRQ must be delayed. */
+  u8_t  im;                   /* Interrupt mode.                                      */
+  int   irq_pending;          /* Non-zero if IRQ pending.                             */
+  int   irq_delay;            /* Number of instructions by which IRQ must be delayed. */
 
   /* NMI. */
-  int              nmi_pending;  /* Non-zero if NMI pending.                  */
-  cpu_nmi_reason_t nmi_reason;   /* Reason for NMI.                           */
+  int              nmi_pending;  /* Non-zero if NMI pending. */
+  cpu_nmi_reason_t nmi_reason;   /* Reason for NMI.          */
 
   /* Reset. */
   int do_reset;
@@ -271,12 +271,6 @@ void cpu_nmi(cpu_nmi_reason_t reason) {
 
 
 static void cpu_irq_pending(void) {
-  /* After EI the next RETN must complete before servicing IRQ. */
-  if (self.irq_delay) {
-    self.irq_delay = 0;
-    return;
-  }
-
   self.irq_pending = 0;
 
   /* Interrupts must be enabled. */
@@ -399,7 +393,10 @@ void cpu_step(void) {
     cpu_nmi_pending();
   }
 
-  if (self.irq_pending) {
+  /* After EI the next RETN must complete before servicing IRQ. */
+  if (self.irq_delay) {
+    self.irq_delay--;
+  } else if (self.irq_pending) {
     cpu_irq_pending();
   }
 }
