@@ -148,12 +148,9 @@ void ay_register_select(u8_t value) {
       self.ays[n].is_right_enabled = (value & 0x20) >> 5;
       return;
     }
-  } else if (value <= E_AY_REGISTER_ENVELOPE_IO_PORT_B_DATA_STORE) {
-    self.ays[self.selected_ay].selected_register = value;
-    return;
   }
   
-  log_err("ay: invalid selected register $%02X\n", value);
+  self.ays[self.selected_ay].selected_register = value & 0x0F;
 }
 
 
