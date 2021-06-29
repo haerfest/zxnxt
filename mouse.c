@@ -44,9 +44,9 @@ void mouse_refresh(void) {
     int         dx;
     int         dy;
     const u32_t buttons = SDL_GetRelativeMouseState(&dx, &dy);
-    const int   middle  = (buttons & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 4 : 0;
-    const int   left    = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT))   ? 2 : 0;
-    const int   right   = (buttons & SDL_BUTTON(SDL_BUTTON_RIGHT))  ? 1 : 0;
+    const int   middle  = (buttons & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 0: 4;
+    const int   left    = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT))   ? 0: 2;
+    const int   right   = (buttons & SDL_BUTTON(SDL_BUTTON_RIGHT))  ? 0: 1;
 
     self.buttons = middle | left | right;
     self.x       = (self.x + dx) & 0xFF;
