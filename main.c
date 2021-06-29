@@ -105,7 +105,7 @@ static int main_init(void) {
     goto exit_sdl;
   }
 
-  self.window = SDL_CreateWindow("zxnxt", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+  self.window = SDL_CreateWindow("zxnxt", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_ALLOW_HIGHDPI);
   if (self.window == NULL) {
     log_err("main: SDL_CreateWindow error: %s\n", SDL_GetError());
     goto exit_sdl;
@@ -115,7 +115,12 @@ static int main_init(void) {
     log_err("main: SDL_SetWindowDisplayMode error: %s\n", SDL_GetError());
     goto exit_sdl;
   }
-  
+
+  if (SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0") != SDL_TRUE) {
+    log_err("main: SDL_SetHint error: %s\n", SDL_GetError());
+    goto exit_sdl;
+  }
+
   self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED);
   if (self.renderer == NULL) {
     log_err("main: SDL_CreateRenderer error: %s\n", SDL_GetError());
