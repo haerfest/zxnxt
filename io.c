@@ -158,19 +158,6 @@ u8_t io_read(u16_t address) {
     case 0xFF:
       return ula_timex_read(address);
 
-    case 0x0F:
-      /* case 0x1F: */
-    case 0x3F:
-    case 0x4F:
-    case 0x5F:
-    case 0xB3:
-    case 0xDF:
-    case 0xF1:
-    case 0xF3:
-    case 0xF9:
-    case 0xFB:
-      return dac_read(address);
-
     default:
       break;
   }

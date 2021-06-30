@@ -6,6 +6,7 @@
 #include "config.h"
 #include "copper.h"
 #include "cpu.h"
+#include "dac.h"
 #include "defs.h"
 #include "dma.h"
 #include "i2c.h"
@@ -22,6 +23,7 @@
 #include "sprites.h"
 #include "tilemap.h"
 #include "rom.h"
+#include "uart.h"
 #include "ula.h"
 
 
@@ -131,6 +133,7 @@ static void nextreg_reset(reset_t reset) {
 
   ay_reset(reset);
   copper_reset(reset);
+  dac_reset(reset);
   dma_reset(reset);
   i2c_reset(reset);
   io_reset(reset);
@@ -140,6 +143,7 @@ static void nextreg_reset(reset_t reset) {
   slu_reset(reset);
   sprites_reset(reset);
   tilemap_reset(reset);
+  uart_reset(reset);
   ula_reset(reset);
 
   rom_select(0);
@@ -802,6 +806,18 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_LINE_INTERRUPT_VALUE_LSB:
       slu_line_interrupt_value_lsb_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_DAC_B_MIRROR:
+      dac_mirror_write(DAC_B, value);
+      break;
+
+    case E_NEXTREG_REGISTER_DAC_A_D_MIRROR:
+      dac_mirror_write(DAC_A | DAC_D, value);
+      break;
+
+     case E_NEXTREG_REGISTER_DAC_C_MIRROR:
+      dac_mirror_write(DAC_C, value);
       break;
 
     default:
