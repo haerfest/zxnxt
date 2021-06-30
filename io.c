@@ -14,6 +14,7 @@
 #include "paging.h"
 #include "spi.h"
 #include "sprites.h"
+#include "uart.h"
 #include "ula.h"
 
 
@@ -73,6 +74,18 @@ u8_t io_read(u16_t address) {
 
     case 0x123B:
       return layer2_access_read();
+
+    case 0x133B:
+      return uart_tx_read();
+
+    case 0x143B:
+      return uart_rx_read();
+
+    case 0x153B:
+      return uart_select_read();
+
+    case 0x163B:
+      return uart_frame_read();
 
     case 0x1FFD:
       return paging_spectrum_plus_3_paging_read();
@@ -186,6 +199,20 @@ void io_write(u16_t address, u8_t value) {
     case 0x123B:
       layer2_access_write(value);
       return;
+
+    case 0x133B:
+      uart_tx_write(value);
+      break;
+
+    case 0x143B:
+      uart_rx_write(value);
+
+    case 0x153B:
+      uart_select_write(value);
+      return;
+
+    case 0x163B:
+      uart_frame_write(value);
 
     case 0x1FFD:
       paging_spectrum_plus_3_paging_write(value);
