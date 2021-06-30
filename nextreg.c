@@ -528,13 +528,24 @@ static u8_t nextreg_sprite_layers_system_read(void) {
 }
 
 
-void nextreg_sprite_layers_system_write(u8_t value) {
+static void nextreg_sprite_layers_system_write(u8_t value) {
   ula_lo_res_enable_set(value & 0x80);
   slu_layer_priority_set((value & 0x1C) >> 2);
   sprites_priority_set(value & 0x40);
   sprites_enable_clipping_over_border_set(value & 0x20);
   sprites_enable_over_border_set(value & 0x02);
   sprites_enable_set(value & 0x01);
+}
+
+
+static void nextreg_interrupt_control_write(u8_t value) {
+  /* TODO */
+}
+
+
+static void nextreg_int_en_0_write(u8_t value) {
+  slu_line_interrupt_enable_set(value & 0x02);
+  ula_irq_enable_set(value & 0x01);
 }
 
 
@@ -825,8 +836,16 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       dac_mirror_write(DAC_C, value);
       break;
 
+    case E_NEXTREG_REGISTER_INTERRUPT_CONTROL:
+      nextreg_interrupt_control_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_INT_EN_0:
+      nextreg_int_en_0_write(value);
+      break;
+
     default:
-      log_wrn("nextreg: unimplemented write of $%02X to register $%02X\n", value, reg);
+      log_wrn("nextreg: unimplemented write of $%02X to register $%02X from PC=$%04X\n", value, reg, cpu_pc_get());
       break;
   }
 
