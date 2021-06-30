@@ -4,7 +4,7 @@
 #include "defs.h"
 
 
-#define N_SOURCES       (E_AUDIO_SOURCE_AY_3_CHANNEL_C - E_AUDIO_SOURCE_BEEPER + 1)
+#define N_SOURCES       (E_AUDIO_SOURCE_LAST - E_AUDIO_SOURCE_FIRST + 1)
 #define SQRT_N_SOURCES  3  /* More or less, provides headroom. */
 
 
@@ -42,6 +42,10 @@ int audio_init(SDL_AudioDeviceID device) {
   self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_A] = E_AUDIO_CHANNEL_LEFT;
   self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_B] = E_AUDIO_CHANNEL_BOTH;
   self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_C] = E_AUDIO_CHANNEL_RIGHT;
+  self.channels[E_AUDIO_SOURCE_DAC_A         ] = E_AUDIO_CHANNEL_LEFT;
+  self.channels[E_AUDIO_SOURCE_DAC_B         ] = E_AUDIO_CHANNEL_LEFT;
+  self.channels[E_AUDIO_SOURCE_DAC_C         ] = E_AUDIO_CHANNEL_RIGHT;
+  self.channels[E_AUDIO_SOURCE_DAC_D         ] = E_AUDIO_CHANNEL_RIGHT;
 
   return 0;
 }

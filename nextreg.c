@@ -283,7 +283,7 @@ static void nextreg_peripheral_3_setting_write(u8_t value) {
   }
 
   ula_contention_set((value & 0x40) == 0);
-
+  dac_enable((value & 0x08) >> 3);
   ula_timex_video_mode_read_enable((value & 0x04) != 0);
 }
 
