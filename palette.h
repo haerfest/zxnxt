@@ -5,6 +5,10 @@
 #include "defs.h"
 
 
+#define PALETTE_RGB8_TO_RGB9(rgb8)  (((rgb8) << 1) | (((rgb8) & 2) >> 1) | ((rgb8) & 1))
+#define PALETTE_RGB9_TO_RGB16(rgb9) ((((rgb9) & 0x1C0) << 7) | (((rgb9) & 0x38) << 6) | (((rgb9) & 0x07) << 5))
+
+
 typedef enum {
   E_PALETTE_ULA_FIRST = 0,
   E_PALETTE_LAYER2_FIRST,

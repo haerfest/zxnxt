@@ -36,7 +36,7 @@ typedef struct {
   u16_t                line_irq_row;
   int                  stencil_mode;
   blend_mode_t         blend_mode;
-  u8_t                 transparent_rgb8;
+  palette_entry_t      transparent;
   u16_t                fallback_rgba;
 } self_t;
 
@@ -74,11 +74,12 @@ void slu_reset(reset_t reset) {
   self.layer_priority   = E_SLU_LAYER_PRIORITY_SLU;
   self.blend_mode       = E_BLEND_MODE_ULA;
   self.stencil_mode     = 0;
-  self.transparent_rgb8 = 0xE3;
   self.line_irq_active  = 0;
   self.line_irq_enabled = 0;
   self.line_irq_row     = 0;
   self.fallback_rgba    = palette_rgb8_rgb16(0xE3);
+
+  slu_transparent_set(0xE3);
 }
 
 
@@ -199,9 +200,10 @@ void slu_mix_layer2(const palette_entry_t* layer2_rgb, const palette_entry_t* mi
 
 u32_t slu_run(u32_t ticks_14mhz) {
   const palette_entry_t black = {
-    .rgb8  = 0,
-    .rgb9  = 0,
-    .rgb16 = 0
+    .rgb8               = 0,
+    .rgb9               = 0,
+    .rgb16              = 0,
+    .is_layer2_priority = 0
   };
 
   u32_t                  tick;
@@ -278,12 +280,12 @@ u32_t slu_run(u32_t ticks_14mhz) {
     sprites_tick(frame_buffer_row, frame_buffer_column, &sprite_pixel_en, &sprite_rgb16);
     layer2_tick( frame_buffer_row, frame_buffer_column, &layer2_pixel_en, &layer2_rgb, &layer2_priority);
 
-    ula_transparent = !ula_en || ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
-    tm_transparent  = !tm_en || !tm_pixel_en || (tm_pixel_textmode && tm_rgb->rgb8 == self.transparent_rgb8);
+    ula_transparent = !ula_en || ula_clipped || (ula_rgb->rgb8 == self.transparent.rgb8);
+    tm_transparent  = !tm_en || !tm_pixel_en || (tm_pixel_textmode && tm_rgb->rgb8 == self.transparent.rgb8);
 
     sprite_transparent = !sprite_pixel_en;
 
-    layer2_transparent = !layer2_pixel_en || (layer2_rgb->rgb8 == self.transparent_rgb8);
+    layer2_transparent = !layer2_pixel_en || (layer2_rgb->rgb8 == self.transparent.rgb8);
     if (layer2_transparent) {
       layer2_priority = 0;
     }
@@ -377,7 +379,7 @@ u32_t slu_run(u32_t ticks_14mhz) {
 
       case E_SLU_LAYER_PRIORITY_BLEND:
       case E_SLU_LAYER_PRIORITY_BLEND_5:
-        ula_mix_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent_rgb8);
+        ula_mix_transparent = ula_clipped || (ula_rgb->rgb8 == self.transparent.rgb8);
         ula_mix_rgb         = ula_mix_transparent ? ula_rgb : &black;
 
         switch (self.blend_mode) {
@@ -500,17 +502,21 @@ void slu_line_interrupt_value_lsb_write(u8_t value) {
 
 
 void slu_ula_control_write(u8_t value) {
+  log_wrn("slu: ULA control $%02X\n", value);
   ula_enable_set((value & 0x80) == 0);
   self.blend_mode               = (value & 0x60) >> 5;
   self.stencil_mode             = value & 0x01;
 }
 
 
-void slu_transparent_rgb8_set(u8_t rgb) {
-  self.transparent_rgb8 = rgb;
+void slu_transparent_set(u8_t rgb8) {
+  self.transparent.rgb8               = rgb8;
+  self.transparent.rgb9               = PALETTE_RGB8_TO_RGB9(rgb8);
+  self.transparent.rgb16              = PALETTE_RGB9_TO_RGB16(self.transparent.rgb9);
+  self.transparent.is_layer2_priority = 0;
 }
 
 
-u8_t slu_transparent_rgb8_get(void) {
-  return self.transparent_rgb8;
+const palette_entry_t* slu_transparent_get(void) {
+  return &self.transparent;
 }

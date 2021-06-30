@@ -8,6 +8,7 @@
 #include "log.h"
 #include "memory.h"
 #include "palette.h"
+#include "slu.h"
 #include "ula.h"
 
 
@@ -288,7 +289,7 @@ typedef struct {
   int                        is_enabled;
   u16_t                      transparency_rgb8;
   u8_t                       ula_next_mask_ink;
-  u8_t                       ula_next_mask_paper;
+  u8_t                       ula_next_rshift_paper;
   int                        is_ula_next_mode;
   int                        is_60hz;
   int                        is_60hz_requested;
@@ -304,67 +305,94 @@ static self_t self;
 #define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_LAST - E_ULA_DISPLAY_MODE_FIRST + 1)
 
 
-static u8_t ula_display_mode_lo_res(u32_t row, u32_t column) {
+static const palette_entry_t* ula_display_mode_lo_res(u32_t row, u32_t column) {
   column = (self.lo_res_offset_x + column) % 256;
   row    = (self.lo_res_offset_y + row   ) % 192;
 
   column /= 2;
   row    /= 2;
 
-  return (row < 48)
-    ? self.display_ram[row * 128 + column]
-    : self.display_ram_alt[(row - 48) * 128 + column];
+  return palette_read(self.palette,
+                      (row < 48)
+                      ? self.display_ram[row * 128 + column]
+                      : self.display_ram_alt[(row - 48) * 128 + column]);
 }
 
 
-static u8_t ula_display_mode_hi_res(u32_t row, u32_t column) {
+static const palette_entry_t* ula_display_mode_hi_res(u32_t row, u32_t column) {
   const u8_t  mask             = 1 << (7 - (column & 0x07));
   const u16_t display_offset   = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | (((column >> 1) / 8) & 0x1F);;
   const u8_t* display_ram      = ((column / 8) & 0x01) ? self.display_ram_alt : self.display_ram;
   const u8_t  display_byte     = display_ram[display_offset];
 
-  return (display_byte & mask)
-    ? 0  + 8 + self.hi_res_ink_colour
-    : 16 + 8 + (~self.hi_res_ink_colour & 0x07);
+  return palette_read(self.palette,
+                      (display_byte & mask)
+                      ? 0  + 8 + self.hi_res_ink_colour
+                      : 16 + 8 + (~self.hi_res_ink_colour & 0x07));
 }
 
 
-static u8_t ula_display_mode_screen_x(u32_t row, u32_t column) {
+static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column) {
   const u32_t halved_column    = column / 2;
-  const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
   const u16_t attribute_offset = (row / 8) * 32 + halved_column / 8;
   const u8_t  attribute_byte   = self.attribute_ram[attribute_offset];
   const u16_t display_offset   = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | ((halved_column / 8) & 0x1F);
   const u8_t  display_byte     = self.display_ram[display_offset];
+  const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
   const int   is_foreground    = display_byte & mask;
-
-  u8_t ink;
-  u8_t paper;
-  u8_t blink;
-  u8_t bright;
 
   /* For floating-bus support. */
   self.attribute_byte = attribute_byte;
 
   if (self.is_ula_next_mode) {
-#if 0
-    if (!is_foreground && self.ula_next_mask_paper == 0) {
-      /* No background mask, background color is fallback color. */
-      return 0;
+    if (is_foreground) {
+      return palette_read(self.palette, attribute_byte & self.ula_next_mask_ink);
     }
-#endif
+    
+    if (self.ula_next_rshift_paper == 0) {
+      return slu_transparent_get();
+    }
 
-    /* TODO: shift paper palette index to the right! */
-    ink    = 0   + (attribute_byte & self.ula_next_mask_ink);
-    paper  = 128 + (attribute_byte & self.ula_next_mask_paper);
-    blink  = 0;
-    bright = 0;
-  } else {
-    bright = (attribute_byte & 0x40) >> 3;
-    ink    = 0  + bright + (attribute_byte & 0x07);
-    paper  = 16 + bright + ((attribute_byte >> 3) & 0x07);
-    blink  = attribute_byte & 0x80;
+    return palette_read(self.palette, 128 + ((attribute_byte & ~self.ula_next_mask_ink) >> self.ula_next_rshift_paper));
   }
+
+  const u8_t             bright = (attribute_byte & 0x40) >> 3;
+  const palette_entry_t* ink    = palette_read(self.palette, 0  + bright + (attribute_byte & 0x07));
+  const palette_entry_t* paper  = palette_read(self.palette, 16 + bright + ((attribute_byte >> 3) & 0x07));;
+  const u8_t             blink  = attribute_byte & 0x80;
+
+  return is_foreground
+    ? ((blink && self.blink_state) ? paper : ink)
+    : ((blink && self.blink_state) ? ink : paper);
+}
+
+static const palette_entry_t* ula_display_mode_hi_colour(u32_t row, u32_t column) {
+  const u32_t halved_column    = column / 2;
+  const u16_t attribute_offset = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | ((halved_column / 8) & 0x1F);
+  const u8_t  attribute_byte   = self.attribute_ram[attribute_offset];
+  const u8_t  display_byte     = self.display_ram[attribute_offset];
+  const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
+  const int   is_foreground    = display_byte & mask;
+
+  /* For floating-bus support. */
+  self.attribute_byte = attribute_byte;
+
+  if (self.is_ula_next_mode) {
+    if (is_foreground) {
+      return palette_read(self.palette, attribute_byte & self.ula_next_mask_ink);
+    }
+    
+    if (self.ula_next_rshift_paper == 0) {
+      return slu_transparent_get();
+    }
+
+    return palette_read(self.palette, 128 + ((attribute_byte & ~self.ula_next_mask_ink) >> self.ula_next_rshift_paper));
+  }
+
+  const u8_t             bright = (attribute_byte & 0x40) >> 3;
+  const palette_entry_t* ink    = palette_read(self.palette, 0  + bright + (attribute_byte & 0x07));
+  const palette_entry_t* paper  = palette_read(self.palette, 16 + bright + ((attribute_byte >> 3) & 0x07));;
+  const u8_t             blink  = attribute_byte & 0x80;
 
   return is_foreground
     ? ((blink && self.blink_state) ? paper : ink)
@@ -372,14 +400,14 @@ static u8_t ula_display_mode_screen_x(u32_t row, u32_t column) {
 }
 
 
-typedef u8_t (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
+typedef const palette_entry_t* (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
 
 const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES] = {  
-  ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_0 */
-  ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_SCREEN_1 */
-  ula_display_mode_screen_x,  /* E_ULA_DISPLAY_MODE_HI_COLOUR (TODO) */
-  ula_display_mode_hi_res,    /* E_ULA_DISPLAY_MODE_HI_RES */
-  ula_display_mode_lo_res     /* E_ULA_DISPLAY_MODE_LO_RES */
+  ula_display_mode_screen_x,   /* E_ULA_DISPLAY_MODE_SCREEN_0 */
+  ula_display_mode_screen_x,   /* E_ULA_DISPLAY_MODE_SCREEN_1 */
+  ula_display_mode_hi_colour,  /* E_ULA_DISPLAY_MODE_HI_COLOUR */
+  ula_display_mode_hi_res,     /* E_ULA_DISPLAY_MODE_HI_RES */
+  ula_display_mode_lo_res      /* E_ULA_DISPLAY_MODE_LO_RES */
 };
 
 
@@ -494,10 +522,8 @@ int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buf
  * whether it is transparent or not.
  */
 void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_clipped, const palette_entry_t** rgb) {
-  u8_t palette_index;
-
+  *is_enabled = self.is_enabled;
   if (!self.is_enabled) {
-    *is_enabled = 0;
     return;
   }
 
@@ -509,25 +535,22 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
     *is_clipped = (row        < self.clip_y1 || row        > self.clip_y2 ||
                    column / 2 < self.clip_x1 || column / 2 > self.clip_x2);
 
-    palette_index = ula_display_handlers[self.display_mode](row, column);
-  } else {
-    *is_border  = 1;
-    *is_clipped = 0;
-
-    palette_index = (self.is_ula_next_mode ? 128 : 16) + self.border_colour;
+    *rgb = ula_display_handlers[self.display_mode](row, column);
+    return;
   }
+  
+  *is_border  = 1;
+  *is_clipped = 0;
 
-#if 0
-    if (self.ula_next_mask_paper == 0) {
-      /* No background mask, border color is fallback color. */
-      return;
+  if (self.is_ula_next_mode) {
+    if (self.ula_next_rshift_paper == 0) {
+      *rgb = slu_transparent_get();
+    } else {
+      *rgb = palette_read(self.palette, 128 + self.border_colour);
     }
-#endif
-
-  *rgb        = palette_read(self.palette, palette_index);
-  *is_enabled = 1;
-
-  return;
+  } else {
+    *rgb = palette_read(self.palette, 16 + self.border_colour);
+  }
 }
 
 
@@ -549,20 +572,20 @@ void ula_finit(void) {
 
 
 void ula_reset(reset_t reset) {
-  self.clip_x1             = 0;
-  self.clip_x2             = 255;
-  self.clip_y1             = 0;
-  self.clip_y2             = 191;
-  self.disable_ula_irq     = 0;
-  self.palette             = E_PALETTE_ULA_FIRST;
-  self.is_ula_next_mode    = 0;
-  self.is_enabled          = 1;
-  self.border_colour       = 0;
-  self.hi_res_ink_colour   = 0;
-  self.ula_next_mask_ink   = 7;
-  self.ula_next_mask_paper = ~7;
-  self.screen_bank         = E_ULA_SCREEN_BANK_5;
-  self.do_contend          = 1;
+  self.clip_x1               = 0;
+  self.clip_x2               = 255;
+  self.clip_y1               = 0;
+  self.clip_y2               = 191;
+  self.disable_ula_irq       = 0;
+  self.palette               = E_PALETTE_ULA_FIRST;
+  self.is_ula_next_mode      = 0;
+  self.ula_next_mask_ink     = 7;
+  self.ula_next_rshift_paper = 3;
+  self.is_enabled            = 1;
+  self.border_colour         = 0;
+  self.hi_res_ink_colour     = 0;
+  self.screen_bank           = E_ULA_SCREEN_BANK_5;
+  self.do_contend            = 1;
 
   if (reset == E_RESET_HARD) {
     self.is_timex_enabled = 0;
@@ -696,9 +719,7 @@ int ula_contention_get(void) {
 
 
 void ula_contention_set(int do_contend) {
-  if (do_contend != self.do_contend) {
-    self.do_contend = do_contend;
-  }
+  self.do_contend = do_contend;
 }
 
 
@@ -802,23 +823,39 @@ void ula_transparency_colour_write(u8_t rgb) {
 
 
 void ula_attribute_byte_format_write(u8_t value) {
+  self.ula_next_mask_ink = value;;
+
   switch (value) {
-    case 0:
     case 1:
+      self.ula_next_rshift_paper = 1;
+      break;
+ 
     case 3:
+      self.ula_next_rshift_paper = 2;
+      break;
+ 
     case 7:
+      self.ula_next_rshift_paper = 3;
+      break;
+ 
     case 15:
+      self.ula_next_rshift_paper = 4;
+      break;
+ 
     case 31:
+      self.ula_next_rshift_paper = 5;
+      break;
+ 
     case 63:
+      self.ula_next_rshift_paper = 6;
+      break;
+ 
     case 127:
-    case 255:
-      self.ula_next_mask_ink   = value;
-      self.ula_next_mask_paper = ~value;
+      self.ula_next_rshift_paper = 7;
       break;
 
     default:
-      self.ula_next_mask_ink   = value;
-      self.ula_next_mask_paper = 0;
+      self.ula_next_rshift_paper = 0;
       break;      
   }
 }

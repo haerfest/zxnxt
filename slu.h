@@ -4,6 +4,7 @@
 
 #include <SDL2/SDL.h>
 #include "defs.h"
+#include "palette.h"
 
 
 typedef enum {
@@ -18,21 +19,21 @@ typedef enum {
 } slu_layer_priority_t;
 
 
-int                  slu_init(SDL_Renderer* renderer, SDL_Texture* texture);
-void                 slu_finit(void);
-u32_t                slu_run(u32_t ticks_14mhz);
-void                 slu_layer_priority_set(slu_layer_priority_t priority);
-slu_layer_priority_t slu_layer_priority_get(void);
-void                 slu_transparency_fallback_colour_write(u8_t value);
-u32_t                slu_active_video_line_get(void);
-u8_t                 slu_line_interrupt_control_read(void);
-void                 slu_line_interrupt_control_write(u8_t value);
-u8_t                 slu_line_interrupt_value_lsb_read(void);
-void                 slu_line_interrupt_value_lsb_write(u8_t value);
-void                 slu_ula_control_write(u8_t value);
-void                 slu_transparent_rgb8_set(u8_t rgb);
-u8_t                 slu_transparent_rgb8_get(void);
-void                 slu_reset(reset_t reset);
+int                    slu_init(SDL_Renderer* renderer, SDL_Texture* texture);
+void                   slu_finit(void);
+u32_t                  slu_run(u32_t ticks_14mhz);
+void                   slu_layer_priority_set(slu_layer_priority_t priority);
+slu_layer_priority_t   slu_layer_priority_get(void);
+void                   slu_transparency_fallback_colour_write(u8_t value);
+u32_t                  slu_active_video_line_get(void);
+u8_t                   slu_line_interrupt_control_read(void);
+void                   slu_line_interrupt_control_write(u8_t value);
+u8_t                   slu_line_interrupt_value_lsb_read(void);
+void                   slu_line_interrupt_value_lsb_write(u8_t value);
+void                   slu_ula_control_write(u8_t value);
+void                   slu_transparent_set(u8_t rgb8);
+const palette_entry_t* slu_transparent_get(void);
+void                   slu_reset(reset_t reset);
 
 
 #endif  /* __SLU_H */

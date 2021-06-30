@@ -3,10 +3,6 @@
 #include "palette.h"
 
 
-#define RGB8_TO_RGB9(rgb8)  (((rgb8) << 1) | (((rgb8) & 2) >> 1) | ((rgb8) & 1))
-#define RGB9_TO_RGB16(rgb9) ((((rgb9) & 0x1C0) << 7) | (((rgb9) & 0x38) << 6) | (((rgb9) & 0x07) << 5))
-
-
 #define N_PALETTES  (E_PALETTE_TILEMAP_SECOND - E_PALETTE_ULA_FIRST + 1)
 
 
@@ -42,8 +38,8 @@ void palette_write_rgb8(palette_t palette, u8_t index, u8_t value) {
    * > the logical OR of blue bits 1 and 0 of this 8-bit value.
    */
   entry->rgb8               = value;
-  entry->rgb9               = RGB8_TO_RGB9(value);
-  entry->rgb16              = RGB9_TO_RGB16(entry->rgb9);
+  entry->rgb9               = PALETTE_RGB8_TO_RGB9(value);
+  entry->rgb16              = PALETTE_RGB9_TO_RGB16(entry->rgb9);
   entry->is_layer2_priority = 0;
 }
 
@@ -52,12 +48,12 @@ void palette_write_rgb9(palette_t palette, u8_t index, u8_t value) {
   palette_entry_t* entry = &self.palette[palette][index];
 
   entry->rgb9               = (entry->rgb9 & 0x1FE) | (value & 1);
-  entry->rgb16              = RGB9_TO_RGB16(entry->rgb9);
+  entry->rgb16              = PALETTE_RGB9_TO_RGB16(entry->rgb9);
   entry->is_layer2_priority = value >> 7;
 }
 
 
 u16_t palette_rgb8_rgb16(u8_t rgb8) {
-  const u16_t rgb9 = RGB8_TO_RGB9(rgb8);
-  return RGB9_TO_RGB16(rgb9);
+  const u16_t rgb9 = PALETTE_RGB8_TO_RGB9(rgb8);
+  return PALETTE_RGB9_TO_RGB16(rgb9);
 }

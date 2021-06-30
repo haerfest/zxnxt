@@ -455,6 +455,8 @@ static void nextreg_palette_control_write(u8_t value) {
   ula_palette_set(self.is_palette_ula_second);
   layer2_palette_set(self.is_palette_layer2_second);
   sprites_palette_set(self.is_palette_sprites_second);
+
+  self.palette_index_9bit_is_first_write = 1;
 }
 
 
@@ -471,6 +473,7 @@ static u8_t nextreg_palette_value_8bits_read(void) {
 
 static void nextreg_palette_value_8bits_write(u8_t value) {
   palette_write_rgb8(self.palette_selected, self.palette_index, value);
+  self.palette_index_9bit_is_first_write = 1;
   if (!self.palette_disable_auto_increment) {
     self.palette_index++;
   }
@@ -636,7 +639,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR:
-      slu_transparent_rgb8_set(value);
+      slu_transparent_set(value);
       break;
 
     case E_NEXTREG_REGISTER_FALLBACK_COLOUR:
@@ -881,7 +884,7 @@ u8_t nextreg_read_internal(u8_t reg) {
       return nextreg_palette_value_9bits_read();
 
     case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR:
-      return slu_transparent_rgb8_get();
+      return slu_transparent_get()->rgb8;
 
     case E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT:
       return ula_attribute_byte_format_read();
