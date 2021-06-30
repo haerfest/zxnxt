@@ -26,6 +26,7 @@ void                   slu_layer_priority_set(slu_layer_priority_t priority);
 slu_layer_priority_t   slu_layer_priority_get(void);
 void                   slu_transparency_fallback_colour_write(u8_t value);
 u32_t                  slu_active_video_line_get(void);
+void                   slu_line_interrupt_enable_set(int enable);
 u8_t                   slu_line_interrupt_control_read(void);
 void                   slu_line_interrupt_control_write(u8_t value);
 u8_t                   slu_line_interrupt_value_lsb_read(void);

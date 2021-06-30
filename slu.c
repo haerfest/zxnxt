@@ -482,12 +482,8 @@ u8_t slu_line_interrupt_control_read(void) {
 void slu_line_interrupt_control_write(u8_t value) {
   ula_irq_enable_set(!(value & 0x04));
 
-  self.line_irq_row     = ((value & 0x01) << 8) | (self.line_irq_row & 0x00FF);
-  self.line_irq_enabled = value & 0x02;
-
-  if (!self.line_irq_enabled) {
-    self.line_irq_active = 0;
-  }
+  self.line_irq_row = ((value & 0x01) << 8) | (self.line_irq_row & 0x00FF);
+  slu_line_interrupt_enable_set(value & 0x02);
 }
 
 
@@ -518,4 +514,12 @@ void slu_transparent_set(u8_t rgb8) {
 
 const palette_entry_t* slu_transparent_get(void) {
   return &self.transparent;
+}
+
+
+void slu_line_interrupt_enable_set(int enable) {
+  self.line_irq_enabled = enable;
+  if (!self.line_irq_enabled) {
+    self.line_irq_active = 0;
+  }  
 }
