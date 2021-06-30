@@ -341,11 +341,6 @@ static void nextreg_cpu_speed_write(u8_t value) {
 }
 
 
-static void nextreg_video_timing_write(u8_t value) {
-  /* Changing 28 MHz clock timing is not supported. */
-}
-
-
 static void nextreg_spectrum_memory_mapping_write(u8_t value) {
   const int change_bank = value & 0x08;
   const int paging_mode = value & 0x04;
@@ -583,7 +578,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_VIDEO_TIMING:
-      nextreg_video_timing_write(value);
+      /* Video timing is fixed at base VGA 28 MHz. */
       break;
 
     case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
@@ -852,6 +847,10 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING:
       return nextreg_peripheral_4_setting_read();
+
+    case E_NEXTREG_REGISTER_VIDEO_TIMING:
+      /* Video timing is fixed at base VGA 28 MHz. */
+      return 0x00;
 
     case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
       return nextreg_sprite_layers_system_read();
