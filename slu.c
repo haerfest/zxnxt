@@ -502,7 +502,6 @@ void slu_line_interrupt_value_lsb_write(u8_t value) {
 
 
 void slu_ula_control_write(u8_t value) {
-  log_wrn("slu: ULA control $%02X\n", value);
   ula_enable_set((value & 0x80) == 0);
   self.blend_mode               = (value & 0x60) >> 5;
   self.stencil_mode             = value & 0x01;
