@@ -189,10 +189,11 @@ void io_write(u16_t address, u8_t value) {
 
     case 0x133B:
       uart_tx_write(value);
-      break;
+      return;
 
     case 0x143B:
       uart_rx_write(value);
+      return;
 
     case 0x153B:
       uart_select_write(value);
@@ -200,6 +201,7 @@ void io_write(u16_t address, u8_t value) {
 
     case 0x163B:
       uart_frame_write(value);
+      return;
 
     case 0x1FFD:
       paging_spectrum_plus_3_paging_write(value);
