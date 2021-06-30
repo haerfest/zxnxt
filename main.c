@@ -31,6 +31,7 @@
 #include "slu.h"
 #include "spi.h"
 #include "tilemap.h"
+#include "uart.h"
 #include "ula.h"
 #include "utils.h"
 
@@ -195,8 +196,12 @@ static int main_init(void) {
     goto exit_sdcard;
   }
 
-  if (palette_init() != 0) {
+  if (uart_init() != 0) {
     goto exit_spi;
+  }
+
+  if (palette_init() != 0) {
+    goto exit_uart;
   }
 
   if (nextreg_init() != 0) {
@@ -343,6 +348,8 @@ exit_nextreg:
   nextreg_finit();
 exit_palette:
   palette_finit();
+exit_uart:
+  uart_finit();
 exit_spi:
   spi_finit();
 exit_sdcard:
@@ -572,6 +579,7 @@ static void main_finit(void) {
   io_finit();
   nextreg_finit();
   palette_finit();
+  uart_finit();
   spi_finit();
   sdcard_finit();
   i2c_finit();
