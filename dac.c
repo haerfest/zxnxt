@@ -46,8 +46,8 @@ void dac_mirror_write(u8_t dac_mask, u8_t value) {
     return;
   }
 
-  if (dac_mask & DAC_A) audio_add_sample(E_AUDIO_SOURCE_DAC_A, (s8_t) value);
-  if (dac_mask & DAC_B) audio_add_sample(E_AUDIO_SOURCE_DAC_B, (s8_t) value);
-  if (dac_mask & DAC_C) audio_add_sample(E_AUDIO_SOURCE_DAC_C, (s8_t) value);
-  if (dac_mask & DAC_D) audio_add_sample(E_AUDIO_SOURCE_DAC_D, (s8_t) value);
+  if (dac_mask & DAC_A) audio_add_sample(E_AUDIO_SOURCE_DAC_A, value >> 1);
+  if (dac_mask & DAC_B) audio_add_sample(E_AUDIO_SOURCE_DAC_B, value >> 1);
+  if (dac_mask & DAC_C) audio_add_sample(E_AUDIO_SOURCE_DAC_C, value >> 1);
+  if (dac_mask & DAC_D) audio_add_sample(E_AUDIO_SOURCE_DAC_D, value >> 1);
 }
