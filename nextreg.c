@@ -808,6 +808,11 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       slu_line_interrupt_value_lsb_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_MSB:
+    case E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_LSB:
+      /* Ignore these. */
+      break;
+      
     case E_NEXTREG_REGISTER_DAC_B_MIRROR:
       dac_mirror_write(DAC_B, value);
       break;

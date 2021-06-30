@@ -40,6 +40,8 @@ typedef enum {
   E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_LSB                 = 0x1F,
   E_NEXTREG_REGISTER_LINE_INTERRUPT_CONTROL                = 0x22,
   E_NEXTREG_REGISTER_LINE_INTERRUPT_VALUE_LSB              = 0x23,
+  E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_MSB                   = 0x2A,
+  E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_LSB                   = 0x2B,
   E_NEXTREG_REGISTER_DAC_B_MIRROR                          = 0x2C,
   E_NEXTREG_REGISTER_DAC_A_D_MIRROR                        = 0x2D,
   E_NEXTREG_REGISTER_DAC_C_MIRROR                          = 0x2E,
