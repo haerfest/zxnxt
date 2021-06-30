@@ -5,7 +5,7 @@
 
 
 #define N_SOURCES       (E_AUDIO_SOURCE_LAST - E_AUDIO_SOURCE_FIRST + 1)
-#define SQRT_N_SOURCES  3  /* More or less, provides headroom. */
+#define SQRT_N_SOURCES  4  /* More or less, provides headroom. */
 
 
 typedef struct {
