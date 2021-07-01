@@ -593,7 +593,9 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_VIDEO_TIMING:
-      /* Video timing is fixed at base VGA 28 MHz. */
+      if (config_is_active()) {
+        clock_timing_write(value);
+      }
       break;
 
     case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
@@ -889,8 +891,7 @@ u8_t nextreg_read_internal(u8_t reg) {
       return nextreg_peripheral_4_setting_read();
 
     case E_NEXTREG_REGISTER_VIDEO_TIMING:
-      /* Video timing is fixed at base VGA 28 MHz. */
-      return 0x00;
+      return clock_timing_read();
 
     case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
       return nextreg_sprite_layers_system_read();
