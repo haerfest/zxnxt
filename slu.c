@@ -28,6 +28,8 @@ typedef struct {
   u32_t                beam_column;
   int                  is_beam_visible;
   int                  do_skip_frame;
+  u32_t                display_rows;
+  u32_t                display_columns;
 
   /* Resettable. */
   slu_layer_priority_t layer_priority;
@@ -110,24 +112,19 @@ static void slu_blit(void) {
 }
 
 
+/**
+ * Beam (0, 0) is the top-left pixel of the (typically) 256x192 content
+ * area.
+ */
 static void slu_beam_advance(void) {
-  u16_t rows;
-  u16_t columns;
-
-  /**
-   * Beam (0, 0) is the top-left pixel of the (typically) 256x192 content
-   * area.
-   */
-  ula_display_size_get(&rows, &columns);
-
   /* Advance beam one pixel horizontally. */
-  if (++self.beam_column < columns) {
+  if (++self.beam_column < self.display_columns) {
     return;
   }
 
   /* Advance beam to beginning of next line. */
   self.beam_column = 0;
-  if (++self.beam_row < rows) {
+  if (++self.beam_row < self.display_rows) {
     return;
   }
 
@@ -145,9 +142,21 @@ static void slu_beam_advance(void) {
 }
 
 
+/**
+ * https://wiki.specnext.dev/Raster_Interrupt_Control_Register
+ *
+ * > The line interrupt value uses coordinate system of Copper coprocessor, i.e.
+ * > line 0 is the first line of pixels. But the line-interrupt happens already
+ * > when the previous line's pixel area is finished (i.e. the raster-line
+ * > counter still reads "previous line" and not the one programmed for
+ * > interrupt). The INT signal is raised while display beam horizontal position
+ * > is between 256-319 standard pixels, precise timing of interrupt handler
+ * > execution then depends on how-quickly/if the Z80 will process the INT
+ * > signal.
+ */
 static void slu_irq(void) {
-  if (self.line_irq_enabled && self.beam_row == self.line_irq_row) {
-    if (self.beam_column == 0) {
+  if (self.line_irq_enabled && ((self.beam_row == self.display_rows - 1 && self.line_irq_row == 0) || self.beam_row == self.line_irq_row - 1)) {
+    if (self.beam_column >= 256 * 2) {
       self.line_irq_active = 1;
       cpu_irq();
     }
@@ -522,4 +531,10 @@ void slu_line_interrupt_enable_set(int enable) {
   if (!self.line_irq_enabled) {
     self.line_irq_active = 0;
   }  
+}
+
+
+void slu_display_size_set(unsigned int rows, unsigned int columns) {
+  self.display_rows    = rows;
+  self.display_columns = columns;
 }

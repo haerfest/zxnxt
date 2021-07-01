@@ -35,6 +35,7 @@ void                   slu_ula_control_write(u8_t value);
 void                   slu_transparent_set(u8_t rgb8);
 const palette_entry_t* slu_transparent_get(void);
 void                   slu_reset(reset_t reset);
+void                   slu_display_size_set(unsigned int rows, unsigned int columns);
 
 
 #endif  /* __SLU_H */

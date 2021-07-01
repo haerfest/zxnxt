@@ -45,7 +45,6 @@ void                 ula_contention_set(int do_contend);
 void                 ula_contend(u8_t bank);
 void                 ula_enable_set(int enable);
 void                 ula_did_complete_frame(void);
-void                 ula_display_size_get(u16_t* rows, u16_t* columns);
 void                 ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_clipped, const palette_entry_t** rgb);
 void                 ula_transparency_colour_write(u8_t rgb);
 void                 ula_attribute_byte_format_write(u8_t value);

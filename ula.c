@@ -458,6 +458,8 @@ static void ula_display_reconfigure(void) {
       self.display_ram_alt = &self.display_ram[0x2000];
       break;
   }
+
+  slu_display_size_set(self.display_spec->rows, self.display_spec->columns);
 }
 
 
@@ -797,17 +799,6 @@ void ula_contend(u8_t bank) {
 
     default:
       break;
-  }
-}
-
-
-void ula_display_size_get(u16_t* rows, u16_t* columns) {
-  if (rows) {
-    *rows = self.display_spec->rows;
-  }
-
-  if (columns) {
-    *columns = self.display_spec->columns;
   }
 }
 
