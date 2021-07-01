@@ -600,8 +600,8 @@ static void main_finit(void) {
 }
 
 
-u32_t main_next_host_sync_get(void) {
-  return (unsigned long) clock_28mhz_get() * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
+u32_t main_next_host_sync_get(u32_t freq_28mhz) {
+  return (unsigned long) freq_28mhz * AUDIO_BUFFER_LENGTH / AUDIO_SAMPLE_RATE;
 }
 
 

@@ -39,7 +39,7 @@ int clock_init(void) {
   self.ticks_28mhz    = 0;
   self.sync_14mhz     = self.ticks_28mhz;
   self.sync_2mhz      = self.ticks_28mhz;
-  self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get();
+  self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get(clock_28mhz[self.clock_timing]);
 
   return 0;
 }
@@ -97,8 +97,13 @@ void clock_run(u32_t cpu_ticks) {
 
   if (self.ticks_28mhz >= self.sync_host_next) {
     main_sync();
-    self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get();
+    self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get(clock_28mhz[self.clock_timing]);
   }
+}
+
+
+clock_timing_t clock_timing_get(void) {
+  return self.clock_timing;
 }
 
 
@@ -109,9 +114,5 @@ u8_t clock_timing_read(void) {
 
 void clock_timing_write(u8_t value) {
   self.clock_timing = value & 0x07;
-}
-
-
-u32_t clock_28mhz_get(void) {
-  return clock_28mhz[self.clock_timing];
+  log_wrn("clock: timing write $%02X\n", value);
 }

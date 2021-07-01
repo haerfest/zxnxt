@@ -39,10 +39,6 @@ typedef enum {
  * 256x192 content area, i.e. the top and left borders are not included. The
  * tables below have been adjusted for this, such that (0, 0) is the first
  * pixel of the generated display, i.e. borders included.
- *
- * Note that zxnxt only implements the "VGA 0" machine timings, where the
- * master clock is exaclty 28 MHz, as that is how the machine is supposed to
- * run. Both display refresh rates of 50 Hz and 60 Hz are supported.
  */
 typedef struct {
   unsigned int rows;                   /** Number of rows.                  */
@@ -56,7 +52,52 @@ typedef struct {
 } ula_display_spec_t;
 
 
-const ula_display_spec_t ula_display_spec[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCIES] = {  
+const ula_display_spec_t ula_display_spec_hdmi[N_REFRESH_FREQUENCIES]= {
+  /**
+   * HDMI, 50 Hz:                                        60 Hz:
+   *
+   *     0                256      323      395      432     0                256      323      392      429
+   *   0 +----------------+--------+--------+--------+     0 +----------------+--------+--------+--------+
+   *     | 192  content   | border | hblank | border |       | 192  content   | border | hblank | border |
+   *     |        256     |   67   |   72   |   37   |       |        256     |   67   |   69   |   37   |
+   * 192 +----------------+                          |   192 +----------------+                          |
+   *     |  63  border                               |       |  38  border                               |
+   * 255 +-----------------                          |   230 X-----------------                          |
+   *     | X 9  vblank        X = (256,4)            |       | X 9  vblank         X = (235,4)           |
+   * 264 +-----------------                          |   239 +-----------------                          |
+   *     |  48  border                               |       |  23  border                               |
+   * 312 +-------------------------------------------+   262 +-------------------------------------------+
+   *
+   * Also note that the display is generated in "half pixel" units (see
+   * FRAME_BUFFER_{WIDTH,HEIGHT}), hence the macro.
+   */
+
+    /* 50 Hz */
+    {
+      .rows         = 312,
+      .columns      = 432                 * 2,
+      .hblank_start = (256 + 32)          * 2,
+      .hblank_end   = (256 + 67 + 72 + 5) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 63 + 9 + 16,
+      .vsync_row    = 256,
+      .vsync_column = 4                   * 2
+    },
+    /* 60 Hz */
+    {
+      .rows         = 262,
+      .columns      = 429                 * 2,
+      .hblank_start = (256 + 32)          * 2,
+      .hblank_end   = (256 + 67 + 69 + 5) * 2,
+      .vblank_start = 192 + 32,
+      .vblank_end   = 192 + 38,  /* TODO Deal with HDMI's small lower border. */
+      .vsync_row    = 235,
+      .vsync_column = 4
+    }
+};
+
+
+const ula_display_spec_t ula_display_spec_vga[N_DISPLAY_TIMINGS][N_REFRESH_FREQUENCIES] = {  
   /**
    * Note:
    * - X marks the spot of the vertical blank interrupt.
@@ -429,7 +470,9 @@ static void ula_display_reconfigure(void) {
   /* Remember the requested mode in case we honor it in bank 5. */
   self.display_mode = mode;
   self.is_60hz      = self.is_60hz_requested;
-  self.display_spec = &ula_display_spec[self.display_timing][self.is_60hz & 1];
+  self.display_spec = (clock_timing_get() == E_CLOCK_TIMING_HDMI)
+    ? &ula_display_spec_hdmi[self.is_60hz & 1]
+    : &ula_display_spec_vga[self.display_timing][self.is_60hz & 1];
 
   /* Use the effective mode, which depends on the actual bank. */
   switch (mode) {
@@ -562,6 +605,7 @@ int ula_init(u8_t* sram) {
   self.audio_last_sample   = 0;
   self.is_7mhz_tick        = 1;
   self.display_timing      = E_ULA_DISPLAY_TIMING_ZX_48K;
+  self.is_60hz             = 1;
 
   ula_reset(E_RESET_HARD);
 
