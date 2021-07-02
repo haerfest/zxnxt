@@ -60,12 +60,6 @@ clock_cpu_speed_t clock_cpu_speed_get(void) {
 
 
 void clock_cpu_speed_set(clock_cpu_speed_t speed) {
-#ifdef DEBUG
-  const char* speeds[] = {
-    "3.5", "7", "14", "28"
-  };
-#endif
-
   self.cpu_speed = speed;
 }
 
