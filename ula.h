@@ -2,6 +2,7 @@
 #define __ULA_H
 
 
+#include "clock.h"
 #include "defs.h"
 #include "palette.h"
 
@@ -58,6 +59,7 @@ void                 ula_lo_res_enable_set(int enable);
 void                 ula_lo_res_offset_x_write(u8_t value);
 void                 ula_lo_res_offset_y_write(u8_t value);
 int                  ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buffer_row, u32_t* frame_buffer_column);
+void                 ula_hdmi_enable(int enable);
 
 
 #endif  /* __ULA_H */

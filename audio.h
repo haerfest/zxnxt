@@ -47,6 +47,7 @@ void audio_assign_channel(audio_source_t source, audio_channel_t channel);
 void audio_add_sample(audio_source_t source, s8_t sample);
 void audio_sync(void);
 void audio_callback(void* userdata, u8_t* stream, int length);
+void audio_clock_28mhz_set(u32_t freq_28mhz);
 
 
 #endif  /* __AUDIO_H */

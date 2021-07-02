@@ -1,11 +1,12 @@
 #include <stdlib.h>
+#include "audio.h"
 #include "ay.h"
 #include "clock.h"
 #include "defs.h"
 #include "log.h"
 #include "main.h"
 #include "slu.h"
-
+#include "ula.h"
 
 
 static const u32_t clock_28mhz[E_CLOCK_TIMING_LAST - E_CLOCK_TIMING_FIRST + 1] = {
@@ -106,7 +107,13 @@ u8_t clock_timing_read(void) {
 }
 
 
+u32_t clock_28mhz_get(void) {
+  return clock_28mhz[self.clock_timing];
+}
+
+
 void clock_timing_write(u8_t value) {
   self.clock_timing = value & 0x07;
-  log_wrn("clock: timing write $%02X\n", value);
+  audio_clock_28mhz_set(clock_28mhz[self.clock_timing]);
+  ula_hdmi_enable(self.clock_timing == E_CLOCK_TIMING_HDMI);
 }

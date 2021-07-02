@@ -334,9 +334,11 @@ typedef struct {
   int                        is_ula_next_mode;
   int                        is_60hz;
   int                        is_60hz_requested;
-  int                        is_lo_res_enabled;
+  int                        is_lo_res_enabled_requested;
   u8_t                       lo_res_offset_x;
   u8_t                       lo_res_offset_y;
+  int                        is_hdmi;
+  int                        is_hdmi_requested;
 } self_t;
 
 
@@ -463,14 +465,15 @@ static void ula_display_reconfigure(void) {
    * supported.
    */
   const ula_display_mode_t mode = \
-    self.is_lo_res_enabled                    ? E_ULA_DISPLAY_MODE_LO_RES :
+    self.is_lo_res_enabled_requested          ? E_ULA_DISPLAY_MODE_LO_RES :
     (self.screen_bank == E_ULA_SCREEN_BANK_7) ? (self.display_mode_requested & 1) :
     /* else */                                  self.display_mode_requested;
 
   /* Remember the requested mode in case we honor it in bank 5. */
   self.display_mode = mode;
   self.is_60hz      = self.is_60hz_requested;
-  self.display_spec = (clock_timing_get() == E_CLOCK_TIMING_HDMI)
+  self.is_hdmi      = self.is_hdmi_requested;
+  self.display_spec = self.is_hdmi
     ? &ula_display_spec_hdmi[self.is_60hz & 1]
     : &ula_display_spec_vga[self.display_timing][self.is_60hz & 1];
 
@@ -605,7 +608,8 @@ int ula_init(u8_t* sram) {
   self.audio_last_sample   = 0;
   self.is_7mhz_tick        = 1;
   self.display_timing      = E_ULA_DISPLAY_TIMING_ZX_48K;
-  self.is_60hz             = 1;
+  self.is_60hz             = 0;
+  self.is_hdmi             = 0;
 
   ula_reset(E_RESET_HARD);
 
@@ -907,10 +911,8 @@ void ula_next_mode_enable(int do_enable) {
 
 
 void ula_60hz_set(int enable) {
-  if (self.is_60hz != enable) {
-    self.is_60hz_requested       = enable;
-    self.did_display_spec_change = 1;
-  }
+  self.is_60hz_requested       = enable;
+  self.did_display_spec_change = 1;
 }
 
 
@@ -930,10 +932,8 @@ void ula_irq_enable_set(int enable) {
 
 
 void ula_lo_res_enable_set(int enable) {
-  if (self.is_lo_res_enabled != enable) {
-    self.is_lo_res_enabled       = enable;
-    self.did_display_spec_change = 1;
-  }
+  self.is_lo_res_enabled_requested = enable;
+  self.did_display_spec_change     = 1;
 }
 
 
@@ -944,4 +944,10 @@ void ula_lo_res_offset_x_write(u8_t value) {
 
 void ula_lo_res_offset_y_write(u8_t value) {
   self.lo_res_offset_y = value;
+}
+
+
+void ula_hdmi_enable(int enable) {
+  self.is_hdmi_requested       = enable;
+  self.did_display_spec_change = 1;
 }

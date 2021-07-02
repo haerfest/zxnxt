@@ -22,6 +22,7 @@ typedef struct {
   SDL_bool          is_empty;
   SDL_cond*         emptied;
   SDL_mutex*        lock;
+  u32_t             clock_28mhz;
 } self_t;
 
 
@@ -37,6 +38,7 @@ int audio_init(SDL_AudioDeviceID device) {
   self.is_empty              = SDL_FALSE;
   self.emptied               = SDL_CreateCond();
   self.lock                  = SDL_CreateMutex();
+  self.clock_28mhz           = clock_28mhz_get();
 
   self.channels[E_AUDIO_SOURCE_BEEPER        ] = E_AUDIO_CHANNEL_BOTH;
   self.channels[E_AUDIO_SOURCE_AY_1_CHANNEL_A] = E_AUDIO_CHANNEL_LEFT;
@@ -67,7 +69,7 @@ void audio_add_sample(audio_source_t source, s8_t sample) {
   SDL_LockAudioDevice(self.device);
 
   /* Calculate where to place the new sample. */
-  index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.emptied_ticks_28mhz) / CLOCK_28MHZ;
+  index = AUDIO_SAMPLE_RATE * (clock_ticks() - self.emptied_ticks_28mhz) / self.clock_28mhz;
 
   if (index < AUDIO_BUFFER_LENGTH) {
     s8_t* mixed;
@@ -145,4 +147,9 @@ void audio_callback(void* userdata, u8_t* stream, int length) {
   self.is_empty = SDL_TRUE;
   SDL_CondSignal(self.emptied);
   SDL_UnlockMutex(self.lock);
+}
+
+
+void audio_clock_28mhz_set(u32_t freq_28mhz) {
+  self.clock_28mhz = freq_28mhz;
 }

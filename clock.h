@@ -36,6 +36,7 @@ u64_t             clock_ticks(void);
 clock_timing_t    clock_timing_get(void);
 u8_t              clock_timing_read(void);
 void              clock_timing_write(u8_t value);
+u32_t             clock_28mhz_get(void);
 
 
 #endif  /* __CLOCK_H */
