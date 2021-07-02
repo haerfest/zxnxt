@@ -649,7 +649,7 @@ static void main_update_title(void) {
     "Config", "48K", "128K", "+3", "Pentagon"
   };
   const char* timings[E_TIMING_LAST - E_TIMING_FIRST + 1] = {
-    "VGA0", "VGA1", "VGA2", "VGA3", "VGA4", "VGA5", "VGA6", "HDMI"
+    "VGA", "VGA1", "VGA2", "VGA3", "VGA4", "VGA5", "VGA6", "HDMI"
   };
 
   char title[40];
