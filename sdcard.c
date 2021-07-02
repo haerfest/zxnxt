@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "cpu.h"
 #include "defs.h"
 #include "log.h"
 #include "sdcard.h"
@@ -96,9 +97,9 @@ int sdcard_init(void) {
     self[n].command_length  = 0;
     self[n].response_length = 0;
     self[n].response_index  = 0;
-    self[n].block_length    = 512;
     self[n].position        = 0;
     self[n].in_app_cmd      = 0;
+    self[n].block_length    = 512;
     self[n].fp              = NULL;
     self[n].size            = 0;
     self[n].is_sdsc         = 1;
@@ -161,7 +162,9 @@ static int sdcard_block_read(sdcard_nr_t n, u8_t* response_buffer) {
 
 
 u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
+#if 0
   u8_t response;
+#endif
 
   /* If there is no response left, should we request one on the fly? */
   if (self[n].fp != NULL) {
@@ -178,14 +181,8 @@ u8_t sdcard_read(sdcard_nr_t n, u16_t address) {
   if (self[n].response_index < self[n].response_length) {
     return self[n].response_buffer[self[n].response_index++];
   }
-  
-  /* Standard R1 response. */
-  response = self[n].error | (self[n].state == E_STATE_IDLE);
 
-  /* Error bits are cleard by the host when read. */
-  self[n].error = E_ERROR_NONE;
-
-  return response;
+  return TOKEN_NO_DATA;
 }
 
 
@@ -227,23 +224,23 @@ static void sdcard_handle_command(sdcard_nr_t n) {
   if (self[n].fp != NULL) {
     u32_t block_length;
 
-    /* Defaults: no error, R1 response. */
-    self[n].error           = E_ERROR_NONE;
-    self[n].response_length = 0;
-    self[n].response_index  = 0;
+    self[n].response_index = 0;
 
     switch (self[n].command) {
       case E_CMD_GO_IDLE_STATE:
-        self[n].state = E_STATE_IDLE;
+        self[n].state              = E_STATE_IDLE;
+        self[n].response_buffer[0] = 0x01;  /* R1 indicating idle. */
+        self[n].response_length    = 1;
         return;
 
       case E_CMD_SEND_OP_COND:
-        self[n].response_buffer[0] = 0x00;  /* Need to clear idle bit. */
+        self[n].response_buffer[0] = 0x00;  /* R1. */
         self[n].response_length    = 1;
         return;
  
       case E_CMD_SEND_IF_COND:
-        self[n].error = E_ERROR_ILLEGAL_COMMAND;
+        self[n].response_buffer[0] = E_ERROR_ILLEGAL_COMMAND;  /* R1 with error. */
+        self[n].response_length    = 1;
         return;
 
       case E_CMD_SEND_CSD:
@@ -280,7 +277,9 @@ static void sdcard_handle_command(sdcard_nr_t n) {
             log_err("sdcard%d: unsupported block length %u bytes\n", n, block_length);
             break;
           }
-          self[n].block_length = block_length;
+          self[n].block_length       = block_length;
+          self[n].response_buffer[0] = 0x00;  /* R1. */
+          self[n].response_length    = 1;
           return;
         }
         break;
@@ -360,8 +359,8 @@ static void sdcard_handle_command(sdcard_nr_t n) {
     }
   }
 
-  self[n].state      = E_STATE_IDLE;
-  self[n].error      = E_ERROR_ILLEGAL_COMMAND;
+  self[n].state              = E_STATE_IDLE;
+  self[n].response_buffer[0] = E_ERROR_ILLEGAL_COMMAND | 0x01;
   self[n].in_app_cmd = 0;
 }
 
@@ -442,3 +441,4 @@ void sdcard_write(sdcard_nr_t n, u16_t address, u8_t value) {
     sdcard_receive_command(n, value);
   }
 }
+
