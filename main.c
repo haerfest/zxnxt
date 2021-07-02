@@ -58,6 +58,10 @@ typedef struct {
   int                 is_windowed;
   int                 is_function_key_down;
   main_task_t         task;
+  int                 is_60hz;
+  cpu_speed_t         speed;
+  machine_type_t      machine;
+  timing_t            timing;
 } self_t;
 
 
@@ -299,6 +303,11 @@ static int main_init(void) {
   }
 
   memory_refresh_accessors(0, 8);
+
+  self.is_60hz = ula_60hz_get();
+  self.machine = ula_timing_get();
+  self.speed   = clock_cpu_speed_get();
+  self.timing  = clock_timing_get();
 
   return 0;
 
@@ -629,4 +638,56 @@ int main(int argc, char* argv[]) {
   main_finit();
 
   return 0;
+}
+
+
+static void main_update_title(void) {
+  const char* mhz[E_CPU_SPEED_LAST - E_CPU_SPEED_FIRST + 1] = {
+    "3.5", "7", "14", "28"
+  };
+  const char* machines[E_MACHINE_TYPE_LAST - E_MACHINE_TYPE_FIRST + 1] = {
+    "Config", "48K", "128K", "+3", "Pentagon"
+  };
+  const char* timings[E_TIMING_LAST - E_TIMING_FIRST + 1] = {
+    "VGA0", "VGA1", "VGA2", "VGA3", "VGA4", "VGA5", "VGA6", "HDMI"
+  };
+
+  char title[40];
+  int  n = 0;
+
+  (void) snprintf(&title[n], sizeof(title), "zxnxt - %s MHz %s %dHz %s", mhz[self.speed], machines[self.machine], self.is_60hz ? 60 : 50, timings[self.timing]);
+                
+  SDL_SetWindowTitle(self.window, title);
+}
+
+
+void main_show_refresh(int is_60hz) {
+  if (self.is_60hz != is_60hz) {
+    self.is_60hz = is_60hz;
+    main_update_title();
+  }
+}
+
+
+void main_show_machine_type(machine_type_t machine) {
+  if (self.machine != machine) {
+    self.machine = machine;
+    main_update_title();
+  }
+}
+
+
+void main_show_timing(timing_t timing) {
+  if (self.timing != timing) {
+    self.timing = timing;
+    main_update_title();
+  }
+}
+
+
+void main_show_cpu_speed(cpu_speed_t speed) {
+  if (self.speed != speed) {
+    self.speed = speed;
+    main_update_title();
+  }
 }

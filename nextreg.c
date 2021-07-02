@@ -150,7 +150,7 @@ static void nextreg_reset(reset_t reset) {
   rom_lock(self.altrom_soft_reset_lock);
   altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
 
-  nextreg_cpu_speed_write(E_CLOCK_CPU_SPEED_3MHZ);
+  nextreg_cpu_speed_write(E_CPU_SPEED_3MHZ);
 }
 
 
@@ -203,9 +203,9 @@ static void nextreg_config_mapping_write(u8_t value) {
 
 static void nextreg_machine_type_write(u8_t value) {
   if (value & 0x80) {
-    const u8_t display_timing = (value >> 4) & 0x03;
-    if (display_timing <= E_ULA_DISPLAY_TIMING_PENTAGON) {
-      ula_display_timing_set(display_timing);
+    const u8_t machine_type = (value >> 4) & 0x03;
+    if (machine_type <= E_MACHINE_TYPE_PENTAGON) {
+      ula_timing_set(machine_type);
     }
   }
 

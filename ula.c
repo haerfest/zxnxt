@@ -6,6 +6,7 @@
 #include "defs.h"
 #include "keyboard.h"
 #include "log.h"
+#include "main.h"
 #include "memory.h"
 #include "palette.h"
 #include "slu.h"
@@ -24,7 +25,7 @@ typedef enum {
 
 
 #define N_IRQ_TSTATES          32
-#define N_DISPLAY_TIMINGS      (E_ULA_DISPLAY_TIMING_PENTAGON - E_ULA_DISPLAY_TIMING_CONFIGURATION + 1)
+#define N_DISPLAY_TIMINGS      (E_MACHINE_TYPE_LAST - E_MACHINE_TYPE_FIRST + 1)
 #define N_REFRESH_FREQUENCIES  2
 
 
@@ -304,7 +305,7 @@ typedef struct {
   int                        did_display_spec_change;
   u8_t*                      display_ram;
   u8_t*                      display_ram_alt;
-  ula_display_timing_t       display_timing;
+  machine_type_t             display_timing;
   ula_display_mode_t         display_mode;
   ula_display_mode_t         display_mode_requested;
   u8_t*                      attribute_ram;
@@ -506,6 +507,8 @@ static void ula_display_reconfigure(void) {
   }
 
   slu_display_size_set(self.display_spec->rows, self.display_spec->columns);
+
+  main_show_refresh(self.is_60hz);
 }
 
 
@@ -607,7 +610,7 @@ int ula_init(u8_t* sram) {
   self.speaker_state       = 0;
   self.audio_last_sample   = 0;
   self.is_7mhz_tick        = 1;
-  self.display_timing      = E_ULA_DISPLAY_TIMING_ZX_48K;
+  self.display_timing      = E_MACHINE_TYPE_ZX_48K;
   self.is_60hz             = 0;
   self.is_hdmi             = 0;
 
@@ -718,19 +721,21 @@ void ula_timex_write(u16_t address, u8_t value) {
 }
 
 
-ula_display_timing_t ula_display_timing_get(void) {
+machine_type_t ula_timing_get(void) {
   return self.display_timing;
 }
 
 
-void ula_display_timing_set(ula_display_timing_t timing) {
-  if (timing < E_ULA_DISPLAY_TIMING_ZX_48K || timing > E_ULA_DISPLAY_TIMING_PENTAGON) {
-    log_err("ula: refused to set display timing to %d\n", timing);
+void ula_timing_set(machine_type_t machine) {
+  if (machine < E_MACHINE_TYPE_ZX_48K || machine > E_MACHINE_TYPE_LAST) {
+    log_err("ula: refused to set timing to %d\n", machine);
     return;
   }
 
-  self.display_timing          = timing;
+  self.display_timing          = machine;
   self.did_display_spec_change = 1;
+
+  main_show_machine_type(self.display_timing);
 }
 
 
@@ -813,7 +818,7 @@ void ula_contend(u8_t bank) {
     return;
   }
 
-  if (clock_cpu_speed_get() != E_CLOCK_CPU_SPEED_3MHZ) {
+  if (clock_cpu_speed_get() != E_CPU_SPEED_3MHZ) {
     /* Contention only plays a role when running at 3.5 MHz. */
     return;
   }
@@ -824,21 +829,21 @@ void ula_contend(u8_t bank) {
   }
 
   switch (self.display_timing) {
-    case E_ULA_DISPLAY_TIMING_ZX_48K:
+    case E_MACHINE_TYPE_ZX_48K:
       if (bank == 5) {
         /* Only bank 5 is contended. */
         ula_contend_48k();
       }
       break;
 
-    case E_ULA_DISPLAY_TIMING_ZX_128K:
+    case E_MACHINE_TYPE_ZX_128K_PLUS2:
       if ((bank & 1) == 1) {
         /* Only odd banks are contended. */
         ula_contend_128k();
       }
       break;
 
-    case E_ULA_DISPLAY_TIMING_ZX_PLUS_2A:
+    case E_MACHINE_TYPE_ZX_PLUS2A_PLUS2B_PLUS3:
       if (bank > 3) {
         /* Only banks four and above are contended. */
         ula_contend_plus_2();
