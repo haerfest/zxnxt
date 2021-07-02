@@ -821,6 +821,14 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       slu_line_interrupt_value_lsb_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_ULA_X_SCROLL:
+      ula_offset_x_write(value);
+      break;
+
+    case E_NEXTREG_REGISTER_ULA_Y_SCROLL:
+      ula_offset_y_write(value);
+      break;
+
     case E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_MSB:
     case E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_LSB:
       /* Ignore these. */
@@ -950,6 +958,12 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_LINE_INTERRUPT_VALUE_LSB:
       return slu_line_interrupt_value_lsb_read();
+
+    case E_NEXTREG_REGISTER_ULA_X_SCROLL:
+      return ula_offset_x_read();
+
+    case E_NEXTREG_REGISTER_ULA_Y_SCROLL:
+      return ula_offset_y_read();
 
     default:
       log_wrn("nextreg: unimplemented read from register $%02X\n", reg);

@@ -340,6 +340,8 @@ typedef struct {
   u8_t                       lo_res_offset_y;
   int                        is_hdmi;
   int                        is_hdmi_requested;
+  u8_t                       offset_x;
+  u8_t                       offset_y;
 } self_t;
 
 
@@ -586,6 +588,9 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
     *is_clipped = (row        < self.clip_y1 || row        > self.clip_y2 ||
                    column / 2 < self.clip_x1 || column / 2 > self.clip_x2);
 
+    row     = (row    + self.offset_y    ) % 192;
+    column  = (column + self.offset_x * 2) % (256 * 2);
+ 
     *rgb = ula_display_handlers[self.display_mode](row, column);
     return;
   }
@@ -639,6 +644,8 @@ void ula_reset(reset_t reset) {
   self.hi_res_ink_colour     = 0;
   self.screen_bank           = E_ULA_SCREEN_BANK_5;
   self.do_contend            = 1;
+  self.offset_x              = 0;
+  self.offset_y              = 0;
 
   if (reset == E_RESET_HARD) {
     self.is_timex_enabled = 0;
@@ -955,4 +962,24 @@ void ula_lo_res_offset_y_write(u8_t value) {
 void ula_hdmi_enable(int enable) {
   self.is_hdmi_requested       = enable;
   self.did_display_spec_change = 1;
+}
+
+
+u8_t ula_offset_x_read(void) {
+  return self.offset_x;
+}
+
+
+void ula_offset_x_write(u8_t value) {
+  self.offset_x = value;
+}
+
+
+u8_t ula_offset_y_read(void) {
+  return self.offset_y;
+}
+
+
+void ula_offset_y_write(u8_t value) {
+  self.offset_y = value;
 }
