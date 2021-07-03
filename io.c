@@ -94,46 +94,39 @@ u8_t io_read(u16_t address) {
 
   switch (address) {
     case 0x113B:
-      if (self.is_enabled[E_IO_FUNC_I2C]) {
-        return i2c_sda_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_I2C]
+        ? i2c_sda_read(address)
+        : ula_floating_bus_read();
 
     case 0x123B:
-      if (self.is_enabled[E_IO_FUNC_LAYER_2]) {
-        return layer2_access_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_LAYER_2]
+        ? layer2_access_read()
+        : ula_floating_bus_read();
 
     case 0x133B:
-      if (self.is_enabled[E_IO_FUNC_UART]) {
-        return uart_tx_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_UART]
+        ? uart_tx_read()
+        : ula_floating_bus_read();
 
     case 0x143B:
-      if (self.is_enabled[E_IO_FUNC_UART]) {
-        return uart_rx_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_UART]
+        ? uart_rx_read()
+        : ula_floating_bus_read();
 
     case 0x153B:
-      if (self.is_enabled[E_IO_FUNC_UART]) {
-        return uart_select_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_UART]
+        ? uart_select_read()
+        : ula_floating_bus_read();
 
     case 0x163B:
-      if (self.is_enabled[E_IO_FUNC_UART]) {
-        return uart_frame_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_UART]
+        ? uart_frame_read()
+        : ula_floating_bus_read();
 
     case 0x1FFD:
-      if (self.is_enabled[E_IO_FUNC_PAGING_PLUS_3]) {
-        return paging_spectrum_plus_3_paging_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_PAGING_PLUS_3]
+        ? paging_spectrum_plus_3_paging_read()
+        : ula_floating_bus_read();
 
     case 0x243B:
       return nextreg_select_read(address);
@@ -142,97 +135,87 @@ u8_t io_read(u16_t address) {
       return nextreg_data_read(address);
 
     case 0x7FFD:
-      if (self.is_enabled[E_IO_FUNC_PAGING_128K]) {
-        return paging_spectrum_128k_paging_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_PAGING_128K]
+        ? paging_spectrum_128k_paging_read()
+        : ula_floating_bus_read();
 
     case 0xDFFD:
-      if (self.is_enabled[E_IO_FUNC_PAGING_NEXT_BANK]) {
-        paging_spectrum_next_bank_extension_read();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_PAGING_NEXT_BANK]
+        ? paging_spectrum_next_bank_extension_read()
+        : ula_floating_bus_read();
 
     case 0xFBDF:
-      if (self.is_enabled[E_IO_FUNC_MOUSE]) {
-        return mouse_read_x();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_MOUSE]
+        ? mouse_read_x()
+        : ula_floating_bus_read();
 
     case 0xFFDF:
-      if (self.is_enabled[E_IO_FUNC_MOUSE]) {
-        return mouse_read_y();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_MOUSE]
+        ? mouse_read_y()
+        : ula_floating_bus_read();
 
     case 0xFADF:
-      if (self.is_enabled[E_IO_FUNC_MOUSE]) {
-        return mouse_read_buttons();
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_MOUSE]
+        ? mouse_read_buttons()
+        : ula_floating_bus_read();
 
     default:
       break;
   } 
 
-  if (self.is_enabled[E_IO_FUNC_AY]) {
-    if ((address & 0xC007) == 0xC005) {
-      return ay_register_read();
-    }
+  if ((address & 0xC007) == 0xC005) {
+    return self.is_enabled[E_IO_FUNC_AY]
+      ? ay_register_read()
+      : ula_floating_bus_read();
   }
 
-  if (self.is_enabled[E_IO_FUNC_MF]) {
-    if ((address & 0x00FF) == self.mf_port_enable) {
-      return mf_enable_read(address);
-    }
+  if ((address & 0x00FF) == self.mf_port_enable) {
+    return self.is_enabled[E_IO_FUNC_MF]
+      ? mf_enable_read(address)
+      : ula_floating_bus_read();
+  }
 
-    if ((address & 0x00FF) == self.mf_port_disable) {
-      return mf_disable_read(address);
-    }
+  if ((address & 0x00FF) == self.mf_port_disable) {
+    return self.is_enabled[E_IO_FUNC_MF]
+      ? mf_disable_read(address)
+      : ula_floating_bus_read();
   }
 
   switch (address & 0x00FF) {
     case 0x0B:
-      if (self.is_enabled[E_IO_FUNC_DMA_Z80]) {
-        return dma_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_DMA_Z80]
+        ? dma_read(address)
+        : ula_floating_bus_read();
 
     case 0x1F:
-      if (self.is_enabled[E_IO_FUNC_KEMPSTON_1]) {
-        return kempston_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_KEMPSTON_1]
+        ? kempston_read(address)
+        : ula_floating_bus_read();
 
     case 0x37:
-      if (self.is_enabled[E_IO_FUNC_KEMPSTON_2]) {
-        return kempston_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_KEMPSTON_2]
+        ? kempston_read(address)
+        : ula_floating_bus_read();
 
     case 0x6B:
-      if (self.is_enabled[E_IO_FUNC_DMA_ZXN]) {
-        return dma_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_DMA_ZXN]
+        ? dma_read(address)
+        : ula_floating_bus_read();
 
     case 0xE3:
-      if (self.is_enabled[E_IO_FUNC_DIVMMC]) {
-        return divmmc_control_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_DIVMMC]
+        ? divmmc_control_read(address)
+        : ula_floating_bus_read();
 
     case 0xE7:
-      if (self.is_enabled[E_IO_FUNC_SPI]) {
-        return spi_cs_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_SPI]
+        ? spi_cs_read(address)
+        : ula_floating_bus_read();
 
     case 0xEB:
-      if (self.is_enabled[E_IO_FUNC_SPI]) {
-        return spi_data_read(address);
-      }
-      break;
+      return self.is_enabled[E_IO_FUNC_SPI]
+        ? spi_data_read(address)
+        : ula_floating_bus_read();
 
     case 0xFF:
       return self.is_enabled[E_IO_FUNC_TIMEX]
@@ -243,9 +226,9 @@ u8_t io_read(u16_t address) {
       break;
   }
 
-  log_wrn("io: unimplemented or disabled read from $%04X\n", address);
+  log_wrn("io: unimplemented read from $%04X\n", address);
 
-  return 0xFF;
+  return ula_floating_bus_read();
 }
 
 
