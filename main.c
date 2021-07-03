@@ -655,7 +655,7 @@ static void main_update_title(void) {
   char title[40];
   int  n = 0;
 
-  (void) snprintf(&title[n], sizeof(title), "zxnxt - %s MHz %s %dHz %s", mhz[self.speed], machines[self.machine], self.is_60hz ? 60 : 50, timings[self.timing]);
+  (void) snprintf(&title[n], sizeof(title), "zxnxt - %sMHz %s %dHz %s", mhz[self.speed], machines[self.machine], self.is_60hz ? 60 : 50, timings[self.timing]);
                 
   SDL_SetWindowTitle(self.window, title);
 }
