@@ -322,13 +322,12 @@ def in_A_n() -> C:
     return '''
         Z = memory_read(PC++);   T(3);
         A = io_read(A << 8 | Z); T(4);
-        F = SZ53P(A);
     '''
 
 def in_r_C(r: str) -> C:
     return f'''
         {r} = io_read(BC); T(4);
-        F = SZ53P({r});
+        F = SZ53P({r}) | (F & CF_MASK);
     '''
 
 def inc_pdd(xy: Optional[str] = None) -> C:
