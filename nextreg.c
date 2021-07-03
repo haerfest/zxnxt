@@ -34,19 +34,6 @@
 #define CORE_VERSION_SUB_MINOR  9
 
 
-typedef enum {
-  E_NEXTREG_AY_1 = 0,
-  E_NEXTREG_AY_2,
-  E_NEXTREG_AY_3
-} nextreg_ay_t;
-
-
-typedef enum {
-  E_NEXTREG_AY_STEREO_MODE_ABC,
-  E_NEXTREG_AY_STEREO_MODE_ACB
-} nextreg_ay_stereo_mode_t;
-
-
 typedef struct {
   u8_t index;
   u8_t values[4];  /* x1, x2, y1, y2. */
@@ -72,8 +59,6 @@ typedef struct {
   int                      altrom_soft_reset_enable;
   int                      altrom_soft_reset_during_writes;
   u8_t                     altrom_soft_reset_lock;
-  nextreg_ay_stereo_mode_t ay_stereo_mode;
-  int                      is_ay_mono[3];
   int                      is_hotkey_cpu_speed_enabled;
   int                      is_hotkey_nmi_multiface_enabled;
   int                      is_hotkey_nmi_divmmc_enabled;
@@ -88,36 +73,18 @@ static nextreg_t self;
 static void nextreg_cpu_speed_write(u8_t value);
 
 
-static void nextreg_ay_configure(nextreg_ay_t ay) {
-  const audio_channel_t a      =  self.is_ay_mono[ay] ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_LEFT;
-  const audio_channel_t b      = (self.is_ay_mono[ay] || self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ABC) ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_RIGHT;
-  const audio_channel_t c      = (self.is_ay_mono[ay] || self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ACB) ? E_AUDIO_CHANNEL_BOTH : E_AUDIO_CHANNEL_RIGHT;
-  const audio_source_t  source = E_AUDIO_SOURCE_AY_1_CHANNEL_A + ay * 3;
-
-  audio_assign_channel(source + 0, a);
-  audio_assign_channel(source + 1, b);
-  audio_assign_channel(source + 2, c);
-}
-
-
-
 static void nextreg_reset(reset_t reset) {
   if (reset == E_RESET_HARD) {
     memset(&self, 0, sizeof(self));
 
     self.is_hard_reset                   = 1;
     self.altrom_soft_reset_during_writes = 1;
-    self.ay_stereo_mode                  = E_NEXTREG_AY_STEREO_MODE_ABC;
     self.is_hotkey_nmi_multiface_enabled = 0;
     self.is_hotkey_nmi_divmmc_enabled    = 0;
 
     bootrom_activate();
     config_set_rom_ram_bank(0);
     config_activate();
-
-    nextreg_ay_configure(E_NEXTREG_AY_1);
-    nextreg_ay_configure(E_NEXTREG_AY_2);
-    nextreg_ay_configure(E_NEXTREG_AY_3);
   }
 
   /* Both hard and soft resets. */
@@ -263,27 +230,18 @@ static void nextreg_peripheral_2_setting_write(u8_t value) {
 static u8_t nextreg_peripheral_3_setting_read(void) {
   return !paging_spectrum_128k_paging_is_locked() << 7
        | !ula_contention_get() << 6
-       | (self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ACB) << 5
+       | (ay_stereo_acb_get() != 0) << 5
        | (ay_turbosound_enable_get() != 0) << 1;
 }
 
 
 static void nextreg_peripheral_3_setting_write(u8_t value) {
-  const nextreg_ay_stereo_mode_t mode = value & 0x20 ? E_NEXTREG_AY_STEREO_MODE_ACB : E_NEXTREG_AY_STEREO_MODE_ABC;
-
-  if (mode != self.ay_stereo_mode) {
-    self.ay_stereo_mode = mode;
-
-    nextreg_ay_configure(E_NEXTREG_AY_1);
-    nextreg_ay_configure(E_NEXTREG_AY_2);
-    nextreg_ay_configure(E_NEXTREG_AY_3);
-  }
-
   if (value & 0x80) {
     paging_spectrum_128k_paging_unlock();
   }
 
   ula_contention_set((value & 0x40) == 0);
+  ay_stereo_acb_set(value & 0x20);
   dac_enable((value & 0x08) >> 3);
   ula_timex_video_mode_read_enable((value & 0x04) != 0);
   ay_turbosound_enable_set(value & 0x02);
@@ -291,21 +249,17 @@ static void nextreg_peripheral_3_setting_write(u8_t value) {
 
 
 static u8_t nextreg_peripheral_4_setting_read(void) {
-  return self.is_ay_mono[E_NEXTREG_AY_3] << 7
-       | self.is_ay_mono[E_NEXTREG_AY_2] << 6
-       | self.is_ay_mono[E_NEXTREG_AY_1] << 5
-       | self.is_sprites_lockstepped     << 4;
+  return (ay_mono_enable_get(2) != 0) << 7
+       | (ay_mono_enable_get(1) != 0) << 6
+       | (ay_mono_enable_get(0) != 0) << 5
+       | self.is_sprites_lockstepped  << 4;
 }
 
 
 static void nextreg_peripheral_4_setting_write(u8_t value) {
-  self.is_ay_mono[E_NEXTREG_AY_1] = (value & 0x20) >> 5;
-  self.is_ay_mono[E_NEXTREG_AY_2] = (value & 0x40) >> 6;
-  self.is_ay_mono[E_NEXTREG_AY_3] = (value & 0x80) >> 7;
-
-  nextreg_ay_configure(E_NEXTREG_AY_1);
-  nextreg_ay_configure(E_NEXTREG_AY_2);
-  nextreg_ay_configure(E_NEXTREG_AY_3);
+  ay_mono_enable_set(2, value & 0x80);
+  ay_mono_enable_set(1, value & 0x40);
+  ay_mono_enable_set(0, value & 0x20);
 
   self.is_sprites_lockstepped = (value & 0x10) >> 4;
 }

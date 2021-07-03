@@ -98,6 +98,7 @@ typedef struct {
   int               is_envelope_first_cycle;
   int               is_left_enabled;
   int               is_right_enabled;
+  int               is_mono;
 } ay_t;
 
 
@@ -107,6 +108,7 @@ typedef struct {
   ay_t ays[3];
   int  ticks_div_16;
   int  ticks_div_256;
+  int  is_stereo_acb;
 } self_t;
 
 
@@ -114,12 +116,33 @@ static self_t self;
 
 
 int ay_init(void) {
+  self.ays[0].source = E_AUDIO_SOURCE_AY_1_CHANNEL_A;
+  self.ays[1].source = E_AUDIO_SOURCE_AY_2_CHANNEL_A;
+  self.ays[2].source = E_AUDIO_SOURCE_AY_3_CHANNEL_A;
+
   ay_reset(E_RESET_HARD);
   return 0;
 }
 
 
 void ay_finit(void) {
+}
+
+
+static void reassign_channels(const ay_t* ay) {
+  if (ay->is_mono) {
+    audio_assign_channel(ay->source + A, E_AUDIO_CHANNEL_BOTH);
+    audio_assign_channel(ay->source + B, E_AUDIO_CHANNEL_BOTH);
+    audio_assign_channel(ay->source + C, E_AUDIO_CHANNEL_BOTH);
+  } else if (self.is_stereo_acb) {
+    audio_assign_channel(ay->source + A, E_AUDIO_CHANNEL_LEFT);
+    audio_assign_channel(ay->source + C, E_AUDIO_CHANNEL_BOTH);
+    audio_assign_channel(ay->source + B, E_AUDIO_CHANNEL_RIGHT);
+  } else {
+    audio_assign_channel(ay->source + A, E_AUDIO_CHANNEL_LEFT);
+    audio_assign_channel(ay->source + B, E_AUDIO_CHANNEL_BOTH);
+    audio_assign_channel(ay->source + C, E_AUDIO_CHANNEL_RIGHT);
+  }
 }
 
 
@@ -138,12 +161,16 @@ void ay_reset(reset_t reset) {
     self.ays[i].noise_seed                           = 0xFFFF;
   }
 
-  self.ays[0].source = E_AUDIO_SOURCE_AY_1_CHANNEL_A;
-  self.ays[1].source = E_AUDIO_SOURCE_AY_2_CHANNEL_A;
-  self.ays[2].source = E_AUDIO_SOURCE_AY_3_CHANNEL_A;
-
   if (reset == E_RESET_HARD) {
     self.is_turbosound_enabled = 0;
+    self.is_stereo_acb         = 0;
+    self.ays[0].is_mono        = 0;
+    self.ays[1].is_mono        = 0;
+    self.ays[2].is_mono        = 0;
+
+    reassign_channels(&self.ays[0]);
+    reassign_channels(&self.ays[1]);
+    reassign_channels(&self.ays[2]);
   }
 }
 
@@ -415,4 +442,35 @@ int ay_turbosound_enable_get(void) {
 
 void ay_turbosound_enable_set(int enable) {
   self.is_turbosound_enabled = enable;
+}
+
+
+int ay_mono_enable_get(int n) {
+  return self.ays[n].is_mono;
+}
+
+
+void ay_mono_enable_set(int n, int enable) {
+  ay_t* ay = &self.ays[n];
+
+  if (ay->is_mono != enable) {
+    ay->is_mono = enable;
+    reassign_channels(ay);
+  } 
+}
+
+
+int ay_stereo_acb_get(void) {
+  return self.is_stereo_acb;
+}
+
+
+void ay_stereo_acb_set(int enable) {
+  if (self.is_stereo_acb != enable) {
+    self.is_stereo_acb = enable;
+
+    if (!self.ays[0].is_mono) reassign_channels(&self.ays[0]);
+    if (!self.ays[1].is_mono) reassign_channels(&self.ays[1]);
+    if (!self.ays[2].is_mono) reassign_channels(&self.ays[2]);
+  }
 }
