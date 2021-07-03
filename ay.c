@@ -102,6 +102,7 @@ typedef struct {
 
 
 typedef struct {
+  int  is_turbosound_enabled;
   u8_t selected_ay;
   ay_t ays[3];
   int  ticks_div_16;
@@ -125,29 +126,40 @@ void ay_finit(void) {
 void ay_reset(reset_t reset) {
   int i;
 
-  memset(&self, 0, sizeof(self));
-
   /* All AY channels are off by default. */
   for (i = 0; i < 3; i++) {
-    self.ays[i].registers[E_AY_REGISTER_ENABLE] = 0xFF;
-    self.ays[i].noise_seed                      = 0xFFFF;
+    self.ays[i].registers[E_AY_REGISTER_ENABLE]      = 0xFF;
+    self.ays[i].channels[A].latched.is_tone_enabled  = 0;
+    self.ays[i].channels[B].latched.is_tone_enabled  = 0;
+    self.ays[i].channels[C].latched.is_tone_enabled  = 0;
+    self.ays[i].channels[A].latched.is_noise_enabled = 0;
+    self.ays[i].channels[B].latched.is_noise_enabled = 0;
+    self.ays[i].channels[C].latched.is_noise_enabled = 0;
+    self.ays[i].noise_seed                           = 0xFFFF;
   }
 
   self.ays[0].source = E_AUDIO_SOURCE_AY_1_CHANNEL_A;
   self.ays[1].source = E_AUDIO_SOURCE_AY_2_CHANNEL_A;
   self.ays[2].source = E_AUDIO_SOURCE_AY_3_CHANNEL_A;
+
+  if (reset == E_RESET_HARD) {
+    self.is_turbosound_enabled = 0;
+  }
 }
 
 
 void ay_register_select(u8_t value) {
-  if ((value & 0x9C) == 0x9C) {
-    const u8_t n = 3 - (value & 0x03);
-    if (n != 3) {
-      self.selected_ay = n;
-      self.ays[n].is_left_enabled  = (value & 0x40) >> 6;
-      self.ays[n].is_right_enabled = (value & 0x20) >> 5;
-      return;
+  if (value & 0x80) {
+    /* Selects active sound chip and enables left/right audio. */
+    if (self.is_turbosound_enabled) {
+      const u8_t n = 3 - (value & 0x03);
+      if (n != 3) {
+        self.selected_ay = n;
+        self.ays[n].is_left_enabled  = (value & 0x40) >> 6;
+        self.ays[n].is_right_enabled = (value & 0x20) >> 5;
+      }
     }
+    return;
   }
   
   self.ays[self.selected_ay].selected_register = value & 0x0F;
@@ -393,4 +405,14 @@ void ay_register_write(u8_t value) {
     default:
       break;
   }
+}
+
+
+int ay_turbosound_enable_get(void) {
+  return self.is_turbosound_enabled;
+}
+
+
+void ay_turbosound_enable_set(int enable) {
+  self.is_turbosound_enabled = enable;
 }

@@ -263,7 +263,8 @@ static void nextreg_peripheral_2_setting_write(u8_t value) {
 static u8_t nextreg_peripheral_3_setting_read(void) {
   return !paging_spectrum_128k_paging_is_locked() << 7
        | !ula_contention_get() << 6
-       | (self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ACB) << 5;
+       | (self.ay_stereo_mode == E_NEXTREG_AY_STEREO_MODE_ACB) << 5
+       | (ay_turbosound_enable_get() != 0) << 1;
 }
 
 
@@ -285,6 +286,7 @@ static void nextreg_peripheral_3_setting_write(u8_t value) {
   ula_contention_set((value & 0x40) == 0);
   dac_enable((value & 0x08) >> 3);
   ula_timex_video_mode_read_enable((value & 0x04) != 0);
+  ay_turbosound_enable_set(value & 0x02);
 }
 
 
