@@ -2,7 +2,7 @@ CC=cc
 CFLAGS=-Wall -I/usr/local/include -g -Ofast -DDEBUG
 LDFLAGS=-lSDL2
 
-SOURCES=main.c altrom.c audio.c ay.c bootrom.c clock.c config.c copper.c cpu.c dac.c dma.c divmmc.c i2c.c io.c kempston.c keyboard.c layer2.c log.c memory.c mf.c mmu.c mouse.c nextreg.c palette.c paging.c rom.c rtc.c sdcard.c slu.c spi.c sprites.c tilemap.c uart.c ula.c utils.c
+SOURCES=main.c altrom.c audio.c ay.c bootrom.c clock.c config.c copper.c cpu.c dac.c dma.c divmmc.c i2c.c io.c joystick.c keyboard.c layer2.c log.c memory.c mf.c mmu.c mouse.c nextreg.c palette.c paging.c rom.c rtc.c sdcard.c slu.c spi.c sprites.c tilemap.c uart.c ula.c utils.c
 OBJECTS=$(SOURCES:.c=.o)
 
 all: zxnxt

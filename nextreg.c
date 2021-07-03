@@ -11,6 +11,7 @@
 #include "dma.h"
 #include "i2c.h"
 #include "io.h"
+#include "joystick.h"
 #include "keyboard.h"
 #include "layer2.h"
 #include "log.h"
@@ -203,11 +204,20 @@ static u8_t nextreg_core_boot_read(void) {
 
 
 static u8_t nextreg_peripheral_1_setting_read(void) {
-  return ula_60hz_get() ? 0x04 : 0x00;
+  const u8_t j1 = joystick_type_get(E_JOYSTICK_LEFT);
+  const u8_t j2 = joystick_type_get(E_JOYSTICK_RIGHT);
+
+  return ((j1 & 0x03) << 6)
+       | ((j1 & 0x04) << 1)
+       | ((j2 & 0x03) << 4)
+       | ((j2 & 0x04) >> 1)
+       | (ula_60hz_get() ? 0x04 : 0x00);
 }
 
 
 static void nextreg_peripheral_1_setting_write(u8_t value) {
+  joystick_type_set(E_JOYSTICK_LEFT, (((value & 0x08) >> 1) | (value & 0xC0) >> 6));
+  joystick_type_set(E_JOYSTICK_RIGHT, (((value & 0x02) << 1) | (value & 0x30) >> 4));
   ula_60hz_set(value & 0x04);
 }
 

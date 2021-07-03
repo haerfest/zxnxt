@@ -6,7 +6,7 @@
 #include "defs.h"
 #include "i2c.h"
 #include "io.h"
-#include "kempston.h"
+#include "joystick.h"
 #include "layer2.h"
 #include "log.h"
 #include "mf.h"
@@ -189,12 +189,12 @@ u8_t io_read(u16_t address) {
 
     case 0x1F:
       return self.is_enabled[E_IO_FUNC_KEMPSTON_1]
-        ? kempston_read(address)
+        ? joystick_kempston_read(E_JOYSTICK_LEFT)
         : ula_floating_bus_read();
 
     case 0x37:
       return self.is_enabled[E_IO_FUNC_KEMPSTON_2]
-        ? kempston_read(address)
+        ? joystick_kempston_read(E_JOYSTICK_RIGHT)
         : ula_floating_bus_read();
 
     case 0x6B:

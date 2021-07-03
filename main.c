@@ -13,7 +13,7 @@
 #include "divmmc.h"
 #include "i2c.h"
 #include "io.h"
-#include "kempston.h"
+#include "joystick.h"
 #include "keyboard.h"
 #include "layer2.h"
 #include "log.h"
@@ -53,7 +53,8 @@ typedef struct {
   SDL_Renderer*       renderer;
   SDL_Texture*        texture;
   SDL_AudioDeviceID   audio_device;
-  SDL_GameController* controller;
+  SDL_GameController* controller_left;
+  SDL_GameController* controller_right;
   const u8_t*         keyboard_state;
   int                 is_windowed;
   int                 is_function_key_down;
@@ -92,10 +93,11 @@ static int main_init(void) {
     goto exit_log;
   }
 
-  self.renderer   = NULL;
-  self.texture    = NULL;
-  self.window     = NULL;
-  self.controller = NULL;
+  self.renderer         = NULL;
+  self.texture          = NULL;
+  self.window           = NULL;
+  self.controller_left  = NULL;
+  self.controller_right = NULL;
 
   memset(&want, 0, sizeof(want));
   want.freq     = AUDIO_SAMPLE_RATE;
@@ -155,8 +157,20 @@ static int main_init(void) {
 
   for (i = 0; i < SDL_NumJoysticks(); i++) {
     if (SDL_IsGameController(i)) {
-      self.controller = SDL_GameControllerOpen(i);
-      if (self.controller) {
+      const char*         name;
+      SDL_GameController* controller = SDL_GameControllerOpen(i);
+      if (controller == NULL) {
+        log_err("main: SDL_GameControllerOpen error: %s\n", SDL_GetError());
+        continue;
+      }
+      name = SDL_GameControllerName(controller);
+      
+      if (self.controller_left == NULL) {
+        log_wrn("main: left controller: %s\n", name);
+        self.controller_left  = controller;
+      } else {
+        log_wrn("main: right controller: %s\n", name);
+        self.controller_right = controller;
         break;
       }
     }
@@ -176,12 +190,12 @@ static int main_init(void) {
     goto exit_audio;
   }
 
-  if (kempston_init(self.controller) != 0) {
+  if (joystick_init(self.controller_left, self.controller_right) != 0) {
     goto exit_ay;
   }
 
   if (utils_init() != 0) {
-    goto exit_kempston;
+    goto exit_joystick;
   }
 
   if (rtc_init() != 0) {
@@ -369,15 +383,18 @@ exit_rtc:
   rtc_finit();
 exit_utils:
   utils_finit();
-exit_kempston:
-  kempston_finit();
+exit_joystick:
+  joystick_finit();
 exit_ay:
   ay_finit();
 exit_audio:
   audio_finit();
 exit_sdl:
-  if (self.controller != NULL) {
-    SDL_GameControllerClose(self.controller);
+  if (self.controller_left != NULL) {
+    SDL_GameControllerClose(self.controller_left);
+  }
+  if (self.controller_right != NULL) {
+    SDL_GameControllerClose(self.controller_right);
   }
   if (self.texture != NULL) {
     SDL_DestroyTexture(self.texture);
@@ -594,11 +611,14 @@ static void main_finit(void) {
   i2c_finit();
   rtc_finit();
   utils_finit();
-  kempston_finit();
+  joystick_finit();
   ay_finit();
   audio_finit();
-  if (self.controller) {
-    SDL_GameControllerClose(self.controller);
+  if (self.controller_left) {
+    SDL_GameControllerClose(self.controller_left);
+  }
+  if (self.controller_right) {
+    SDL_GameControllerClose(self.controller_right);
   }
   SDL_DestroyTexture(self.texture);
   SDL_DestroyRenderer(self.renderer);
@@ -616,7 +636,7 @@ u32_t main_next_host_sync_get(u32_t freq_28mhz) {
 
 void main_sync(void) {
   /* Perform these housekeeping tasks in downtime. */
-  kempston_refresh();
+  joystick_refresh();
   keyboard_refresh();
   mouse_refresh();
   main_handle_function_keys();
