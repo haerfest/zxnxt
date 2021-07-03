@@ -769,15 +769,15 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
       
     case E_NEXTREG_REGISTER_DAC_B_MIRROR:
-      dac_mirror_write(DAC_B, value);
+      dac_write(DAC_B, value);
       break;
 
     case E_NEXTREG_REGISTER_DAC_A_D_MIRROR:
-      dac_mirror_write(DAC_A | DAC_D, value);
+      dac_write(DAC_A | DAC_D, value);
       break;
 
      case E_NEXTREG_REGISTER_DAC_C_MIRROR:
-      dac_mirror_write(DAC_C, value);
+      dac_write(DAC_C, value);
       break;
 
     case E_NEXTREG_REGISTER_INTERRUPT_CONTROL:

@@ -32,16 +32,7 @@ void dac_enable(int enable) {
 }
 
 
-void dac_write(u16_t address, u8_t value) {
-  if (!self.is_enabled) {
-    return;
-  }
-
-  log_wrn("dac: unimplemented write of $%02X to $%02X\n", value, address & 0x00FF);
-}
-
-
-void dac_mirror_write(u8_t dac_mask, u8_t value) {
+void dac_write(u8_t dac_mask, u8_t value) {
   if (!self.is_enabled) {
     return;
   }

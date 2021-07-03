@@ -386,70 +386,70 @@ void io_write(u16_t address, u8_t value) {
     case 0x0F:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1] ||
           self.is_enabled[E_IO_FUNC_DAC_STEREO_COVOX]) {
-        dac_write(address, value);
+        dac_write(DAC_B, value);
       }
       return;
 
     case 0x1F:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1]) {
-        dac_write(address, value);
+        dac_write(DAC_A, value);
       }
       return;
 
     case 0x3F:
       if (self.is_enabled[E_IO_FUNC_DAC_STEREO_PROFI_COVOX]) {
-        dac_write(address, value);
+        dac_write(DAC_A, value);
       }
       return;
 
     case 0x4F:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1] ||
           self.is_enabled[E_IO_FUNC_DAC_STEREO_COVOX]) {
-        dac_write(address, value);
+        dac_write(DAC_C, value);
       }
       return;
 
     case 0x5F:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1] ||
           self.is_enabled[E_IO_FUNC_DAC_STEREO_PROFI_COVOX]) {
-        dac_write(address, value);
+        dac_write(DAC_D, value);
       }
       return;
 
     case 0xB3:
       if (self.is_enabled[E_IO_FUNC_DAC_MONO_GS_COVOX]) {
-        dac_write(address, value);
+        dac_write(DAC_B | DAC_C, value);
       }
       return;
 
     case 0xDF:
       if (self.is_enabled[E_IO_FUNC_DAC_MONO_SPECDRUM]) {
-        dac_write(address, value);
+        dac_write(DAC_A | DAC_D, value);
       }
       return;
 
     case 0xF1:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2]) {
-        dac_write(address, value);
+        dac_write(DAC_A, value);
       }
       return;
 
     case 0xF3:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2]) {
-        dac_write(address, value);
+        dac_write(DAC_B, value);
       }
       return;
 
     case 0xF9:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2]) {
-        dac_write(address, value);
+        dac_write(DAC_C, value);
       }
       return;
 
     case 0xFB:
       if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2] ||
           self.is_enabled[E_IO_FUNC_DAC_MONO_PENTAGON_ATM]) {
-        dac_write(address, value);
+        dac_write(DAC_A | DAC_D, value);
       }
       return;
 
