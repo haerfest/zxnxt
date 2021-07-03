@@ -680,21 +680,13 @@ void ula_timex_video_mode_read_enable(int do_enable) {
 
 
 u8_t ula_timex_read(u16_t address) {
-  if (self.is_timex_enabled) {
-    return self.disable_ula_irq   << 6
+  if (!self.is_timex_enabled) {
+    return ula_floating_bus_read();
+  }
+  
+  return self.disable_ula_irq   << 6
          | self.hi_res_ink_colour << 3
          | self.display_mode;
-  }
-
-  if (self.is_displaying_content) {
-    /* Implement floating bus behaviour. This fixes Arkanoid freezing at the
-     * start of the first level and prevents flickering and slowdown in
-     * Short Circuit.
-     */
-    return self.attribute_byte;
-  }
-
-  return 0xFF;
 }
 
 
@@ -983,4 +975,16 @@ u8_t ula_offset_y_read(void) {
 
 void ula_offset_y_write(u8_t value) {
   self.offset_y = value;
+}
+
+
+/**
+ * Implement floating bus behaviour. This fixes Arkanoid freezing at the
+ * start of the first level and prevents flickering and slowdown in
+ * Short Circuit.
+ */
+u8_t ula_floating_bus_read(void) {
+  return self.is_displaying_content
+    ? self.attribute_byte
+    : 0xFF;
 }

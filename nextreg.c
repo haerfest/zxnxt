@@ -499,26 +499,6 @@ static void nextreg_palette_value_9bits_write(u8_t value) {
 }
 
 
-static void nextreg_internal_port_decoding_0_write(u8_t value) {
-  io_port_enable(0x7FFD, value & 0x02);
-}
-
-
-static void nextreg_internal_port_decoding_1_write(u8_t value) {
-  io_mf_port_decoding_enable(value & 0x02);
-}
-
-
-static void nextreg_internal_port_decoding_2_write(u8_t value) {
-  io_port_enable(0xBFFD, value & 0x01);
-  io_port_enable(0xFFFD, value & 0x01);
-}
-
-
-static void nextreg_internal_port_decoding_3_write(u8_t value) {
-}
-
-
 static u8_t nextreg_sprite_layers_system_read(void) {
   return (slu_layer_priority_get() << 2)                      |
     (sprites_priority_get()                    ? 0x40 : 0x00) |
@@ -670,19 +650,17 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
-      nextreg_internal_port_decoding_0_write(value);
-      break;
-
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1:
-      nextreg_internal_port_decoding_1_write(value);
-      break;
-
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
-      nextreg_internal_port_decoding_2_write(value);
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
+      io_decoding_write(reg - E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0, value);
       break;
 
-    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
-      nextreg_internal_port_decoding_3_write(value);
+    case E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_0:
+    case E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_1:
+    case E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_2:
+    case E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_3:
+      /* Ignored. */
       break;
 
     case E_NEXTREG_REGISTER_ALTERNATE_ROM:
@@ -946,6 +924,13 @@ u8_t nextreg_read_internal(u8_t reg) {
     case E_NEXTREG_REGISTER_MMU_SLOT6_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL:
       return mmu_page_get(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL);
+
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1:
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
+      /* Return cached value. */
+      break;
 
     case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_MSB:
       return (slu_active_video_line_get() >> 8) & 0x01;

@@ -18,17 +18,48 @@
 #include "ula.h"
 
 
+typedef enum {
+  E_IO_FUNC_FIRST = 0,
+  E_IO_FUNC_TIMEX = E_IO_FUNC_FIRST,
+  E_IO_FUNC_PAGING_128K,
+  E_IO_FUNC_PAGING_NEXT_BANK,
+  E_IO_FUNC_PAGING_PLUS_3,
+  E_IO_FUNC_FLOATING_BUS_PLUS_3,
+  E_IO_FUNC_DMA_ZXN,
+  E_IO_FUNC_KEMPSTON_1,
+  E_IO_FUNC_KEMPSTON_2,
+  E_IO_FUNC_DIVMMC,
+  E_IO_FUNC_MF,
+  E_IO_FUNC_I2C,
+  E_IO_FUNC_SPI,
+  E_IO_FUNC_UART,
+  E_IO_FUNC_MOUSE,
+  E_IO_FUNC_SPRITES,
+  E_IO_FUNC_LAYER_2,
+  E_IO_FUNC_AY,
+  E_IO_FUNC_DAC_SOUNDRIVE_MODE_1,
+  E_IO_FUNC_DAC_SOUNDRIVE_MODE_2,
+  E_IO_FUNC_DAC_STEREO_PROFI_COVOX,
+  E_IO_FUNC_DAC_STEREO_COVOX,
+  E_IO_FUNC_DAC_MONO_PENTAGON_ATM,
+  E_IO_FUNC_DAC_MONO_GS_COVOX,
+  E_IO_FUNC_DAC_MONO_SPECDRUM,
+  E_IO_FUNC_ULAPLUS,
+  E_IO_FUNC_DMA_Z80,
+  E_IO_FUNC_PENTAGON_1024_MEMORY,
+  E_IO_FUNC_Z80_CTC,
+  E_IO_FUNC_LAST = E_IO_FUNC_Z80_CTC
+} io_func_t;
+
+
 typedef struct {
-  int  is_port_7FFD_enabled;
-  int  is_port_BFFD_enabled;
-  int  is_port_FFFD_enabled;
+  int  is_enabled[E_IO_FUNC_LAST - E_IO_FUNC_FIRST + 1];
   u8_t mf_port_enable;
   u8_t mf_port_disable;
-  int  is_mf_port_decoding_enabled;
-} self_t;
+} io_t;
 
 
-static self_t self;
+static io_t self;
 
 
 int io_init(void) {
@@ -38,21 +69,15 @@ int io_init(void) {
 
 
 void io_reset(reset_t reset) {
-  self.is_port_7FFD_enabled        = 1;
-  self.is_port_BFFD_enabled        = 1;
-  self.is_port_FFFD_enabled        = 1;
-  self.mf_port_enable              = 0x3F;
-  self.mf_port_disable             = 0xBF;
-  self.is_mf_port_decoding_enabled = 1;
+  /* Enable all ports. */
+  memset(self.is_enabled, 0xFF, sizeof(self.is_enabled));
+
+  self.mf_port_enable  = 0x3F;
+  self.mf_port_disable = 0xBF;
 }
 
 
 void io_finit(void) {
-}
-
-
-void io_mf_port_decoding_enable(int do_enable) {
-  self.is_mf_port_decoding_enabled = do_enable;
 }
 
 
@@ -67,28 +92,48 @@ u8_t io_read(u16_t address) {
     return ula_read(address);
   }
 
-
   switch (address) {
     case 0x113B:
-      return i2c_sda_read(address);
+      if (self.is_enabled[E_IO_FUNC_I2C]) {
+        return i2c_sda_read(address);
+      }
+      break;
 
     case 0x123B:
-      return layer2_access_read();
+      if (self.is_enabled[E_IO_FUNC_LAYER_2]) {
+        return layer2_access_read();
+      }
+      break;
 
     case 0x133B:
-      return uart_tx_read();
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        return uart_tx_read();
+      }
+      break;
 
     case 0x143B:
-      return uart_rx_read();
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        return uart_rx_read();
+      }
+      break;
 
     case 0x153B:
-      return uart_select_read();
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        return uart_select_read();
+      }
+      break;
 
     case 0x163B:
-      return uart_frame_read();
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        return uart_frame_read();
+      }
+      break;
 
     case 0x1FFD:
-      return paging_spectrum_plus_3_paging_read();
+      if (self.is_enabled[E_IO_FUNC_PAGING_PLUS_3]) {
+        return paging_spectrum_plus_3_paging_read();
+      }
+      break;
 
     case 0x243B:
       return nextreg_select_read(address);
@@ -97,38 +142,46 @@ u8_t io_read(u16_t address) {
       return nextreg_data_read(address);
 
     case 0x7FFD:
-      return paging_spectrum_128k_paging_read();
+      if (self.is_enabled[E_IO_FUNC_PAGING_128K]) {
+        return paging_spectrum_128k_paging_read();
+      }
+      break;
 
     case 0xDFFD:
-      paging_spectrum_next_bank_extension_read();
+      if (self.is_enabled[E_IO_FUNC_PAGING_NEXT_BANK]) {
+        paging_spectrum_next_bank_extension_read();
+      }
       break;
 
     case 0xFBDF:
-      return mouse_read_x();
+      if (self.is_enabled[E_IO_FUNC_MOUSE]) {
+        return mouse_read_x();
+      }
+      break;
 
     case 0xFFDF:
-      return mouse_read_y();
+      if (self.is_enabled[E_IO_FUNC_MOUSE]) {
+        return mouse_read_y();
+      }
+      break;
 
     case 0xFADF:
-      return mouse_read_buttons();
+      if (self.is_enabled[E_IO_FUNC_MOUSE]) {
+        return mouse_read_buttons();
+      }
+      break;
 
     default:
       break;
   } 
 
-  /* TODO: Bit 14 of address must be set on Plus 3? */
-  if ((address & 0x8003) == 0x0001) {
-    /* Typically 0x7FFD. */
-    return paging_spectrum_128k_paging_read();
+  if (self.is_enabled[E_IO_FUNC_AY]) {
+    if ((address & 0xC007) == 0xC005) {
+      return ay_register_read();
+    }
   }
 
-  /* TODO: 0xBFFD is readable on +3. */
-  if ((address & 0xC007) == 0xC005) {
-    /* 0xFFFD */
-    return self.is_port_FFFD_enabled ? ay_register_read() : 0xFF;
-  }
-
-  if (self.is_mf_port_decoding_enabled) {
+  if (self.is_enabled[E_IO_FUNC_MF]) {
     if ((address & 0x00FF) == self.mf_port_enable) {
       return mf_enable_read(address);
     }
@@ -140,29 +193,57 @@ u8_t io_read(u16_t address) {
 
   switch (address & 0x00FF) {
     case 0x0B:
-    case 0x6B:
-      return dma_read(address);
+      if (self.is_enabled[E_IO_FUNC_DMA_Z80]) {
+        return dma_read(address);
+      }
+      break;
 
     case 0x1F:
-      return kempston_read(address);
+      if (self.is_enabled[E_IO_FUNC_KEMPSTON_1]) {
+        return kempston_read(address);
+      }
+      break;
+
+    case 0x37:
+      if (self.is_enabled[E_IO_FUNC_KEMPSTON_2]) {
+        return kempston_read(address);
+      }
+      break;
+
+    case 0x6B:
+      if (self.is_enabled[E_IO_FUNC_DMA_ZXN]) {
+        return dma_read(address);
+      }
+      break;
 
     case 0xE3:
-      return divmmc_control_read(address);
+      if (self.is_enabled[E_IO_FUNC_DIVMMC]) {
+        return divmmc_control_read(address);
+      }
+      break;
 
     case 0xE7:
-      return spi_cs_read(address);
+      if (self.is_enabled[E_IO_FUNC_SPI]) {
+        return spi_cs_read(address);
+      }
+      break;
 
     case 0xEB:
-      return spi_data_read(address);
+      if (self.is_enabled[E_IO_FUNC_SPI]) {
+        return spi_data_read(address);
+      }
+      break;
 
     case 0xFF:
-      return ula_timex_read(address);
+      return self.is_enabled[E_IO_FUNC_TIMEX]
+        ? ula_timex_read(address)
+        : ula_floating_bus_read();
 
     default:
       break;
   }
 
-  log_wrn("io: unimplemented read from $%04X\n", address);
+  log_wrn("io: unimplemented or disabled read from $%04X\n", address);
 
   return 0xFF;
 }
@@ -176,35 +257,51 @@ void io_write(u16_t address, u8_t value) {
 
   switch (address) {
     case 0x103B:
-      i2c_scl_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_I2C]) {
+        i2c_scl_write(address, value);
+      }
       return;
 
     case 0x113B:
-      i2c_sda_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_I2C]) {
+        i2c_sda_write(address, value);
+      }
       return;
 
     case 0x123B:
-      layer2_access_write(value);
+      if (self.is_enabled[E_IO_FUNC_LAYER_2]) {
+        layer2_access_write(value);
+      }
       return;
 
     case 0x133B:
-      uart_tx_write(value);
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        uart_tx_write(value);
+      }
       return;
 
     case 0x143B:
-      uart_rx_write(value);
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        uart_rx_write(value);
+      }
       return;
 
     case 0x153B:
-      uart_select_write(value);
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        uart_select_write(value);
+      }
       return;
 
     case 0x163B:
-      uart_frame_write(value);
+      if (self.is_enabled[E_IO_FUNC_UART]) {
+        uart_frame_write(value);
+      }
       return;
 
     case 0x1FFD:
-      paging_spectrum_plus_3_paging_write(value);
+      if (self.is_enabled[E_IO_FUNC_PAGING_PLUS_3]) {
+        paging_spectrum_plus_3_paging_write(value);
+      }
       return;
 
     case 0x243B:
@@ -216,24 +313,28 @@ void io_write(u16_t address, u8_t value) {
       return;
 
     case 0x303B:
-      sprites_slot_set(value);
+      if (self.is_enabled[E_IO_FUNC_SPRITES]) {
+        sprites_slot_set(value);
+      }
       return;
 
     case 0x7FFD:
-      if (self.is_port_7FFD_enabled) {
+      if (self.is_enabled[E_IO_FUNC_PAGING_128K]) {
         paging_spectrum_128k_paging_write(value);
       }
       return;
 
     case 0xDFFD:
-      paging_spectrum_next_bank_extension_write(value);
+      if (self.is_enabled[E_IO_FUNC_PAGING_NEXT_BANK]) {
+        paging_spectrum_next_bank_extension_write(value);
+      }
       return;
 
     default:
       break;
   }
 
-  if (self.is_mf_port_decoding_enabled) {
+  if (self.is_enabled[E_IO_FUNC_MF]) {
     if ((address & 0x00FF) == self.mf_port_enable) {
       mf_enable_write(address, value);
       return;
@@ -247,13 +348,13 @@ void io_write(u16_t address, u8_t value) {
 
   switch (address & 0xC007) {
     case 0xC005:  /* 0xFFFD */
-      if (self.is_port_FFFD_enabled) {
+      if (self.is_enabled[E_IO_FUNC_AY]) {
         ay_register_select(value);
       }
       return;
 
     case 0x8005:  /* 0xBFFD */
-      if (self.is_port_BFFD_enabled) {
+      if (self.is_enabled[E_IO_FUNC_AY]) {
         ay_register_write(value);
       }
       return;
@@ -264,46 +365,121 @@ void io_write(u16_t address, u8_t value) {
 
   switch (address & 0x00FF) {
     case 0x0B:
+      if (self.is_enabled[E_IO_FUNC_DMA_Z80]) {
+        dma_write(address, value);
+      }
+      break;
+
     case 0x6B:
-      dma_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_DMA_ZXN]) {
+        dma_write(address, value);
+      }
       return;
 
     case 0xE3:
-      divmmc_control_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_DIVMMC]) {
+        divmmc_control_write(address, value);
+      }
       return;
 
     case 0xE7:
-      spi_cs_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_SPI]) {
+        spi_cs_write(address, value);
+      }
       return;
 
     case 0xEB:
-      spi_data_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_SPI]) {
+        spi_data_write(address, value);
+      }
       return;
 
     case 0xFF:
-      ula_timex_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_TIMEX]) {
+        ula_timex_write(address, value);
+      }
       return;
 
     case 0x0F:
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1] ||
+          self.is_enabled[E_IO_FUNC_DAC_STEREO_COVOX]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0x1F:
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0x3F:
+      if (self.is_enabled[E_IO_FUNC_DAC_STEREO_PROFI_COVOX]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0x4F:
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1] ||
+          self.is_enabled[E_IO_FUNC_DAC_STEREO_COVOX]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0x5F:
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1] ||
+          self.is_enabled[E_IO_FUNC_DAC_STEREO_PROFI_COVOX]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0xB3:
+      if (self.is_enabled[E_IO_FUNC_DAC_MONO_GS_COVOX]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0xDF:
+      if (self.is_enabled[E_IO_FUNC_DAC_MONO_SPECDRUM]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0xF1:
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0xF3:
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0xF9:
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2]) {
+        dac_write(address, value);
+      }
+      return;
+
     case 0xFB:
-      dac_write(address, value);
+      if (self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2] ||
+          self.is_enabled[E_IO_FUNC_DAC_MONO_PENTAGON_ATM]) {
+        dac_write(address, value);
+      }
       return;
 
     case 0x57:
-      sprites_next_attribute_set(value);
+      if (self.is_enabled[E_IO_FUNC_SPRITES]) {
+        sprites_next_attribute_set(value);
+      }
       return;
 
     case 0x5B:
-      sprites_next_pattern_set(value);
+      if (self.is_enabled[E_IO_FUNC_SPRITES]) {
+        sprites_next_pattern_set(value);
+      }
       return;
 
     default:
@@ -314,23 +490,50 @@ void io_write(u16_t address, u8_t value) {
 }
 
 
-void io_port_enable(u16_t address, int enable) {
-  switch (address) {
-    case 0x7FFD:
-      self.is_port_7FFD_enabled = enable;
+void io_decoding_write(u8_t index, u8_t value) {
+  /* TODO: Reset when bits 0:30 are 1 (bit 31=0: soft, 1: hard). */
+  switch (index) {
+    case 0:
+      self.is_enabled[E_IO_FUNC_TIMEX]               = value & 0x01;
+      self.is_enabled[E_IO_FUNC_PAGING_128K]         = value & 0x02;
+      self.is_enabled[E_IO_FUNC_PAGING_NEXT_BANK]    = value & 0x04;
+      self.is_enabled[E_IO_FUNC_PAGING_PLUS_3]       = value & 0x08;
+      self.is_enabled[E_IO_FUNC_FLOATING_BUS_PLUS_3] = value & 0x10;
+      self.is_enabled[E_IO_FUNC_DMA_ZXN]             = value & 0x20;
+      self.is_enabled[E_IO_FUNC_KEMPSTON_1]          = value & 0x40;
+      self.is_enabled[E_IO_FUNC_KEMPSTON_2]          = value & 0x80;
       break;
 
-    case 0xBFFD:
-      self.is_port_BFFD_enabled = enable;
+    case 1:
+      self.is_enabled[E_IO_FUNC_DIVMMC]  = value & 0x01;
+      self.is_enabled[E_IO_FUNC_MF]      = value & 0x02;
+      self.is_enabled[E_IO_FUNC_I2C]     = value & 0x04;
+      self.is_enabled[E_IO_FUNC_SPI]     = value & 0x08;
+      self.is_enabled[E_IO_FUNC_UART]    = value & 0x10;
+      self.is_enabled[E_IO_FUNC_MOUSE]   = value & 0x20;
+      self.is_enabled[E_IO_FUNC_SPRITES] = value & 0x40;
+      self.is_enabled[E_IO_FUNC_LAYER_2] = value & 0x80;
       break;
 
-    case 0xFFFD:
-      self.is_port_FFFD_enabled = enable;
+    case 2:
+      self.is_enabled[E_IO_FUNC_AY]                     = value & 0x01;
+      self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_1]   = value & 0x02;
+      self.is_enabled[E_IO_FUNC_DAC_SOUNDRIVE_MODE_2]   = value & 0x04;
+      self.is_enabled[E_IO_FUNC_DAC_STEREO_PROFI_COVOX] = value & 0x08;
+      self.is_enabled[E_IO_FUNC_DAC_STEREO_COVOX]       = value & 0x10;
+      self.is_enabled[E_IO_FUNC_DAC_MONO_PENTAGON_ATM]  = value & 0x20;
+      self.is_enabled[E_IO_FUNC_DAC_MONO_GS_COVOX]      = value & 0x40;
+      self.is_enabled[E_IO_FUNC_DAC_MONO_SPECDRUM]      = value & 0x80;
       break;
-      
+
+    case 3:
+      self.is_enabled[E_IO_FUNC_ULAPLUS]              = value & 0x01;
+      self.is_enabled[E_IO_FUNC_DMA_Z80]              = value & 0x02;
+      self.is_enabled[E_IO_FUNC_PENTAGON_1024_MEMORY] = value & 0x04;
+      self.is_enabled[E_IO_FUNC_Z80_CTC]              = value & 0x08;
+      break;
+
     default:
-      log_wrn("io: port $%04X en/disabling not implemented\n", address);
       break;
   }
 }
-    
