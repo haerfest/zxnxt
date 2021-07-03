@@ -651,8 +651,9 @@ void ula_reset(reset_t reset) {
     self.is_timex_enabled = 0;
   }
 
-  self.display_mode_requested  = E_ULA_DISPLAY_MODE_SCREEN_0;
-  self.did_display_spec_change = 1;
+  self.display_mode_requested      = E_ULA_DISPLAY_MODE_SCREEN_0;
+  self.is_lo_res_enabled_requested = 0;
+  self.did_display_spec_change     = 1;
   ula_display_reconfigure();
 }
 
