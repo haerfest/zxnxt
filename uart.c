@@ -1,5 +1,6 @@
 #include "clock.h"
 #include "defs.h"
+#include "esp.h"
 #include "log.h"
 #include "uart.h"
 
@@ -104,6 +105,14 @@ void uart_frame_write(u8_t value) {
 
 
 u8_t uart_rx_read(void) {
+  switch (self.selected) {
+    case E_DEVICE_ESP:
+      return esp_read();
+
+    default:
+      break;
+  }
+  
   return 0x10;  /* tx buffer empty. */
 }
 
@@ -130,4 +139,13 @@ void uart_tx_write(u8_t value) {
           self.selected,
           value,
           (value < 32 || value > 127) ? '?' : value);
+
+  switch (self.selected) {
+    case E_DEVICE_ESP:
+      esp_write(value);
+      break;
+
+    default:
+      break;
+  }
 }
