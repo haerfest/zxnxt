@@ -279,7 +279,17 @@ static int is_pixel_visible(int x, int y) {
     }
   }
 
-  return (x >= self.clip_x1_eff) && (x <= self.clip_x2_eff) && (y >= self.clip_y1_eff) && (y <= self.clip_y2_eff);
+  if (x < self.clip_x1_eff || x > self.clip_x2_eff || y < self.clip_y1_eff || y > self.clip_y2_eff) {
+    /* Clipped. */
+    return 0;
+  }
+
+  if (self.is_zero_on_top && !self.is_transparent[y * 320 + x]) {
+    /* Earlier higher priority sprite plotted here. */
+    return 0;
+  }
+
+  return 1;
 }
 
 
