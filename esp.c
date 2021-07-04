@@ -118,17 +118,18 @@ static void error(void) {
 
 static void clear_crlf(void) {
   u8_t value;
-  
-  while (buffer_peek(&self.tx, 0, &value)) {
-    if (value == CR) {
-      (void) buffer_read(&self.tx, NULL);
-      break;
-    }
-  }
 
-  while (buffer_peek(&self.tx, 0, &value)) {
-    if (value == LF) {
-      (void) buffer_read(&self.tx, NULL);
+  /* Precondition: there is a CRLF in the TX buffer. */
+
+  while (1) {
+    /* Hunt for CR. */
+    while (buffer_read(&self.tx, &value) && value != CR);
+
+    /* Could be sole CR, not followed by LF. */
+    if (!buffer_read(&self.tx, &value)) {
+      return;
+    }
+    if (value == CR) {
       break;
     }
   }
@@ -145,22 +146,28 @@ typedef void (*at_handler_t)(void);
 static void at_echo(void) {
   u8_t value;
 
+  /* Skip ATE. */
+  (void) buffer_read(&self.tx, NULL);
+  (void) buffer_read(&self.tx, NULL);
+  (void) buffer_read(&self.tx, NULL);
+
+  /* Expect 0 or 1. */
   if (!buffer_read(&self.tx, &value)) {
     error();
     return;
   }
-
-  if (value == '0' || value == '1') {
-    self.do_echo = (value == '1');
-    ok();
+  if (value != '0' && value != '1') {
+    error();
     return;
   }
 
-  error();
+  self.do_echo = (value == '1');
+  ok();
 }
 
 
 static void at(void) {
+  /* Order these from longest to shortest prefix. */
   const struct {
     char*        prefix;
     at_handler_t handler;
@@ -170,7 +177,6 @@ static void at(void) {
   const size_t n_handlers = sizeof(handlers) / sizeof(*handlers);
   char         prefix[MAX_AT_PREFIX_LENGTH + 1];
   size_t       i;
-  size_t       prefix_length;
   u8_t         value;
 
   /* Command syntax must be one of:
@@ -178,25 +184,25 @@ static void at(void) {
    * 2. AT<cmd>=<payload>
    * 3. AT<cmd>
    */
-  prefix_length = 0;
-  while (prefix_length < MAX_AT_PREFIX_LENGTH && buffer_peek(&self.tx, 0, &value)) {
+  i = 0;
+  while (i < MAX_AT_PREFIX_LENGTH && buffer_peek(&self.tx, i, &value)) {
     if (value == '?' || value == '=') {
       break;
     }
-    (void) buffer_read(&self.tx, NULL);
-    prefix[prefix_length++] = value;
+    prefix[i++] = value;
   }
-  prefix[prefix_length] = 0;
-  log_wrn("esp: at => %s\n", prefix);
+  prefix[i] = 0;
 
   for (i = 0; i < n_handlers; i++) {
-    if (strncmp(handlers[i].prefix, prefix, prefix_length) == 0) {
+    const size_t n = strlen(handlers[i].prefix);
+    if (strncmp(prefix, handlers[i].prefix, n) == 0) {
       handlers[i].handler();
       return;
     }
   }
 
   /* Unknown command. */
+  log_wrn("esp: unknown AT-command: '%s'\n", prefix);
   error();
 }
 
@@ -214,15 +220,6 @@ static void idle_tx(void) {
     return;
   }
 
-  /* Must be AT-command. */
-  (void) buffer_peek(&self.tx, 0, &prefix[0]);
-  (void) buffer_peek(&self.tx, 1, &prefix[1]);
-  if (strncmp((const char*) prefix, "AT", 2) != 0) {
-    error();
-    clear_crlf();
-    return;
-  }
-
   /* Echo if required. */
   if (self.do_echo) {
     size_t i;
@@ -233,12 +230,22 @@ static void idle_tx(void) {
     }
   }
 
+  /* Must be AT-command. */
+  (void) buffer_peek(&self.tx, 0, &prefix[0]);
+  (void) buffer_peek(&self.tx, 1, &prefix[1]);
+  if (strncmp((const char*) prefix, "AT", 2) != 0) {
+    error();
+    clear_crlf();
+    return;
+  }
+
+  /* Handle AT-command. */
   at();
   clear_crlf();
 }
 
 
-void esp_write(u8_t value) {
+void esp_tx_write(u8_t value) {
   if (!buffer_write(&self.tx, value)) {
     /* Buffer full, signal? */
     error();
@@ -249,7 +256,15 @@ void esp_write(u8_t value) {
 }
 
 
-u8_t esp_read(void) {
+u8_t esp_tx_read(void) {
+  return (self.tx.n_elements == 0)                    << 4 /* Tx empty      */
+       | (self.rx.n_elements >= self.rx.size * 3 / 4) << 3 /* Rx near full  */
+       | (self.tx.n_elements == self.tx.size)         << 1 /* Tx full       */
+       | (self.rx.n_elements > 0);                         /* Rx not empty  */
+}
+
+
+u8_t esp_rx_read(void) {
   u8_t value;
 
   return buffer_read(&self.rx, &value) ? value : 0x00;

@@ -107,7 +107,7 @@ void uart_frame_write(u8_t value) {
 u8_t uart_rx_read(void) {
   switch (self.selected) {
     case E_DEVICE_ESP:
-      return esp_read();
+      return esp_rx_read();
 
     default:
       break;
@@ -130,19 +130,22 @@ void uart_rx_write(u8_t value) {
 
 
 u8_t uart_tx_read(void) {
+  switch (self.selected) {
+    case E_DEVICE_ESP:
+      return esp_tx_read();
+
+    default:
+      break;
+  }
+
   return 0x00;
 }
 
 
 void uart_tx_write(u8_t value) {
-  log_wrn("uart%d: tx $%02X (%c)\n",
-          self.selected,
-          value,
-          (value < 32 || value > 127) ? '?' : value);
-
   switch (self.selected) {
     case E_DEVICE_ESP:
-      esp_write(value);
+      esp_tx_write(value);
       break;
 
     default:

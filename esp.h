@@ -8,8 +8,9 @@
 int  esp_init(void);
 void esp_finit(void);
 void esp_reset(reset_t reset);
-void esp_write(u8_t value);
-u8_t esp_read(void);
+u8_t esp_tx_read(void);
+void esp_tx_write(u8_t value);
+u8_t esp_rx_read(void);
 
 
 #endif  /* __ESP_H */
