@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_net.h>
 #include "altrom.h"
 #include "audio.h"
 #include "ay.h"
@@ -183,8 +184,13 @@ static int main_init(void) {
   self.is_function_key_down = 0;
   self.is_windowed          = 1;
 
-  if (audio_init(self.audio_device) != 0) {
+  if (SDLNet_Init() != 0) {
+    log_err("SDLNet_Init: %s\n", SDLNet_GetError());
     goto exit_sdl;
+  }
+
+  if (audio_init(self.audio_device) != 0) {
+    goto exit_sdlnet;
   }
 
   if (ay_init() != 0) {
@@ -396,6 +402,8 @@ exit_ay:
   ay_finit();
 exit_audio:
   audio_finit();
+exit_sdlnet:
+  SDLNet_Quit();
 exit_sdl:
   if (self.controller_left != NULL) {
     SDL_GameControllerClose(self.controller_left);
@@ -622,6 +630,7 @@ static void main_finit(void) {
   joystick_finit();
   ay_finit();
   audio_finit();
+  SDLNet_Quit();
   if (self.controller_left) {
     SDL_GameControllerClose(self.controller_left);
   }
