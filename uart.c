@@ -1,3 +1,4 @@
+#include "clock.h"
 #include "defs.h"
 #include "log.h"
 #include "uart.h"
@@ -68,7 +69,10 @@ void uart_select_write(u8_t value) {
     self.uart[self.selected].prescalar = (self.uart[self.selected].prescalar & 0x3FFF) | ((value & 0x07) << 14);
   }
 
-  log_wrn("uart%d: selected, prescalar=%u\n", self.selected, self.uart[self.selected].prescalar);
+  log_wrn("uart%d: selected, prescalar=%u => %u baud \n",
+          self.selected,
+          self.uart[self.selected].prescalar,
+          self.uart[self.selected].prescalar == 0 ? 0 : clock_28mhz_get() / self.uart[self.selected].prescalar);
 }
 
 
@@ -109,7 +113,10 @@ void uart_rx_write(u8_t value) {
     ? (self.uart[self.selected].prescalar & 0x1C07F) | ((value & 0x7F) << 7)
     : (self.uart[self.selected].prescalar & 0x1FF80) |  (value & 0x7F);
 
-  log_wrn("uart%d: prescalar=%u\n", self.selected, self.uart[self.selected].prescalar);
+  log_wrn("uart%d: prescalar=%u => %u baud\n",
+          self.selected,
+          self.uart[self.selected].prescalar,
+          self.uart[self.selected].prescalar == 0 ? 0 : clock_28mhz_get() / self.uart[self.selected].prescalar);
 }
 
 
@@ -119,5 +126,8 @@ u8_t uart_tx_read(void) {
 
 
 void uart_tx_write(u8_t value) {
-  log_wrn("uart%d: tx $%02X (%c)\n", self.selected, value, value);
+  log_wrn("uart%d: tx $%02X (%c)\n",
+          self.selected,
+          value,
+          (value < 32 || value > 127) ? '?' : value);
 }
