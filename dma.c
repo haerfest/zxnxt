@@ -64,11 +64,14 @@ typedef struct {
   u8_t   match_byte;
   u8_t   zxn_prescalar;
   int    is_enabled;
-  u16_t  n_transferred;
+  u16_t  n_bytes_transferred;
+  u16_t  n_blocks_transferred;
   mode_t mode;
   int    do_restart;
   u64_t  next_transfer_ticks;
-  
+  u8_t   group_read_index;
+
+  int   is_a_to_b;
   u16_t src_address;
   u16_t dst_address;
   int   is_src_io;
@@ -99,9 +102,11 @@ void dma_finit(void) {
 
 
 void dma_reset(reset_t reset) {
-  self.group      = NO_GROUP;
-  self.read_mask  = 0x7F;
-  self.is_enabled = 0;
+  self.group            = NO_GROUP;
+  self.read_mask        = 0x7F;
+  self.is_enabled       = 0;
+  self.group_read_index = 0;
+  self.zxn_prescalar    = 0;
 }
 
 
@@ -128,9 +133,8 @@ static void dma_load(void) {
   const int   b_address_delta = dma_get_address_delta(2);
   const u8_t  a_cycle_length  = self.a_variable_timing & 0x03;
   const u8_t  b_cycle_length  = self.b_variable_timing & 0x03;
-  const int   is_a_to_b       = self.group_value[0] & 0x04;
 
-  if (is_a_to_b) {
+  if (self.is_a_to_b) {
     /* A -> B */
     self.src_address       = self.a_starting_address;
     self.dst_address       = self.b_starting_address;
@@ -152,14 +156,15 @@ static void dma_load(void) {
     self.dst_cycle_length  = a_cycle_length;
   }
 
-  self.n_transferred = 0;
+  self.n_bytes_transferred  = 0;
+  self.n_blocks_transferred = 0;
 
   {
     const char* delta_str[] = {"--", "", "++"};
     const char* mode_str[] = {"BYTE", "CONT", "BRST", "N/A"};
 
     log_wrn("dma: LOAD %s %s>%s %04X%s>%04X%s %s len=%04X pre=%02X\n",
-            is_a_to_b ? "A>B" : "B>A",
+            self.is_a_to_b ? "A>B" : "B>A",
             self.is_src_io ? "IO" : "M",
             self.is_dst_io ? "IO" : "M",
             self.src_address,
@@ -213,7 +218,9 @@ static u8_t dma_decode_group(u8_t value) {
 
 
 static void dma_group_0_write(u8_t value, int is_first_write) {
-  if (!is_first_write) {
+  if (is_first_write) {
+    self.is_a_to_b = self.group_value[0] & 0x04;
+  } else {
     if (self.group_value[0] & 0x08) {
       self.a_starting_address &= 0xFF00;
       self.a_starting_address |= value;
@@ -340,9 +347,12 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
       case E_DMA_CMD_RESET_AND_DISABLE_INTERRUPTS:
       case E_DMA_CMD_ENABLE_AFTER_RTI:
       case E_DMA_CMD_READ_STATUS_BYTE:
-      case E_DMA_CMD_REINITIALISE_STATUS_BYTE:
       case E_DMA_CMD_INITIATE_READ_SEQUENCE:
       case E_DMA_CMD_FORCE_READY:
+        break;
+
+      case E_DMA_CMD_REINITIALISE_STATUS_BYTE:
+        self.group_read_index = 0;
         break;
 
       case E_DMA_CMD_ENABLE_DMA:
@@ -405,9 +415,41 @@ void dma_write(u16_t address, u8_t value) {
 
 
 u8_t dma_read(u16_t address) {
-  /* log_wrn("dma: unimplemented DMA read from $%04X\n", address); */
+  const int group_read_index = self.group_read_index & self.read_mask;
 
-  return 0xFF;
+  self.group_read_index = (self.group_read_index + 1) % 7;
+
+  switch (group_read_index) {
+    case 1:
+      /* Byte counter low. */
+      return self.n_bytes_transferred & 0x00FF;
+
+    case 2:
+      /* Byte counter high. */
+      return self.n_bytes_transferred >> 8;
+
+    case 3:
+      /* Port A address low. */
+      return (self.is_a_to_b ? self.src_address : self.dst_address) & 0x00FF;
+
+    case 4:
+      /* Port A address high. */
+      return (self.is_a_to_b ? self.src_address : self.dst_address) >> 8;
+
+    case 5:
+      /* Port B address low. */
+      return (self.is_a_to_b ? self.dst_address : self.src_address) & 0x00FF;
+
+    case 7:
+      /* Port B address high. */
+      return (self.is_a_to_b ? self.dst_address : self.src_address) >> 8;
+
+    default:
+      /* Status byte, see below. */
+      break;
+  }
+
+  return 0x1A | ((self.n_blocks_transferred > 0) << 5) | (self.n_bytes_transferred > 0);
 }
 
 
@@ -424,7 +466,7 @@ static void transfer_one_byte(void) {
   self.dst_address += self.dst_address_delta;
   clock_run(self.dst_cycle_length);
 
-  self.n_transferred++;
+  self.n_bytes_transferred++;
 
   if (self.zxn_prescalar != 0) {
     /**
@@ -450,7 +492,7 @@ void dma_run(void) {
       break;
 
     case E_MODE_CONTINUOUS:
-      while (self.n_transferred < self.block_length) {
+      while (self.n_bytes_transferred < self.block_length) {
         if (self.zxn_prescalar != 0) {
           const u64_t now = clock_ticks();
           if (self.next_transfer_ticks > now) {
@@ -466,9 +508,10 @@ void dma_run(void) {
       return;
   }
 
-  if (self.n_transferred == self.block_length) {
+  if (self.n_bytes_transferred == self.block_length) {
     if (self.do_restart) {
-      self.n_transferred = 0;
+      self.n_blocks_transferred++;
+      self.n_bytes_transferred = 0;
     } else {
       self.is_enabled = 0;
     }
