@@ -148,16 +148,16 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enable
     : (self.definitions_base_address + (tile * 32 + def_row * 4 + def_column / 2));
   const u8_t  pattern        = self.bank5[def_offset];
   const u8_t  palette_offset = attribute & (self.use_text_mode ? 0xFE : 0xF0);
-  const u8_t  palette_index  = palette_offset | (self.use_text_mode
-                                                 ? ((pattern & (0x80 >> def_column)) ? 1 : 0)
-                                                 : ((def_column & 0x01) ? (pattern & 0x0F) : (pattern >> 4)));
+  const u8_t  palette_index  = (self.use_text_mode
+                                ? ((pattern & (0x80 >> def_column)) ? 1 : 0)
+                                : ((def_column & 0x01) ? (pattern & 0x0F) : (pattern >> 4)));
   const int   is_transparent = palette_index == self.transparency_index;
 
   *is_enabled        = 1;
   *is_pixel_enabled  = !(is_clipped || is_transparent);
   *is_pixel_below    = self.use_512_tiles ? 0 : (attribute & 1);
   *is_pixel_textmode = self.use_text_mode;
-  *rgb               = palette_read(self.palette, palette_index);
+  *rgb               = palette_read(self.palette, palette_offset | palette_index);
 }
 
 
