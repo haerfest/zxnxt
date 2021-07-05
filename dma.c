@@ -36,27 +36,37 @@ typedef enum {
 } dma_cmd_t;
 
 
+typedef enum {
+  E_MODE_BYTE = 0,
+  E_MODE_CONTINUOUS,
+  E_MODE_BURST,
+  E_MODE_DO_NOT_PROGRAM
+} mode_t;
+
+
 typedef void (*dma_decode_handler_t)(u8_t value, int is_first_write);
 
 
 typedef struct {
-  u8_t* sram;
-  u8_t  group;
-  u8_t  group_value[N_GROUPS];
-  u16_t a_starting_address;
-  u16_t b_starting_address;
-  u8_t  a_variable_timing;
-  u8_t  b_variable_timing;
-  u16_t block_length;
-  u8_t  interrupt_control;
-  u8_t  pulse_control;
-  u8_t  interrupt_vector;
-  u8_t  read_mask;
-  u8_t  mask_byte;
-  u8_t  match_byte;
-  u8_t  zxn_prescalar;
-  int   is_enabled;
-  u16_t n_transferred;
+  u8_t*  sram;
+  u8_t   group;
+  u8_t   group_value[N_GROUPS];
+  u16_t  a_starting_address;
+  u16_t  b_starting_address;
+  u8_t   a_variable_timing;
+  u8_t   b_variable_timing;
+  u16_t  block_length;
+  u8_t   interrupt_control;
+  u8_t   pulse_control;
+  u8_t   interrupt_vector;
+  u8_t   read_mask;
+  u8_t   mask_byte;
+  u8_t   match_byte;
+  u8_t   zxn_prescalar;
+  int    is_enabled;
+  u16_t  n_transferred;
+  mode_t mode;
+  int    do_restart;
   
   u16_t src_address;
   u16_t dst_address;
@@ -142,6 +152,23 @@ static void dma_load(void) {
   }
 
   self.n_transferred = 0;
+
+  {
+    const char* delta_str[] = {"--", "", "++"};
+    const char* mode_str[] = {"BYTE", "CONT", "BRST", "N/A"};
+
+    log_wrn("dma: LOAD %s %s>%s %04X%s>%04X%s %s len=%04X pre=%02X\n",
+            is_a_to_b ? "A>B" : "B>A",
+            self.is_src_io ? "IO" : "M",
+            self.is_dst_io ? "IO" : "M",
+            self.src_address,
+            delta_str[1 + self.src_address_delta],
+            self.dst_address,
+            delta_str[1 + self.dst_address_delta],
+            mode_str[self.mode],
+            self.block_length,
+            self.zxn_prescalar);
+  }          
 }
 
 
@@ -236,7 +263,8 @@ static void dma_group_2_write(u8_t value, int is_first_write) {
     }
   }
 
-  if ((self.group_value[2] & 0x40) == 0x00) {
+  if (((self.group_value[2]    & 0x40) == 0x00) &&
+      ((self.b_variable_timing & 0x20) == 0x00)) {
     self.group = NO_GROUP;
   }
 }
@@ -260,7 +288,9 @@ static void dma_group_3_write(u8_t value, int is_first_write) {
 
 
 static void dma_group_4_write(u8_t value, int is_first_write) {
-  if (!is_first_write) {
+  if (is_first_write) {
+    self.mode = (value & 0x60) >> 5;
+  } else {
     if (self.group_value[4] & 0x04) {
       self.b_starting_address &= 0xFF00;
       self.b_starting_address |= value;
@@ -289,7 +319,8 @@ static void dma_group_4_write(u8_t value, int is_first_write) {
 
 
 static void dma_group_5_write(u8_t value, int is_first_write) {
-  self.group = NO_GROUP;
+  self.do_restart = value & 0x20;
+  self.group      = NO_GROUP;
 }
 
 
@@ -360,12 +391,12 @@ void dma_write(u16_t address, u8_t value) {
   };
   
   if (self.group == NO_GROUP) {
-      self.group = dma_decode_group(value);
-      if (self.group != NO_GROUP) {
-        self.group_value[self.group] = value;
-        handlers[self.group](value, 1);
-      }
-      return;
+    self.group = dma_decode_group(value);
+    if (self.group != NO_GROUP) {
+      self.group_value[self.group] = value;
+      handlers[self.group](value, 1);
+    }
+    return;
   }
 
   handlers[self.group](value, 0);
@@ -373,9 +404,26 @@ void dma_write(u16_t address, u8_t value) {
 
 
 u8_t dma_read(u16_t address) {
-  log_wrn("dma: unimplemented DMA read from $%04X\n", address);
+  /* log_wrn("dma: unimplemented DMA read from $%04X\n", address); */
 
   return 0xFF;
+}
+
+
+static void xfer(void) {
+  const u8_t byte = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
+  self.src_address += self.src_address_delta;
+  clock_run(self.src_cycle_length);
+
+  if (self.is_dst_io) {
+    io_write(self.dst_address, byte);
+  } else {
+    memory_write(self.dst_address, byte);
+  }
+  self.dst_address += self.dst_address_delta;
+  clock_run(self.dst_cycle_length);
+
+  self.n_transferred++;
 }
 
 
@@ -384,23 +432,27 @@ void dma_run(void) {
     return;
   }
 
-  /**
-   * TODO Byte and burst transfers.
-   * TODO Auto restart on end of block.
-   */
-  while (self.n_transferred < self.block_length) {
-    const u8_t byte = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
-    self.src_address += self.src_address_delta;
-    clock_run(self.src_cycle_length);
+  switch (self.mode) {
+    case E_MODE_BURST:
+      xfer();
+      break;
 
-    if (self.is_dst_io) {
-      io_write(self.dst_address, byte);
+    case E_MODE_CONTINUOUS:
+      while (self.n_transferred < self.block_length) {
+        xfer();
+      }
+      break;
+
+    default:
+      /* Not implemented in ZXDN. */
+      return;
+  }
+
+  if (self.n_transferred == self.block_length) {
+    if (self.do_restart) {
+      self.n_transferred = 0;
     } else {
-      memory_write(self.dst_address, byte);
+      self.is_enabled = 0;
     }
-    self.dst_address += self.dst_address_delta;
-    clock_run(self.dst_cycle_length);
-
-    self.n_transferred++;
   }
 }
