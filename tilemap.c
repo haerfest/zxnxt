@@ -131,8 +131,8 @@ void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enable
     return;
   }
 
-  row    = (row    + self.offset_y) % FRAME_BUFFER_HEIGHT;
-  column = (column + self.offset_x) % FRAME_BUFFER_WIDTH;
+  row    = (row    + self.offset_y                           ) % FRAME_BUFFER_HEIGHT;
+  column = (column + self.offset_x * (self.use_80x32 ? 1 : 2)) % FRAME_BUFFER_WIDTH;
 
   const int is_clipped = \
     row        < self.clip_y1 || row        > self.clip_y2 ||
