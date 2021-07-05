@@ -69,7 +69,7 @@ typedef struct {
   mode_t mode;
   int    do_restart;
   u64_t  next_transfer_ticks;
-  u8_t   group_read_index;
+  u8_t   read_bit;
 
   int   is_a_to_b;
   u16_t src_address;
@@ -105,7 +105,6 @@ void dma_reset(reset_t reset) {
   self.group            = NO_GROUP;
   self.read_mask        = 0x7F;
   self.is_enabled       = 0;
-  self.group_read_index = 0;
   self.zxn_prescalar    = 0;
 }
 
@@ -126,7 +125,31 @@ static int dma_get_address_delta(int group) {
 }
 
 
-static void dma_load(void) {
+static void read_bit_reset(void) {
+  int i;
+
+  self.read_bit = 1;
+
+  for (i = 0; ((self.read_mask & self.read_bit) == 0) && (i < 8); i++) {
+    self.read_bit = (self.read_bit << 1) | (self.read_bit >> 7);
+  }
+}
+
+
+static void read_bit_advance(void) {
+  int i;
+
+  for (i = 0; i < 8; i++) {
+    self.read_bit = (self.read_bit << 1) | (self.read_bit >> 7);
+
+    if (self.read_mask & self.read_bit) {
+      break;
+    }
+  }
+}
+
+
+static void block_reload(void) {
   const int   is_a_io         = self.group_value[1] & 0x08;
   const int   is_b_io         = self.group_value[2] & 0x08;
   const int   a_address_delta = dma_get_address_delta(1);
@@ -155,6 +178,12 @@ static void dma_load(void) {
     self.src_cycle_length  = b_cycle_length;
     self.dst_cycle_length  = a_cycle_length;
   }
+}
+
+
+static void dma_load(void) {
+  block_reload();
+  read_bit_reset();
 
   self.n_bytes_transferred  = 0;
   self.n_blocks_transferred = 0;
@@ -163,7 +192,7 @@ static void dma_load(void) {
     const char* delta_str[] = {"--", "", "++"};
     const char* mode_str[] = {"BYTE", "CONT", "BRST", "N/A"};
 
-    log_wrn("dma: LOAD %s %s>%s %04X%s>%04X%s %s len=%04X pre=%02X\n",
+    log_wrn("dma: LOAD %s %s>%s %04X%s>%04X%s %s len=%04X pre=%02X rstrt=%c\n",
             self.is_a_to_b ? "A>B" : "B>A",
             self.is_src_io ? "IO" : "M",
             self.is_dst_io ? "IO" : "M",
@@ -173,7 +202,8 @@ static void dma_load(void) {
             delta_str[1 + self.dst_address_delta],
             mode_str[self.mode],
             self.block_length,
-            self.zxn_prescalar);
+            self.zxn_prescalar,
+            self.do_restart ? 'Y' : 'N');
   }          
 }
 
@@ -346,13 +376,13 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
       case E_DMA_CMD_ENABLE_INTERRUPTS:
       case E_DMA_CMD_RESET_AND_DISABLE_INTERRUPTS:
       case E_DMA_CMD_ENABLE_AFTER_RTI:
-      case E_DMA_CMD_READ_STATUS_BYTE:
-      case E_DMA_CMD_INITIATE_READ_SEQUENCE:
       case E_DMA_CMD_FORCE_READY:
         break;
 
+      case E_DMA_CMD_READ_STATUS_BYTE:
       case E_DMA_CMD_REINITIALISE_STATUS_BYTE:
-        self.group_read_index = 0;
+      case E_DMA_CMD_INITIATE_READ_SEQUENCE:
+        read_bit_reset();
         break;
 
       case E_DMA_CMD_ENABLE_DMA:
@@ -379,7 +409,7 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
       self.group = NO_GROUP;
     }
   } else {
-    self.read_mask = value;
+    self.read_mask = value & 0x7F;
     self.group     = NO_GROUP;
   }
 }
@@ -415,48 +445,61 @@ void dma_write(u16_t address, u8_t value) {
 
 
 u8_t dma_read(u16_t address) {
-  const int group_read_index = self.group_read_index & self.read_mask;
+  u8_t value;
 
-  self.group_read_index = (self.group_read_index + 1) % 7;
+  switch (self.read_bit) {
+    case 0x01:
+      /* Status byte. */
+      value = 0x1A | ((self.n_blocks_transferred > 0) << 5) | (self.n_bytes_transferred > 0);
+      break;
 
-  switch (group_read_index) {
-    case 1:
-      /* Byte counter low. */
-      return self.n_bytes_transferred & 0x00FF;
+    case 0x02:
+      /* Byte counter high? */
+      value = self.n_bytes_transferred >> 8;
+      break;
 
-    case 2:
-      /* Byte counter high. */
-      return self.n_bytes_transferred >> 8;
+    case 0x04:
+      /* Byte counter low? */
+      value = self.n_bytes_transferred & 0x00FF;
+      break;
 
-    case 3:
+    case 0x08:
       /* Port A address low. */
-      return (self.is_a_to_b ? self.src_address : self.dst_address) & 0x00FF;
+      value = (self.is_a_to_b ? self.src_address : self.dst_address) & 0x00FF;
+      break;
 
-    case 4:
+    case 0x10:
       /* Port A address high. */
-      return (self.is_a_to_b ? self.src_address : self.dst_address) >> 8;
+      value = (self.is_a_to_b ? self.src_address : self.dst_address) >> 8;
+      break;
 
-    case 5:
+    case 0x20:
       /* Port B address low. */
-      return (self.is_a_to_b ? self.dst_address : self.src_address) & 0x00FF;
+      value = (self.is_a_to_b ? self.dst_address : self.src_address) & 0x00FF;
+      break;
 
-    case 7:
+    case 0x40:
       /* Port B address high. */
-      return (self.is_a_to_b ? self.dst_address : self.src_address) >> 8;
+      value = (self.is_a_to_b ? self.dst_address : self.src_address) >> 8;
+      break;
 
     default:
-      /* Status byte, see below. */
+      value = 0x00;
       break;
   }
 
-  return 0x1A | ((self.n_blocks_transferred > 0) << 5) | (self.n_bytes_transferred > 0);
+  read_bit_advance();
+
+  return value;
 }
 
 
 static void transfer_one_byte(void) {
-  const u8_t byte = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
+  const u64_t start_ticks = clock_ticks();
+  const u8_t  byte        = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
+  
   self.src_address += self.src_address_delta;
-  clock_run(self.src_cycle_length);
+  //clock_run(self.src_cycle_length);
 
   if (self.is_dst_io) {
     io_write(self.dst_address, byte);
@@ -464,7 +507,7 @@ static void transfer_one_byte(void) {
     memory_write(self.dst_address, byte);
   }
   self.dst_address += self.dst_address_delta;
-  clock_run(self.dst_cycle_length);
+  //clock_run(self.dst_cycle_length);
 
   self.n_bytes_transferred++;
 
@@ -473,12 +516,14 @@ static void transfer_one_byte(void) {
      * Each byte should be written at a rate of 875 kHz / prescalar,
      * assuming a 28 Mhz clock (875 kHz = 28 MHz / 32).
      */
-    self.next_transfer_ticks = clock_ticks() + self.zxn_prescalar * 32;
+    self.next_transfer_ticks = start_ticks + self.zxn_prescalar * 32;
   }
 }
 
 
 void dma_run(void) {
+  u64_t now;
+
   if (!self.is_enabled) {
     return;
   }
@@ -493,13 +538,13 @@ void dma_run(void) {
 
     case E_MODE_CONTINUOUS:
       while (self.n_bytes_transferred < self.block_length) {
+        transfer_one_byte();
         if (self.zxn_prescalar != 0) {
-          const u64_t now = clock_ticks();
+          now = clock_ticks();
           if (self.next_transfer_ticks > now) {
             clock_run_28mhz_ticks(self.next_transfer_ticks - now);
           }
         }
-        transfer_one_byte();
       }
       break;
 
@@ -510,6 +555,7 @@ void dma_run(void) {
 
   if (self.n_bytes_transferred == self.block_length) {
     if (self.do_restart) {
+      block_reload();
       self.n_blocks_transferred++;
       self.n_bytes_transferred = 0;
     } else {
