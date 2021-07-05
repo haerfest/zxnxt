@@ -67,16 +67,12 @@ void clock_cpu_speed_set(cpu_speed_t speed) {
 }
 
 
-void clock_run(u32_t cpu_ticks) {
-  const unsigned int clock_divider[E_CPU_SPEED_LAST - E_CPU_SPEED_FIRST + 1] = {
-    8, 4, 2, 1
-  };
-  const u32_t ticks_28mhz = cpu_ticks * clock_divider[self.cpu_speed];
-  u32_t       ticks_14mhz;
-  u32_t       ticks_2mhz;
+void clock_run_28mhz_ticks(u64_t ticks) {
+  u32_t ticks_14mhz;
+  u32_t ticks_2mhz;
 
   /* Update system clock. */
-  self.ticks_28mhz += ticks_28mhz;
+  self.ticks_28mhz += ticks;
 
   /* Update 14 MHz clock for SLU. */
   ticks_14mhz = (self.ticks_28mhz - self.sync_14mhz) / 2;
@@ -96,6 +92,14 @@ void clock_run(u32_t cpu_ticks) {
     main_sync();
     self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get(clock_28mhz[self.clock_timing]);
   }
+}
+
+
+void clock_run(u32_t cpu_ticks) {
+  const unsigned int clock_divider[E_CPU_SPEED_LAST - E_CPU_SPEED_FIRST + 1] = {
+    8, 4, 2, 1
+  };
+  clock_run_28mhz_ticks(cpu_ticks * clock_divider[self.cpu_speed]);
 }
 
 

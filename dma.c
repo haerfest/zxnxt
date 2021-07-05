@@ -67,6 +67,7 @@ typedef struct {
   u16_t  n_transferred;
   mode_t mode;
   int    do_restart;
+  u64_t  next_transfer_ticks;
   
   u16_t src_address;
   u16_t dst_address;
@@ -410,7 +411,7 @@ u8_t dma_read(u16_t address) {
 }
 
 
-static void xfer(void) {
+static void transfer_one_byte(void) {
   const u8_t byte = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
   self.src_address += self.src_address_delta;
   clock_run(self.src_cycle_length);
@@ -424,6 +425,14 @@ static void xfer(void) {
   clock_run(self.dst_cycle_length);
 
   self.n_transferred++;
+
+  if (self.zxn_prescalar != 0) {
+    /**
+     * Each byte should be written at a rate of 875 kHz / prescalar,
+     * assuming a 28 Mhz clock (875 kHz = 28 MHz / 32).
+     */
+    self.next_transfer_ticks = clock_ticks() + self.zxn_prescalar * 32;
+  }
 }
 
 
@@ -434,12 +443,21 @@ void dma_run(void) {
 
   switch (self.mode) {
     case E_MODE_BURST:
-      xfer();
+      if (self.zxn_prescalar != 0 && clock_ticks() < self.next_transfer_ticks) {
+        return;
+      }
+      transfer_one_byte();
       break;
 
     case E_MODE_CONTINUOUS:
       while (self.n_transferred < self.block_length) {
-        xfer();
+        if (self.zxn_prescalar != 0) {
+          const u64_t now = clock_ticks();
+          if (self.next_transfer_ticks > now) {
+            clock_run_28mhz_ticks(self.next_transfer_ticks - now);
+          }
+        }
+        transfer_one_byte();
       }
       break;
 
