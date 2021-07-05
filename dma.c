@@ -102,10 +102,12 @@ void dma_finit(void) {
 
 
 void dma_reset(reset_t reset) {
-  self.group            = NO_GROUP;
-  self.read_mask        = 0x7F;
-  self.is_enabled       = 0;
-  self.zxn_prescalar    = 0;
+  self.group               = NO_GROUP;
+  self.read_mask           = 0x7F;
+  self.is_enabled          = 0;
+  self.zxn_prescalar       = 0;
+  self.do_restart          = 0;
+  self.next_transfer_ticks = 0;
 }
 
 
@@ -188,6 +190,7 @@ static void dma_load(void) {
   self.n_bytes_transferred  = 0;
   self.n_blocks_transferred = 0;
 
+#if 0
   {
     const char* delta_str[] = {"--", "", "++"};
     const char* mode_str[] = {"BYTE", "CONT", "BRST", "N/A"};
@@ -204,7 +207,8 @@ static void dma_load(void) {
             self.block_length,
             self.zxn_prescalar,
             self.do_restart ? 'Y' : 'N');
-  }          
+  }
+#endif
 }
 
 
@@ -499,7 +503,7 @@ static void transfer_one_byte(void) {
   const u8_t  byte        = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
   
   self.src_address += self.src_address_delta;
-  //clock_run(self.src_cycle_length);
+  clock_run(self.src_cycle_length);
 
   if (self.is_dst_io) {
     io_write(self.dst_address, byte);
@@ -507,7 +511,7 @@ static void transfer_one_byte(void) {
     memory_write(self.dst_address, byte);
   }
   self.dst_address += self.dst_address_delta;
-  //clock_run(self.dst_cycle_length);
+  clock_run(self.dst_cycle_length);
 
   self.n_bytes_transferred++;
 
