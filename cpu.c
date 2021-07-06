@@ -146,6 +146,11 @@ typedef union {
 } reg16_t;
 
 
+#define CPU_REQUEST_RESET  0x01
+#define CPU_REQUEST_IRQ    0x02
+#define CPU_REQUEST_NMI    0x04
+
+
 typedef struct {
   /* Combined 8-bit and 16-bit registers. */
   reg16_t af;
@@ -178,17 +183,16 @@ typedef struct {
   u8_t i;
   u8_t r;
 
+
+  /* Requests from outside. */
+  int requests;
+
   /* IRQ. */
-  u8_t  im;                   /* Interrupt mode.                                      */
-  int   irq_pending;          /* Non-zero if IRQ pending.                             */
-  int   irq_delay;            /* Number of instructions by which IRQ must be delayed. */
+  u8_t  im;                      /* Interrupt mode.                                      */
+  int   irq_delay;               /* Number of instructions by which IRQ must be delayed. */
 
   /* NMI. */
-  int              nmi_pending;  /* Non-zero if NMI pending. */
   cpu_nmi_reason_t nmi_reason;   /* Reason for NMI.          */
-
-  /* Reset. */
-  int do_reset;
 
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
@@ -218,7 +222,7 @@ static void cpu_fill_tables(void) {
 
 
 static void cpu_reset_internal(void) {
-  self.do_reset = 0;
+  self.requests &= ~CPU_REQUEST_RESET;
 
   IFF1 = 0;
   IFF2 = 0;
@@ -255,23 +259,23 @@ void cpu_finit(void) {
 
 
 void cpu_reset(void) {
-  self.do_reset = 1;
+  self.requests |= CPU_REQUEST_RESET;
 }
 
 
 void cpu_irq(void) {
-  self.irq_pending = 1;
+  self.requests |= CPU_REQUEST_IRQ;
 }
 
 
 void cpu_nmi(cpu_nmi_reason_t reason) {
-  self.nmi_pending = 1;
-  self.nmi_reason  = reason;
+  self.requests  |= CPU_REQUEST_NMI;
+  self.nmi_reason = reason;
 }
 
 
 static void cpu_irq_pending(void) {
-  self.irq_pending = 0;
+  self.requests &= ~CPU_REQUEST_IRQ;
 
   /* Interrupts must be enabled. */
   if (IFF1 == 0) {
@@ -317,7 +321,7 @@ static void cpu_irq_pending(void) {
 
 
 static void cpu_nmi_pending(void) {
-  self.nmi_pending = 0;
+  self.requests &= ~CPU_REQUEST_NMI;
 
   /* Save the IFF1 state. */
   IFF2 = IFF1;
@@ -385,19 +389,21 @@ void cpu_step(void) {
   cpu_trace();
   cpu_execute_next_opcode();
 
-  if (self.do_reset) {
-    cpu_reset_internal();
-  }
+  if (self.requests) {
+    if (self.requests & CPU_REQUEST_RESET) {
+      cpu_reset_internal();
+    }
 
-  if (self.nmi_pending) {
-    cpu_nmi_pending();
-  }
+    if (self.requests & CPU_REQUEST_NMI) {
+      cpu_nmi_pending();
+    }
 
-  /* After EI the next RETN must complete before servicing IRQ. */
-  if (self.irq_delay) {
-    self.irq_delay--;
-  } else if (self.irq_pending) {
-    cpu_irq_pending();
+    /* After EI the next RETN must complete before servicing IRQ. */
+    if (self.irq_delay) {
+      self.irq_delay--;
+    } else if (self.requests & CPU_REQUEST_IRQ) {
+      cpu_irq_pending();
+    }
   }
 }
 
