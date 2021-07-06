@@ -183,14 +183,94 @@ static void at_echo_off(void) {
 }
 
 
+/**
+ * AT+CWMODE
+ */
+static void at_cwmode(void) {
+  u8_t value;
+
+  if (!buffer_peek(&self.tx, 0, &value)) {
+    error();
+    return;
+  }
+
+  switch (value) {
+    case '?':
+      respond("+CWMODE:1" CRLF);
+      ok();
+      break;
+
+    case '=':
+      (void) buffer_read(&self.tx, NULL);
+      if (!buffer_peek(&self.tx, 0, &value)) {
+        error();
+        break;
+      }
+      if (value == '1') {
+        ok();
+      } else {
+        error();
+      }
+      break;
+
+    default:
+      error();
+      break;
+  }
+}
+
+
+/**
+ * AT+CWJAP
+ */
+static void at_cwjap(void) {
+  u8_t value;
+
+  if (!buffer_peek(&self.tx, 0, &value)) {
+    error();
+    return;
+  }
+
+  switch (value) {
+    case '?':
+      respond("+CWJAP:EmulatedWifi,\"00:14:a5:41:61:6b\",1,-30" CRLF);
+      ok();
+      break;
+
+    case '=':
+      respond("+CWJAP:3" CRLF "FAIL" CRLF);
+      break;
+
+    default:
+      error();
+      break;
+  }
+
+}
+
+
+/**
+ * AT+GMR
+ */
+static void at_gmr(void) {
+  respond("AT version:0.23.0.0(Apr 24 2015 21:11:01)" CRLF
+          "SDK version:1.0.1" CRLF
+          "compile time:Apr 24 2015 21:19:31" CRLF);
+  ok();
+}
+
+
 static void at(void) {
-  /* Order these from longest to shortest prefix. */
+  /* Order common prefixes from longest to shortest. */
   const struct {
     char*        prefix;
     at_handler_t handler;
   } handlers[] = {
-    { "E0", at_echo_off },
-    { "E1", at_echo_on }
+    { "E0",          at_echo_off },
+    { "E1",          at_echo_on  },
+    { "+CWMODE",     at_cwmode   },
+    { "+CWJAP",      at_cwjap    },
+    { "+GMR",        at_gmr      } 
   };
   const size_t n_handlers = sizeof(handlers) / sizeof(*handlers);
   char         prefix[MAX_AT_PREFIX_LENGTH + 1];
@@ -202,21 +282,25 @@ static void at(void) {
    * 3. AT<cmd>
    */
   i = buffer_peek_n(&self.tx, 0, MAX_AT_PREFIX_LENGTH, (u8_t *) prefix);
+  for (j = 0; (j < i) && (prefix[j] != CR); j++);
+  prefix[j] = 0;
+  log_wrn("esp: got '%s'\n", prefix);
+
+  /* We'll match on just the prefix. */
   for (j = 0; (j < i) && (prefix[j] != '=' && prefix[j] != '?' && prefix[j] != CR); j++);
   prefix[j] = 0;
-
-  log_wrn("esp: got '%s'\n", prefix);
 
   for (i = 0; i < n_handlers; i++) {
     const size_t n = strlen(handlers[i].prefix);
     if (strncmp(prefix, handlers[i].prefix, n) == 0) {
+      (void) buffer_read_n(&self.tx, n, NULL);
       handlers[i].handler();
       return;
     }
   }
 
   /* Unknown command. */
-  log_wrn("esp: unknown AT-command: 'AT%s'\n", prefix);
+  log_wrn("esp: unknown AT-command: '%s'\n", prefix);
   error();
 }
 
