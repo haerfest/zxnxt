@@ -26,7 +26,7 @@ typedef struct {
 } buffer_t;
 
 
-static int buffer_read(buffer_t* buffer, u8_t* value) {
+static size_t buffer_read(buffer_t* buffer, u8_t* value) {
   if (buffer->n_elements == 0) {
     return 0;
   }
@@ -41,7 +41,22 @@ static int buffer_read(buffer_t* buffer, u8_t* value) {
 }
 
 
-static int buffer_peek(buffer_t* buffer, size_t index, u8_t* value) {
+static size_t buffer_read_n(buffer_t* buffer, size_t n, u8_t* values) {
+  size_t i;
+
+  for (i = 0; buffer->n_elements && (i < n); i++) {
+    if (values) {
+      values[i] = buffer->data[buffer->read_index];
+    }
+    buffer->n_elements--;
+    buffer->read_index = (buffer->read_index + 1) % buffer->size;
+  }
+
+  return i;
+}
+
+
+static size_t buffer_peek(buffer_t* buffer, size_t index, u8_t* value) {
   if (buffer->n_elements <= index) {
     return 0;
   }
@@ -52,7 +67,18 @@ static int buffer_peek(buffer_t* buffer, size_t index, u8_t* value) {
 }
 
 
-static int buffer_write(buffer_t* buffer, u8_t value) {
+static size_t buffer_peek_n(buffer_t* buffer, size_t index, size_t n, u8_t* values) {
+  size_t i;
+
+  for (i = 0; (index + i < buffer->n_elements) && (i < n); i++) {
+    values[i] = buffer->data[(buffer->read_index + index + i) % buffer->size];
+  }
+
+  return i;
+}
+
+
+static size_t buffer_write(buffer_t* buffer, u8_t value) {
   if (buffer->n_elements == buffer->size) {
     return 0;
   }
@@ -116,7 +142,7 @@ static void error(void) {
 }
 
 
-static void clear_crlf(void) {
+static void next(void) {
   u8_t value;
 
   /* Precondition: there is a CRLF in the TX buffer. */
@@ -141,27 +167,18 @@ typedef void (*at_handler_t)(void);
 
 /**
  * ATE0
+ */
+static void at_echo_on(void) {
+  self.do_echo = 1;
+  ok();
+}
+
+
+/**
  * ATE1
  */
-static void at_echo(void) {
-  u8_t value;
-
-  /* Skip ATE. */
-  (void) buffer_read(&self.tx, NULL);
-  (void) buffer_read(&self.tx, NULL);
-  (void) buffer_read(&self.tx, NULL);
-
-  /* Expect 0 or 1. */
-  if (!buffer_read(&self.tx, &value)) {
-    error();
-    return;
-  }
-  if (value != '0' && value != '1') {
-    error();
-    return;
-  }
-
-  self.do_echo = (value == '1');
+static void at_echo_off(void) {
+  self.do_echo = 0;
   ok();
 }
 
@@ -172,26 +189,23 @@ static void at(void) {
     char*        prefix;
     at_handler_t handler;
   } handlers[] = {
-    { "ATE", at_echo }
+    { "E0", at_echo_off },
+    { "E1", at_echo_on }
   };
   const size_t n_handlers = sizeof(handlers) / sizeof(*handlers);
   char         prefix[MAX_AT_PREFIX_LENGTH + 1];
-  size_t       i;
-  u8_t         value;
+  size_t       i, j;
 
   /* Command syntax must be one of:
    * 1. AT<cmd>?
    * 2. AT<cmd>=<payload>
    * 3. AT<cmd>
    */
-  i = 0;
-  while (i < MAX_AT_PREFIX_LENGTH && buffer_peek(&self.tx, i, &value)) {
-    if (value == '?' || value == '=') {
-      break;
-    }
-    prefix[i++] = value;
-  }
-  prefix[i] = 0;
+  i = buffer_peek_n(&self.tx, 0, MAX_AT_PREFIX_LENGTH, (u8_t *) prefix);
+  for (j = 0; (j < i) && (prefix[j] != '=' && prefix[j] != '?' && prefix[j] != CR); j++);
+  prefix[j] = 0;
+
+  log_wrn("esp: got '%s'\n", prefix);
 
   for (i = 0; i < n_handlers; i++) {
     const size_t n = strlen(handlers[i].prefix);
@@ -202,7 +216,7 @@ static void at(void) {
   }
 
   /* Unknown command. */
-  log_wrn("esp: unknown AT-command: '%s'\n", prefix);
+  log_wrn("esp: unknown AT-command: 'AT%s'\n", prefix);
   error();
 }
 
@@ -214,8 +228,7 @@ static void idle_tx(void) {
   if (self.tx.n_elements < 2) {
     return;
   }
-  (void) buffer_peek(&self.tx, self.tx.n_elements - 2, &prefix[0]);
-  (void) buffer_peek(&self.tx, self.tx.n_elements - 1, &prefix[1]);
+  (void) buffer_peek_n(&self.tx, self.tx.n_elements - 2, 2, prefix);
   if (strncmp((const char *) prefix, CRLF, 2) != 0) {
     return;
   }
@@ -231,17 +244,16 @@ static void idle_tx(void) {
   }
 
   /* Must be AT-command. */
-  (void) buffer_peek(&self.tx, 0, &prefix[0]);
-  (void) buffer_peek(&self.tx, 1, &prefix[1]);
+  (void) buffer_read_n(&self.tx, 2, prefix);
   if (strncmp((const char*) prefix, "AT", 2) != 0) {
     error();
-    clear_crlf();
+    next();
     return;
   }
 
   /* Handle AT-command. */
   at();
-  clear_crlf();
+  next();
 }
 
 
