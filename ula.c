@@ -324,7 +324,7 @@ typedef struct {
   int                        disable_ula_irq;
   u8_t                       hi_res_ink_colour;
   int                        do_contend;
-  u32_t                      ticks_14mhz_after_irq;
+  u32_t                      tstates_x4;
   int                        is_timex_enabled;
   int                        is_7mhz_tick;
   int                        is_displaying_content;
@@ -515,6 +515,14 @@ static void ula_display_reconfigure(void) {
 
 
 void ula_did_complete_frame(void) {
+  /**
+   * https://worldofspectrum.org/faq/reference/48kreference.htm#Hardware
+   *
+   * > The Spectrum's 'FLASH' effect is also produced by the ULA: Every 16
+   * > frames, the ink and paper of all flashing bytes is swapped; ie a normal
+   * > to inverted to normal cycle takes 32 frames, which is (good as) 0.64
+   * > seconds.
+   */
   if ((++self.frame_counter & 15) == 0) {
     self.blink_state ^= 1;
   }
@@ -536,15 +544,19 @@ void ula_did_complete_frame(void) {
  * layers which use the 320x256 or 640x256 resolutions.
  */
 int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
-  self.ticks_14mhz_after_irq++;
+  /**
+   * tstates are expressed in the stock 3.5 MHz clock, but this function is
+   * called at a 14 MHz rate, hence the "times four".
+   */
+  self.tstates_x4++;
 
   if (beam_row == self.display_spec->vsync_row && beam_column == self.display_spec->vsync_column) {
     copper_irq();
     if (!self.disable_ula_irq) {
       cpu_irq();
     }
-    self.ticks_14mhz_after_irq = 0;
-  } else if (self.ticks_14mhz_after_irq < N_IRQ_TSTATES * 4 && !self.disable_ula_irq) {
+    self.tstates_x4 = 0;
+  } else if (self.tstates_x4 / 4 < N_IRQ_TSTATES && !self.disable_ula_irq) {
     cpu_irq();
   }
 
@@ -779,20 +791,32 @@ void ula_contention_set(int do_contend) {
 
 
 /**
- * TODO: See https://worldofspectrum.org/faq/reference/48kreference.htm#Contention
+ * https://worldofspectrum.org/faq/reference/48kreference.htm#Contention
  *
  * The contention actually starts at t-state 14335, i.e. one t-state *before*
  * the first pixel in the top-left corner is being drawn.
+ *
+ * We could otherwise have used self.displaying_content, but that is one t-state
+ * too late.
  */
 static void ula_contend_48k(void) {
-  if (self.is_displaying_content) {
-    const u32_t delay[8] = {
-      6, 5, 4, 3, 2, 1, 0, 0
-    };
-    const u32_t t_states = self.ticks_14mhz_after_irq / 4;
+  const u32_t delays[8] = {
+    6, 5, 4, 3, 2, 1, 0, 0
+  };
+  u32_t relative_tstate;
 
-    clock_run(delay[(t_states % 224) % 8]);
+  if (self.tstates_x4 < 14335 * 4 || self.tstates_x4 >= (14335 + 192 * 224) * 4) {
+    /* Outside visible area. */
+    return;
   }
+
+  relative_tstate = ((self.tstates_x4 / 4) - 14335) % 224;
+  if (relative_tstate >= 128) {
+    /* In one of the borders or horizontal blanking. */
+    return;
+  }
+
+  clock_run(delays[relative_tstate & 0x07]);
 }
 
 
@@ -801,9 +825,9 @@ static void ula_contend_128k(void) {
     const u32_t delay[8] = {
       6, 5, 4, 3, 2, 1, 0, 0
     };
-    const u32_t t_states = self.ticks_14mhz_after_irq / 4;
+    const u32_t t_states = self.tstates_x4 / 4;
 
-    clock_run(delay[(t_states % 228) % 8]);
+    clock_run(delay[((t_states + 1) % 228) % 8]);
   }
 }
 
