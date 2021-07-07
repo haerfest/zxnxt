@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_net.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include "defs.h"
@@ -92,6 +93,11 @@ static size_t buffer_write(buffer_t* buffer, u8_t value) {
 }
 
 
+/* Forward declarations. */
+static void idle_tx(void);
+static void send_tx(void);
+
+
 typedef struct {
   buffer_t     tx;
   buffer_t     rx;
@@ -102,8 +108,11 @@ typedef struct {
   int          use_parity_check;
   int          use_odd_parity;
   int          use_two_stop_bits;
-
   int          do_echo;
+
+  TCPsocket    tcp_socket;
+  size_t       length;
+  
 } esp_t;
 
 
@@ -111,10 +120,11 @@ static esp_t self;
 
 
 int esp_init(void) {
-  self.tx.size = TX_SIZE;
-  self.rx.size = RX_SIZE;
-  self.tx.data = (u8_t *) malloc(self.tx.size);
-  self.rx.data = (u8_t *) malloc(self.rx.size);
+  self.tcp_socket = NULL;
+  self.tx.size    = TX_SIZE;
+  self.rx.size    = RX_SIZE;
+  self.tx.data    = (u8_t *) malloc(self.tx.size);
+  self.rx.data    = (u8_t *) malloc(self.rx.size);
 
   if (self.tx.data == NULL || self.rx.data == NULL) {
     log_wrn("esp: out of memory\n");
@@ -130,6 +140,10 @@ int esp_init(void) {
 
 
 void esp_finit(void) {
+  if (self.tcp_socket) {
+    SDLNet_TCP_Close(self.tcp_socket);
+    self.tcp_socket = NULL;
+  }
 }
 
 
@@ -150,7 +164,7 @@ static void error(void) {
 }
 
 
-static void next(void) {
+static void skip_crlf(void) {
   u8_t value;
 
   /* Precondition: there is a CRLF in the TX buffer. */
@@ -192,7 +206,7 @@ static void at_echo_off(void) {
 
 
 /**
- * AT+UART_CUR
+ * AT+UART_CUR?
  */
 static void at_uart_cur(void) {
   char response[32 + 1];
@@ -218,6 +232,157 @@ static void at_uart_cur(void) {
 }
 
 
+/**
+ * AT+CIPSTART="TCP","<host>",<port>[<keepalive>]
+ */
+static void at_cipstart(void) {
+  u8_t      host[80 + 1];
+  u8_t      port[5 + 1];
+  u8_t      s[8];
+  size_t    i;
+  IPaddress ip;
+
+  if (buffer_read_n(&self.tx, sizeof(s), s) != sizeof(s)) {
+    error();
+    return;
+  }
+
+  if (strncmp((const char *) s, "=\"TCP\",\"", sizeof(s)) != 0) {
+    error();
+    return;
+  }
+
+  /* Read hostname or IP address until speech marks. */
+  memset(host, 0, sizeof(host));
+  for (i = 0; (i < sizeof(host)) && buffer_read(&self.tx, &host[i]) && host[i] != '"'; i++);
+  if (i == sizeof(host)) {
+    error();
+    return;
+  }
+  if (host[i] != '"') {
+    error();
+    return;
+  }
+  host[i] = 0;
+
+  /* Skip ",". */
+  if (!buffer_read(&self.tx, s)) {
+    error();
+    return;
+  }
+  if (s[0] != ',') {
+    error();
+    return;
+  }
+
+  /* Read numeric port. */
+  memset(port, 0, sizeof(port));
+  for (i = 0; (i < sizeof(port) - 1) && buffer_read(&self.tx, &port[i]) && isdigit(port[i]); i++);
+  if (i == sizeof(port) - 1) {
+    error();
+    return;
+  }
+  port[i] = 0;
+
+  if (self.tcp_socket) {
+    respond("ALREADY CONNECTED" CRLF);
+    return;
+  }
+
+  log_wrn("esp: host='%s' port='%s'\n", host, port);
+  if (SDLNet_ResolveHost(&ip, (const char *) host, atoi((const char *) port)) != 0) {
+    log_wrn("SDLNet_ResolveHost: %s\n", SDLNet_GetError());
+    error();
+    return;
+  }
+
+  self.tcp_socket = SDLNet_TCP_Open(&ip);
+  if (!self.tcp_socket) {
+    log_wrn("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
+    error();
+    return;
+  }
+
+  ok();
+}
+
+
+static void clear_tx(void) {
+  while (buffer_read(&self.tx, NULL));
+}
+
+
+static void send_tx(void) {
+  u8_t packet[2048];
+  u8_t value;
+
+  /* Wait until it starts with ">". */
+  if (!buffer_peek(&self.tx, 0, &value)) {
+    return;
+  }
+  if (value != '>') {
+    error();
+    clear_tx();
+    self.tx_handler = idle_tx;
+    return;
+  }
+
+  /* Wait for the packet. */
+  if (buffer_peek_n(&self.tx, 1, sizeof(packet), packet) != sizeof(packet)) {
+    return;
+  }
+
+  if (SDLNet_TCP_Send(self.tcp_socket, packet, sizeof(packet)) < sizeof(packet)) {
+    log_wrn("SDLNet_TCP_Send: %s\n", SDLNet_GetError());
+    respond("SEND FAIL" CRLF);
+  } else {
+    respond("SEND OK" CRLF);
+  }
+
+  self.tx_handler = idle_tx;
+}
+
+
+/**
+ * AT+CIPSEND
+ * AT+CIPSEND=<length>
+ */
+static void at_cipsend(void) {
+  u8_t   length[4 + 1];  /* Max 2048. */
+  u8_t   value;
+  size_t i;
+
+  (void) buffer_peek(&self.tx, 0, &value);
+  switch (value) {
+    case '=':
+      /* Normal transmission mode. */
+      (void) buffer_read(&self.tx, NULL);
+ 
+      /* Read length. */
+      memset(length, 0, sizeof(length));
+      for (i = 0; (i < sizeof(length) - 1) && buffer_read(&self.tx, &length[i]) && isdigit(length[i]); i++);
+      if (i == sizeof(length) - 1) {
+        error();
+        return;
+      }
+      length[i] = 0;
+      self.length = atoi((const char *) length);
+      break;
+
+    case CR:
+      /* Transparent transmission mode. */
+      error();
+      break;
+
+    default:
+      error();
+      return;
+  }
+
+  self.tx_handler = send_tx;
+}
+
+
 static void at(void) {
   /* Order common prefixes from longest to shortest. */
   const struct {
@@ -226,7 +391,12 @@ static void at(void) {
   } handlers[] = {
     { "E0",        at_echo_off },
     { "E1",        at_echo_on  },
-    { "+UART_CUR", at_uart_cur }
+    { "+UART_CUR", at_uart_cur },
+    { "+CIPCLOSE", ok          },
+    { "+CIPMUX",   ok          },
+    { "+CIPSTART", at_cipstart },
+    { "+CIPSEND",  at_cipsend  },
+    { "",          ok          }
   };
   const size_t n_handlers = sizeof(handlers) / sizeof(*handlers);
   char         prefix[MAX_AT_PREFIX_LENGTH + 1];
@@ -238,11 +408,6 @@ static void at(void) {
    * 3. AT<cmd>
    */
   i = buffer_peek_n(&self.tx, 0, MAX_AT_PREFIX_LENGTH, (u8_t *) prefix);
-  for (j = 0; (j < i) && (prefix[j] != CR); j++);
-  prefix[j] = 0;
-  log_wrn("esp: got '%s'\n", prefix);
-
-  /* We'll match on just the prefix. */
   for (j = 0; (j < i) && (prefix[j] != '=' && prefix[j] != '?' && prefix[j] != CR); j++);
   prefix[j] = 0;
 
@@ -287,13 +452,13 @@ static void idle_tx(void) {
   (void) buffer_read_n(&self.tx, 2, prefix);
   if (strncmp((const char*) prefix, "AT", 2) != 0) {
     error();
-    next();
+    skip_crlf();
     return;
   }
 
   /* Handle AT-command. */
   at();
-  next();
+  skip_crlf();
 }
 
 
@@ -332,6 +497,11 @@ void esp_reset(reset_t reset) {
   self.tx_handler = idle_tx;
 
   self.do_echo = 1;
+
+  if (self.tcp_socket) {
+    SDLNet_TCP_Close(self.tcp_socket);
+    self.tcp_socket = NULL;
+  }
 }
 
 
