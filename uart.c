@@ -41,6 +41,11 @@ void uart_finit(void) {
 }
 
 
+static u32_t baudrate(u32_t prescalar) {
+  return prescalar ? clock_28mhz_get() : clock_28mhz_get() / prescalar;
+}
+
+
 void uart_reset(reset_t reset) {
   self.selected = E_DEVICE_ESP;
 
@@ -55,6 +60,9 @@ void uart_reset(reset_t reset) {
       self.uart[i].use_two_stop_bits = 0;
     }
   }
+
+  esp_baudrate_set(baudrate(self.uart[self.selected].prescalar));
+  esp_dataformat_set(self.uart[E_DEVICE_ESP].bits_per_frame, self.uart[E_DEVICE_ESP].use_parity_check, self.uart[E_DEVICE_ESP].use_odd_parity, self.uart[E_DEVICE_ESP].use_two_stop_bits);
 }
 
 
@@ -68,6 +76,9 @@ void uart_select_write(u8_t value) {
 
   if (value & 0x10) {
     self.uart[self.selected].prescalar = (self.uart[self.selected].prescalar & 0x3FFF) | ((value & 0x07) << 14);
+    if (self.selected == E_DEVICE_ESP) {
+      esp_baudrate_set(self.uart[E_DEVICE_ESP].prescalar);
+    }
   }
 
   log_wrn("uart%d: selected, prescalar=%u => %u baud \n",
@@ -95,6 +106,10 @@ void uart_frame_write(u8_t value) {
   uart->use_odd_parity    =  (value & 0x02) >> 1;
   uart->use_two_stop_bits =   value & 0x01;
 
+  if (self.selected == E_DEVICE_ESP) {
+    esp_dataformat_set(uart->bits_per_frame, uart->use_parity_check, uart->use_odd_parity, uart->use_two_stop_bits);
+  }
+
   log_wrn("uart%d: bits/frame=%d parity=%c type=%c stop=%d\n",
           self.selected,
           self.uart[self.selected].bits_per_frame,
@@ -121,6 +136,10 @@ void uart_rx_write(u8_t value) {
   self.uart[self.selected].prescalar = (value & 0x80)
     ? (self.uart[self.selected].prescalar & 0x1C07F) | ((value & 0x7F) << 7)
     : (self.uart[self.selected].prescalar & 0x1FF80) |  (value & 0x7F);
+
+  if (self.selected == E_DEVICE_ESP) {
+    esp_baudrate_set(baudrate(self.uart[self.selected].prescalar));
+  }
 
   log_wrn("uart%d: prescalar=%u => %u baud\n",
           self.selected,

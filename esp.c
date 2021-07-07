@@ -1,3 +1,5 @@
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_net.h>
 #include <stdlib.h>
 #include <string.h>
 #include "defs.h"
@@ -95,6 +97,12 @@ typedef struct {
   buffer_t     rx;
   tx_handler_t tx_handler;
 
+  u32_t        baudrate;
+  int          bits_per_frame;
+  int          use_parity_check;
+  int          use_odd_parity;
+  int          use_two_stop_bits;
+
   int          do_echo;
 } esp_t;
 
@@ -184,78 +192,28 @@ static void at_echo_off(void) {
 
 
 /**
- * AT+CWMODE
+ * AT+UART_CUR
  */
-static void at_cwmode(void) {
+static void at_uart_cur(void) {
+  char response[32 + 1];
   u8_t value;
 
-  if (!buffer_peek(&self.tx, 0, &value)) {
+  if (!buffer_read(&self.tx, &value)) {
     error();
     return;
   }
 
-  switch (value) {
-    case '?':
-      respond("+CWMODE:1" CRLF);
-      ok();
-      break;
-
-    case '=':
-      (void) buffer_read(&self.tx, NULL);
-      if (!buffer_peek(&self.tx, 0, &value)) {
-        error();
-        break;
-      }
-      if (value == '1') {
-        ok();
-      } else {
-        error();
-      }
-      break;
-
-    default:
-      error();
-      break;
-  }
-}
-
-
-/**
- * AT+CWJAP
- */
-static void at_cwjap(void) {
-  u8_t value;
-
-  if (!buffer_peek(&self.tx, 0, &value)) {
+  if (value != '?') {
     error();
     return;
   }
-
-  switch (value) {
-    case '?':
-      respond("+CWJAP:EmulatedWifi,\"00:14:a5:41:61:6b\",1,-30" CRLF);
-      ok();
-      break;
-
-    case '=':
-      respond("+CWJAP:3" CRLF "FAIL" CRLF);
-      break;
-
-    default:
-      error();
-      break;
-  }
-
-}
-
-
-/**
- * AT+GMR
- */
-static void at_gmr(void) {
-  respond("AT version:0.23.0.0(Apr 24 2015 21:11:01)" CRLF
-          "SDK version:1.0.1" CRLF
-          "compile time:Apr 24 2015 21:19:31" CRLF);
+  
+  snprintf(response, sizeof(response), "+UART_CUR:%u,%d,%d,%d,0" CRLF,
+           self.baudrate,
+           self.bits_per_frame,
+           self.use_two_stop_bits ? 2 : 1,             
+           self.use_parity_check ? (self.use_odd_parity ? 1 : 2) : 0);
+  respond(response);
   ok();
 }
 
@@ -266,11 +224,9 @@ static void at(void) {
     char*        prefix;
     at_handler_t handler;
   } handlers[] = {
-    { "E0",          at_echo_off },
-    { "E1",          at_echo_on  },
-    { "+CWMODE",     at_cwmode   },
-    { "+CWJAP",      at_cwjap    },
-    { "+GMR",        at_gmr      } 
+    { "E0",        at_echo_off },
+    { "E1",        at_echo_on  },
+    { "+UART_CUR", at_uart_cur }
   };
   const size_t n_handlers = sizeof(handlers) / sizeof(*handlers);
   char         prefix[MAX_AT_PREFIX_LENGTH + 1];
@@ -299,9 +255,9 @@ static void at(void) {
     }
   }
 
-  /* Unknown command. */
+  /* Unknown command, just fake an OK. */
   log_wrn("esp: unknown AT-command: '%s'\n", prefix);
-  error();
+  ok();
 }
 
 
@@ -376,4 +332,17 @@ void esp_reset(reset_t reset) {
   self.tx_handler = idle_tx;
 
   self.do_echo = 1;
+}
+
+
+void esp_baudrate_set(u32_t baud) {
+  self.baudrate = baud;
+}
+
+
+void esp_dataformat_set(int bits_per_frame, int use_parity_check, int use_odd_parity, int use_two_stop_bits) {
+  self.bits_per_frame    = bits_per_frame;
+  self.use_parity_check  = use_parity_check;
+  self.use_odd_parity    = use_odd_parity;
+  self.use_two_stop_bits = use_two_stop_bits;
 }
