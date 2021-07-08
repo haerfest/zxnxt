@@ -310,26 +310,8 @@ static void at_cipstart(void) {
 }
 
 
-static void clear_tx(void) {
-  while (buffer_read(&self.tx, NULL));
-}
-
-
 static void send_tx(void) {
   u8_t packet[MAX_PACKET_LENGTH];
-  u8_t value;
-
-  /* Wait until it starts with ">". */
-  if (!buffer_peek(&self.tx, 0, &value)) {
-    return;
-  }
-  log_wrn("esp: tx value=%c (%d)\n", value, value);
-  if (value != '>') {
-    error();
-    clear_tx();
-    self.tx_handler = idle_tx;
-    return;
-  }
 
   /* Wait for the packet. */
   if (buffer_peek_n(&self.tx, 1, self.length, packet) != self.length) {
@@ -385,6 +367,7 @@ static void at_cipsend(void) {
         error();
         return;
       }
+      respond(">");
       break;
 
     case CR:
