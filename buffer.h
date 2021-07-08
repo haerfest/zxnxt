@@ -12,8 +12,8 @@ typedef struct {
   size_t     read_index;
   size_t     n_elements;
   SDL_mutex* mutex;
-  SDL_cond*  not_full;
-  SDL_cond*  not_empty;
+  SDL_cond*  element_added;
+  SDL_cond*  element_removed;
 } buffer_t;
 
 

@@ -8,10 +8,10 @@ int buffer_init(buffer_t* buffer, size_t size) {
   buffer->size      = size;
   buffer->data      = malloc(size);
   buffer->mutex     = SDL_CreateMutex();
-  buffer->not_empty = SDL_CreateCond();
-  buffer->not_full  = SDL_CreateCond();
+  buffer->element_added = SDL_CreateCond();
+  buffer->element_removed  = SDL_CreateCond();
 
-  if (buffer->data == NULL || buffer->mutex == NULL || buffer->not_empty == NULL || buffer->not_full == NULL) {
+  if (buffer->data == NULL || buffer->mutex == NULL || buffer->element_added == NULL || buffer->element_removed == NULL) {
     log_wrn("buffer: out of memory\n");
 
     if (buffer->data) {
@@ -22,13 +22,13 @@ int buffer_init(buffer_t* buffer, size_t size) {
       SDL_DestroyMutex(buffer->mutex);
       buffer->mutex = NULL;
     }
-    if (buffer->not_empty) {
-      SDL_DestroyCond(buffer->not_empty);
-      buffer->not_empty = NULL;
+    if (buffer->element_added) {
+      SDL_DestroyCond(buffer->element_added);
+      buffer->element_added = NULL;
     }
-    if (buffer->not_full) {
-      SDL_DestroyCond(buffer->not_full);
-      buffer->not_full = NULL;
+    if (buffer->element_removed) {
+      SDL_DestroyCond(buffer->element_removed);
+      buffer->element_removed = NULL;
     }
 
     return 1;
@@ -47,13 +47,13 @@ void buffer_finit(buffer_t* buffer) {
     SDL_DestroyMutex(buffer->mutex);
     buffer->mutex = NULL;
   }
-  if (buffer->not_empty) {
-    SDL_DestroyCond(buffer->not_empty);
-    buffer->not_empty = NULL;
+  if (buffer->element_added) {
+    SDL_DestroyCond(buffer->element_added);
+    buffer->element_added = NULL;
   }
-  if (buffer->not_full) {
-    SDL_DestroyCond(buffer->not_full);
-    buffer->not_full = NULL;
+  if (buffer->element_removed) {
+    SDL_DestroyCond(buffer->element_removed);
+    buffer->element_removed = NULL;
   }
 }
 
@@ -75,10 +75,10 @@ size_t buffer_read_n(buffer_t* buffer, size_t n, u8_t* values) {
     }
     buffer->n_elements--;
     buffer->read_index = (buffer->read_index + 1) % buffer->size;
+  }
 
-    if (buffer->n_elements == buffer->size - 1) {
-      SDL_CondSignal(buffer->not_full);
-    }
+  if (n > 0) {
+    SDL_CondSignal(buffer->element_removed);
   }
 
   SDL_UnlockMutex(buffer->mutex);
@@ -114,9 +114,7 @@ size_t buffer_write(buffer_t* buffer, u8_t value) {
   buffer->data[(buffer->read_index + buffer->n_elements) % buffer->size] = value;
   buffer->n_elements++;
 
-  if (buffer->n_elements == 1) {
-    SDL_CondSignal(buffer->not_empty);
-  }
+  SDL_CondSignal(buffer->element_added);
 
   SDL_UnlockMutex(buffer->mutex);
   
