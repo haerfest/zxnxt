@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include "buffer.h"
 #include "defs.h"
 #include "esp.h"
 #include "log.h"
@@ -20,127 +21,6 @@
 
 
 typedef void (*tx_handler_t)(void);
-
-
-typedef struct {
-  u8_t*      data;
-  size_t     size;
-  size_t     read_index;
-  size_t     n_elements;
-  SDL_mutex* mutex;
-  SDL_cond*  is_available;
-} buffer_t;
-
-
-/**
- * TODO Only reading incoming TCP traffic happens asynchronously, so accessing
- *      the rx buffer must be protected by a mutex, where the Z80 reading from
- *      it can just try to acquire the mutex without waiting for it.  All
- *      sending of data happens synchronously, so locking is not necessary
- *      there.
- */
-
-
-static size_t buffer_read(buffer_t* buffer, u8_t* value) {
-  if (SDL_TryLockMutex(buffer->mutex) != 0) {
-    return 0;
-  }
-
-  if (buffer->n_elements == 0) {
-    (void) SDL_UnlockMutex(buffer->mutex);
-    return 0;
-  }
-
-  if (value) {
-    *value = buffer->data[buffer->read_index];
-  }
-  buffer->n_elements--;
-  buffer->read_index = (buffer->read_index + 1) % buffer->size;
-
-  if (buffer->n_elements == 0) {
-    (void) SDL_CondSignal(buffer->is_available);
-  }
-  (void) SDL_UnlockMutex(buffer->mutex);
-
-  return 1;
-}
-
-
-static size_t buffer_read_n(buffer_t* buffer, size_t n, u8_t* values) {
-  size_t i;
-
-  if (SDL_TryLockMutex(buffer->mutex) != 0) {
-    return 0;
-  }
-
-  for (i = 0; buffer->n_elements && (i < n); i++) {
-    if (values) {
-      values[i] = buffer->data[buffer->read_index];
-    }
-    buffer->n_elements--;
-    buffer->read_index = (buffer->read_index + 1) % buffer->size;
-  }
-
-  if (buffer->n_elements == 0) {
-    (void) SDL_CondSignal(buffer->is_available);
-  }
-
-  (void) SDL_UnlockMutex(buffer->mutex);
-
-  return i;
-}
-
-
-static size_t buffer_peek(buffer_t* buffer, size_t index, u8_t* value) {
-  if (SDL_TryLockMutex(buffer->mutex) != 0) {
-    return 0;
-  }
-
-  if (buffer->n_elements <= index) {
-    (void) SDL_UnlockMutex(buffer->mutex);
-    return 0;
-  }
-
-  *value = buffer->data[(buffer->read_index + index) % buffer->size];
-
-  (void) SDL_UnlockMutex(buffer->mutex);
-
-  return 1;
-}
-
-
-static size_t buffer_peek_n(buffer_t* buffer, size_t index, size_t n, u8_t* values) {
-  size_t i;
-
-  if (SDL_TryLockMutex(buffer->mutex) != 0) {
-    return 0;
-  }
-
-  for (i = 0; (index + i < buffer->n_elements) && (i < n); i++) {
-    values[i] = buffer->data[(buffer->read_index + index + i) % buffer->size];
-  }
-
-  (void) SDL_UnlockMutex(buffer->mutex);
-
-  return i;
-}
-
-
-static size_t buffer_write(buffer_t* buffer, u8_t value) {
-  (void) SDL_LockMutex(buffer->mutex);
-
-  if (buffer->n_elements == buffer->size) {
-    (void) SDL_UnlockMutex(buffer->mutex);
-    return 0;
-  }
-
-  buffer->data[(buffer->read_index + buffer->n_elements) % buffer->size] = value;
-  buffer->n_elements++;
-
-  (void) SDL_UnlockMutex(buffer->mutex);
-  
-  return 1;
-}
 
 
 /* Forward declarations. */
@@ -171,29 +51,15 @@ static esp_t self;
 
 int esp_init(void) {
   self.tcp_socket      = NULL;
-  self.rx.size         = RX_SIZE;
-  self.tx.size         = TX_SIZE;
-  self.rx.data         = (u8_t *) malloc(self.rx.size);
-  self.tx.data         = (u8_t *) malloc(self.tx.size);
-  self.rx.is_available = SDL_CreateCond();
-  self.tx.is_available = SDL_CreateCond();
-  self.rx.mutex        = SDL_CreateMutex();
-  self.tx.mutex        = SDL_CreateMutex();
 
-  if (self.rx.data         == NULL || self.tx.data         == NULL ||
-      self.rx.is_available == NULL || self.rx.is_available == NULL ||
-      self.rx.mutex        == NULL || self.tx.mutex        == NULL) {
-    log_wrn("esp: out of memory\n");
-
-    if (self.rx.data)          free(self.rx.data);
-    if (self.tx.data)          free(self.tx.data);
-    if (self.rx.is_available)  SDL_DestroyCond(self.rx.is_available);
-    if (self.tx.is_available)  SDL_DestroyCond(self.tx.is_available);
-    if (self.rx.mutex)         SDL_DestroyMutex(self.rx.mutex);
-    if (self.tx.mutex)         SDL_DestroyMutex(self.tx.mutex);
-
+  if (buffer_init(&self.rx, RX_SIZE) != 0) {
     return 1;
   }
+
+  if (buffer_init(&self.tx, TX_SIZE) != 0) {
+    buffer_finit(&self.rx);
+    return 1;
+  }   
 
   esp_reset(E_RESET_HARD);
 
@@ -207,10 +73,8 @@ void esp_finit(void) {
     SDL_WaitThread(self.read_thread, NULL);
   }
 
-  SDL_DestroyCond(self.rx.is_available);
-  SDL_DestroyCond(self.tx.is_available);
-  SDL_DestroyMutex(self.rx.mutex);
-  SDL_DestroyMutex(self.tx.mutex);
+  buffer_finit(&self.rx);
+  buffer_finit(&self.tx);
 }
 
 
@@ -221,10 +85,13 @@ static int rx_thread(void *ptr) {
   while (SDLNet_TCP_Recv(self.tcp_socket, &value, 1) == 1) {
     log_wrn("%c", isprint(value) ? value : '.');
 
+#if 0
     (void) SDL_LockMutex(self.rx.mutex);
     while (self.rx.n_elements == self.rx.size) {
       (void) SDL_CondWait(self.rx.is_available, self.rx.mutex);
     }
+#endif
+
     (void) buffer_write(&self.rx, value);
     (void) SDL_UnlockMutex(self.rx.mutex);
   }
@@ -259,10 +126,10 @@ static void skip_crlf(void) {
 
   while (1) {
     /* Hunt for CR. */
-    while (buffer_read(&self.tx, &value) && value != CR);
+    while (buffer_read_n(&self.tx, 1, &value) && value != CR);
 
     /* Could be sole CR, not followed by LF. */
-    if (!buffer_read(&self.tx, &value)) {
+    if (!buffer_read_n(&self.tx, 1, &value)) {
       return;
     }
     if (value == CR) {
@@ -300,7 +167,7 @@ static void at_uart_cur(void) {
   char response[32 + 1];
   u8_t value;
 
-  if (!buffer_read(&self.tx, &value)) {
+  if (!buffer_read_n(&self.tx, 1, &value)) {
     error();
     return;
   }
@@ -342,7 +209,7 @@ static void at_cipstart(void) {
 
   /* Read hostname or IP address until speech marks. */
   memset(host, 0, sizeof(host));
-  for (i = 0; (i < sizeof(host)) && buffer_read(&self.tx, &host[i]) && host[i] != '"'; i++);
+  for (i = 0; (i < sizeof(host)) && buffer_read_n(&self.tx, 1, &host[i]) && host[i] != '"'; i++);
   if (i == sizeof(host)) {
     error();
     return;
@@ -354,7 +221,7 @@ static void at_cipstart(void) {
   host[i] = 0;
 
   /* Skip ",". */
-  if (!buffer_read(&self.tx, s)) {
+  if (!buffer_read_n(&self.tx, 1, s)) {
     error();
     return;
   }
@@ -365,7 +232,7 @@ static void at_cipstart(void) {
 
   /* Read numeric port. */
   memset(port, 0, sizeof(port));
-  for (i = 0; (i < sizeof(port) - 1) && buffer_read(&self.tx, &port[i]) && isdigit(port[i]); i++);
+  for (i = 0; (i < sizeof(port) - 1) && buffer_read_n(&self.tx, 1, &port[i]) && isdigit(port[i]); i++);
   if (i == sizeof(port) - 1) {
     error();
     return;
@@ -456,16 +323,16 @@ static void at_cipsend(void) {
   u8_t   value;
   size_t i;
 
-  (void) buffer_peek(&self.tx, 0, &value);
+  (void) buffer_peek_n(&self.tx, 0, 1, &value);
   switch (value) {
     case '=':
       /* Normal transmission mode. */
-      (void) buffer_read(&self.tx, NULL);
+      (void) buffer_read_n(&self.tx, 1, NULL);
  
       /* Read length. */
       memset(length, 0, sizeof(length));
-      while (buffer_read(&self.tx, &length[0]) && length[0] == '0');
-      for (i = 1; (i < sizeof(length) - 1) && buffer_read(&self.tx, &length[i]) && isdigit(length[i]); i++);
+      while (buffer_read_n(&self.tx, 1, &length[0]) && length[0] == '0');
+      for (i = 1; (i < sizeof(length) - 1) && buffer_read_n(&self.tx, 1, &length[i]) && isdigit(length[i]); i++);
       if (i == sizeof(length) - 1) {
         error();
         return;
@@ -516,7 +383,7 @@ static void at(void) {
   {
     u8_t value;
     log_wrn("esp: command '");
-    for (j = 0; buffer_peek(&self.tx, j, &value); j++) {
+    for (j = 0; buffer_peek_n(&self.tx, j, 1, &value); j++) {
       log_wrn("%c", isprint(value) ? value : '.');
     }
     log_wrn("'\n");
@@ -563,7 +430,7 @@ static void idle_tx(void) {
     size_t i;
     for (i = 0; i < self.tx.n_elements; i++) {
       u8_t value;
-      (void) buffer_peek(&self.tx, i, &value);
+      (void) buffer_peek_n(&self.tx, i, 1, &value);
       (void) buffer_write(&self.rx, value);
     }
   }
@@ -604,7 +471,7 @@ u8_t esp_tx_read(void) {
 u8_t esp_rx_read(void) {
   u8_t value;
 
-  return buffer_read(&self.rx, &value) ? value : 0x00;
+  return buffer_read_n(&self.rx, 1, &value) ? value : 0x00;
 }
 
 
