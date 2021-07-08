@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include "clock.h"
 #include "defs.h"
 #include "esp.h"
@@ -164,6 +165,7 @@ u8_t uart_tx_read(void) {
 void uart_tx_write(u8_t value) {
   switch (self.selected) {
     case E_DEVICE_ESP:
+      log_wrn("%c", isprint(value) ? value : '.');
       esp_tx_write(value);
       break;
 

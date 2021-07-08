@@ -8,7 +8,8 @@
 #include "log.h"
 
 
-#define MAX_AT_PREFIX_LENGTH  20
+#define MAX_AT_PREFIX_LENGTH    20
+#define MAX_PACKET_LENGTH     2048
 
 #define TX_SIZE  (8 * 1024)
 #define RX_SIZE  (8 * 1024)
@@ -155,11 +156,13 @@ static void respond(const char* response) {
 
 
 static void ok(void) {
+  log_wrn("esp: OK\n");
   respond("OK" CRLF);
 }
 
 
 static void error(void) {
+  log_wrn("esp: ERROR\n");
   respond("ERROR" CRLF);
 }
 
@@ -313,13 +316,14 @@ static void clear_tx(void) {
 
 
 static void send_tx(void) {
-  u8_t packet[2048];
+  u8_t packet[MAX_PACKET_LENGTH];
   u8_t value;
 
   /* Wait until it starts with ">". */
   if (!buffer_peek(&self.tx, 0, &value)) {
     return;
   }
+  log_wrn("esp: tx value=%c (%d)\n", value, value);
   if (value != '>') {
     error();
     clear_tx();
@@ -328,11 +332,19 @@ static void send_tx(void) {
   }
 
   /* Wait for the packet. */
-  if (buffer_peek_n(&self.tx, 1, sizeof(packet), packet) != sizeof(packet)) {
+  if (buffer_peek_n(&self.tx, 1, self.length, packet) != self.length) {
     return;
   }
 
-  if (SDLNet_TCP_Send(self.tcp_socket, packet, sizeof(packet)) < sizeof(packet)) {
+  {
+    size_t i;
+    log_wrn("esp: sending ");
+    for (i = 0; i < self.length; i++) {
+      log_wrn("%c", isprint(packet[i]) ? packet[i] : '.');
+    }
+    log_wrn("\n");
+  }
+  if (SDLNet_TCP_Send(self.tcp_socket, packet, self.length) < self.length) {
     log_wrn("SDLNet_TCP_Send: %s\n", SDLNet_GetError());
     respond("SEND FAIL" CRLF);
   } else {
@@ -360,19 +372,25 @@ static void at_cipsend(void) {
  
       /* Read length. */
       memset(length, 0, sizeof(length));
-      for (i = 0; (i < sizeof(length) - 1) && buffer_read(&self.tx, &length[i]) && isdigit(length[i]); i++);
+      while (buffer_read(&self.tx, &length[0]) && length[0] == '0');
+      for (i = 1; (i < sizeof(length) - 1) && buffer_read(&self.tx, &length[i]) && isdigit(length[i]); i++);
       if (i == sizeof(length) - 1) {
         error();
         return;
       }
       length[i] = 0;
       self.length = atoi((const char *) length);
+      log_wrn("esp: length=%lu\n", self.length);
+      if (self.length > MAX_PACKET_LENGTH) {
+        error();
+        return;
+      }
       break;
 
     case CR:
       /* Transparent transmission mode. */
       error();
-      break;
+      return;
 
     default:
       error();
@@ -401,6 +419,15 @@ static void at(void) {
   const size_t n_handlers = sizeof(handlers) / sizeof(*handlers);
   char         prefix[MAX_AT_PREFIX_LENGTH + 1];
   size_t       i, j;
+
+  {
+    u8_t value;
+    log_wrn("esp: command '");
+    for (j = 0; buffer_peek(&self.tx, j, &value); j++) {
+      log_wrn("%c", isprint(value) ? value : '.');
+    }
+    log_wrn("'\n");
+  }
 
   /* Command syntax must be one of:
    * 1. AT<cmd>?
