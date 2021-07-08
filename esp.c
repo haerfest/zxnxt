@@ -314,7 +314,7 @@ static void send_tx(void) {
   u8_t packet[MAX_PACKET_LENGTH];
 
   /* Wait for the packet. */
-  if (buffer_peek_n(&self.tx, 1, self.length, packet) != self.length) {
+  if (buffer_peek_n(&self.tx, 0, self.length, packet) != self.length) {
     return;
   }
 
