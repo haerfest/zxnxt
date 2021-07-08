@@ -23,15 +23,31 @@ typedef void (*tx_handler_t)(void);
 
 
 typedef struct {
-  u8_t*  data;
-  size_t size;
-  size_t read_index;
-  size_t n_elements;
+  u8_t*      data;
+  size_t     size;
+  size_t     read_index;
+  size_t     n_elements;
+  SDL_mutex* mutex;
+  SDL_cond*  is_available;
 } buffer_t;
 
 
+/**
+ * TODO Only reading incoming TCP traffic happens asynchronously, so accessing
+ *      the rx buffer must be protected by a mutex, where the Z80 reading from
+ *      it can just try to acquire the mutex without waiting for it.  All
+ *      sending of data happens synchronously, so locking is not necessary
+ *      there.
+ */
+
+
 static size_t buffer_read(buffer_t* buffer, u8_t* value) {
+  if (SDL_TryLockMutex(buffer->mutex) != 0) {
+    return 0;
+  }
+
   if (buffer->n_elements == 0) {
+    (void) SDL_UnlockMutex(buffer->mutex);
     return 0;
   }
 
@@ -41,12 +57,21 @@ static size_t buffer_read(buffer_t* buffer, u8_t* value) {
   buffer->n_elements--;
   buffer->read_index = (buffer->read_index + 1) % buffer->size;
 
+  if (buffer->n_elements == 0) {
+    (void) SDL_CondSignal(buffer->is_available);
+  }
+  (void) SDL_UnlockMutex(buffer->mutex);
+
   return 1;
 }
 
 
 static size_t buffer_read_n(buffer_t* buffer, size_t n, u8_t* values) {
   size_t i;
+
+  if (SDL_TryLockMutex(buffer->mutex) != 0) {
+    return 0;
+  }
 
   for (i = 0; buffer->n_elements && (i < n); i++) {
     if (values) {
@@ -56,16 +81,29 @@ static size_t buffer_read_n(buffer_t* buffer, size_t n, u8_t* values) {
     buffer->read_index = (buffer->read_index + 1) % buffer->size;
   }
 
+  if (buffer->n_elements == 0) {
+    (void) SDL_CondSignal(buffer->is_available);
+  }
+
+  (void) SDL_UnlockMutex(buffer->mutex);
+
   return i;
 }
 
 
 static size_t buffer_peek(buffer_t* buffer, size_t index, u8_t* value) {
+  if (SDL_TryLockMutex(buffer->mutex) != 0) {
+    return 0;
+  }
+
   if (buffer->n_elements <= index) {
+    (void) SDL_UnlockMutex(buffer->mutex);
     return 0;
   }
 
   *value = buffer->data[(buffer->read_index + index) % buffer->size];
+
+  (void) SDL_UnlockMutex(buffer->mutex);
 
   return 1;
 }
@@ -74,22 +112,33 @@ static size_t buffer_peek(buffer_t* buffer, size_t index, u8_t* value) {
 static size_t buffer_peek_n(buffer_t* buffer, size_t index, size_t n, u8_t* values) {
   size_t i;
 
+  if (SDL_TryLockMutex(buffer->mutex) != 0) {
+    return 0;
+  }
+
   for (i = 0; (index + i < buffer->n_elements) && (i < n); i++) {
     values[i] = buffer->data[(buffer->read_index + index + i) % buffer->size];
   }
+
+  (void) SDL_UnlockMutex(buffer->mutex);
 
   return i;
 }
 
 
 static size_t buffer_write(buffer_t* buffer, u8_t value) {
+  (void) SDL_LockMutex(buffer->mutex);
+
   if (buffer->n_elements == buffer->size) {
+    (void) SDL_UnlockMutex(buffer->mutex);
     return 0;
   }
 
   buffer->data[(buffer->read_index + buffer->n_elements) % buffer->size] = value;
   buffer->n_elements++;
 
+  (void) SDL_UnlockMutex(buffer->mutex);
+  
   return 1;
 }
 
@@ -113,7 +162,7 @@ typedef struct {
 
   TCPsocket    tcp_socket;
   size_t       length;
-  
+  SDL_Thread*  read_thread;
 } esp_t;
 
 
@@ -121,16 +170,28 @@ static esp_t self;
 
 
 int esp_init(void) {
-  self.tcp_socket = NULL;
-  self.tx.size    = TX_SIZE;
-  self.rx.size    = RX_SIZE;
-  self.tx.data    = (u8_t *) malloc(self.tx.size);
-  self.rx.data    = (u8_t *) malloc(self.rx.size);
+  self.tcp_socket      = NULL;
+  self.rx.size         = RX_SIZE;
+  self.tx.size         = TX_SIZE;
+  self.rx.data         = (u8_t *) malloc(self.rx.size);
+  self.tx.data         = (u8_t *) malloc(self.tx.size);
+  self.rx.is_available = SDL_CreateCond();
+  self.tx.is_available = SDL_CreateCond();
+  self.rx.mutex        = SDL_CreateMutex();
+  self.tx.mutex        = SDL_CreateMutex();
 
-  if (self.tx.data == NULL || self.rx.data == NULL) {
+  if (self.rx.data         == NULL || self.tx.data         == NULL ||
+      self.rx.is_available == NULL || self.rx.is_available == NULL ||
+      self.rx.mutex        == NULL || self.tx.mutex        == NULL) {
     log_wrn("esp: out of memory\n");
-    if (self.tx.data != NULL) free(self.tx.data);
-    if (self.rx.data != NULL) free(self.rx.data);
+
+    if (self.rx.data)          free(self.rx.data);
+    if (self.tx.data)          free(self.tx.data);
+    if (self.rx.is_available)  SDL_DestroyCond(self.rx.is_available);
+    if (self.tx.is_available)  SDL_DestroyCond(self.tx.is_available);
+    if (self.rx.mutex)         SDL_DestroyMutex(self.rx.mutex);
+    if (self.tx.mutex)         SDL_DestroyMutex(self.tx.mutex);
+
     return 1;
   }
 
@@ -143,8 +204,32 @@ int esp_init(void) {
 void esp_finit(void) {
   if (self.tcp_socket) {
     SDLNet_TCP_Close(self.tcp_socket);
-    self.tcp_socket = NULL;
+    SDL_WaitThread(self.read_thread, NULL);
   }
+
+  SDL_DestroyCond(self.rx.is_available);
+  SDL_DestroyCond(self.tx.is_available);
+  SDL_DestroyMutex(self.rx.mutex);
+  SDL_DestroyMutex(self.tx.mutex);
+}
+
+
+static int rx_thread(void *ptr) {
+  u8_t value;
+
+  /* This will terminate when the socket is closed. */
+  while (SDLNet_TCP_Recv(self.tcp_socket, &value, 1) == 1) {
+    log_wrn("%c", isprint(value) ? value : '.');
+
+    (void) SDL_LockMutex(self.rx.mutex);
+    while (self.rx.n_elements == self.rx.size) {
+      (void) SDL_CondWait(self.rx.is_available, self.rx.mutex);
+    }
+    (void) buffer_write(&self.rx, value);
+    (void) SDL_UnlockMutex(self.rx.mutex);
+  }
+
+  return 0;
 }
 
 
@@ -306,6 +391,29 @@ static void at_cipstart(void) {
     return;
   }
 
+  self.read_thread = SDL_CreateThread(rx_thread, "rx_thread", NULL);
+  if (!self.read_thread) {
+    log_wrn("SDL_CreateThread: %s\n", SDL_GetError());
+    SDLNet_TCP_Close(self.tcp_socket);
+    self.tcp_socket = NULL;
+    error();
+    return;
+  }
+
+  ok();
+}
+
+
+/**
+ * AT+CIPCLOSE
+ */
+static void at_cipclose(void) {
+  if (self.tcp_socket) {
+    SDLNet_TCP_Close(self.tcp_socket);
+    SDL_WaitThread(self.read_thread, NULL);
+    self.tcp_socket = NULL;
+  }
+
   ok();
 }
 
@@ -318,13 +426,15 @@ static void send_tx(void) {
     return;
   }
 
+  (void) buffer_read_n(&self.tx, self.length, NULL);
+
   {
     size_t i;
-    log_wrn("esp: sending ");
+    log_wrn("esp: sending '");
     for (i = 0; i < self.length; i++) {
       log_wrn("%c", isprint(packet[i]) ? packet[i] : '.');
     }
-    log_wrn("\n");
+    log_wrn("'\n");
   }
   if (SDLNet_TCP_Send(self.tcp_socket, packet, self.length) < self.length) {
     log_wrn("SDLNet_TCP_Send: %s\n", SDLNet_GetError());
@@ -393,7 +503,7 @@ static void at(void) {
     { "E0",        at_echo_off },
     { "E1",        at_echo_on  },
     { "+UART_CUR", at_uart_cur },
-    { "+CIPCLOSE", ok          },
+    { "+CIPCLOSE", at_cipclose },
     { "+CIPMUX",   ok          },
     { "+CIPSTART", at_cipstart },
     { "+CIPSEND",  at_cipsend  },
@@ -510,6 +620,7 @@ void esp_reset(reset_t reset) {
 
   if (self.tcp_socket) {
     SDLNet_TCP_Close(self.tcp_socket);
+    SDL_WaitThread(self.read_thread, NULL);
     self.tcp_socket = NULL;
   }
 }
