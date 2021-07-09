@@ -61,30 +61,46 @@ static esp_t self;
 #define HEADER_SIZE  10
 
 
-static void copy_to_rx(size_t n) {
+static void respond_n(const u8_t* response, size_t length) {
   size_t i;
 
+  for (i = 0; (i < length) && !self.do_finit; i++) {
+    SDL_LockMutex(self.rx.mutex);
+    while (self.rx.n_elements == self.rx.size && !self.do_finit) {
+      SDL_CondWaitTimeout(self.rx.element_removed, self.rx.mutex, 1000);
+    }
+    if (!self.do_finit) {
+      buffer_write(&self.rx, response[i]);
+    }
+    SDL_UnlockMutex(self.rx.mutex);
+  }
+}
+
+
+static void respond(const char* response) {
+  respond_n((const u8_t *) response, strlen(response));
+}
+
+
+static void ok(void) {
+  log_wrn("esp: OK\n");
+  respond("OK" CRLF);
+}
+
+
+static void error(void) {
+  log_wrn("esp: ERROR\n");
+  respond("ERROR" CRLF);
+}
+
+
+static void copy_to_rx(size_t n) {
   /* Patch size. */
   snprintf((char *) &self.rx_temp[5], 4 + 1, "%04lu", n);
   self.rx_temp[HEADER_SIZE - 1] = ':';
 
-#if 0
-  /* Terminate string. */
-  self.rx_temp[HEADER_SIZE + n] = 0;
-  log_wrn("esp: recv '%s'\n", (char *) self.rx_temp);
-#endif
-
   /* Copy data to rx buffer. */
-  for (i = 0; (i < HEADER_SIZE + n) && !self.do_finit; i++) {
-    if ((buffer_write(&self.rx, self.rx_temp[i]) == 0) && !self.do_finit) {
-      SDL_LockMutex(self.rx.mutex);
-      while (self.rx.n_elements == self.rx.size && !self.do_finit) {
-        SDL_CondWaitTimeout(self.rx.element_removed, self.rx.mutex, 1000);
-      }
-      SDL_UnlockMutex(self.rx.mutex);
-    }
-  }
-
+  respond_n(self.rx_temp, HEADER_SIZE + n);
   log_wrn("esp: rcv %lu bytes\n", n);
 }
 
@@ -106,6 +122,7 @@ static int rx_thread(void *ptr) {
     socket = self.socket;
     SDL_UnlockMutex(self.socket_mutex);
 
+    log_wrn("esp: got socket change (%d) or finit (%d)\n", socket != NULL, self.do_finit);
     i = HEADER_SIZE;
 
     while (!self.do_finit) {
@@ -122,10 +139,12 @@ static int rx_thread(void *ptr) {
       } else if (result == 1) {
         /* Our socket should be ready. */
         if (!SDLNet_SocketReady(socket)) {
+          log_wrn("r");
           break;
         }
 
         if (SDLNet_TCP_Recv(socket, &self.rx_temp[i], 1) != 1) {
+          log_wrn("R");
           break;
         }
         
@@ -137,6 +156,7 @@ static int rx_thread(void *ptr) {
         }
       } else {
         /* Error */
+        log_wrn("E");
         break;
       }
     }
@@ -147,9 +167,11 @@ static int rx_thread(void *ptr) {
 
 
 int esp_init(void) {
-  self.socket_set = SDLNet_AllocSocketSet(1);
-  self.socket     = NULL;
-  self.do_finit   = 0;
+  self.socket_set     = SDLNet_AllocSocketSet(1);
+  self.socket_changed = SDL_CreateCond();
+  self.socket_mutex   = SDL_CreateMutex();
+  self.socket         = NULL;
+  self.do_finit       = 0;
 
   if (buffer_init(&self.rx, RX_SIZE) != 0) {
     return 1;
@@ -194,25 +216,6 @@ void esp_finit(void) {
 
   buffer_finit(&self.rx);
   buffer_finit(&self.tx);
-}
-
-
-static void respond(const char* response) {
-  while (*response) {
-    (void) buffer_write(&self.rx, *response++);
-  }
-}
-
-
-static void ok(void) {
-  log_wrn("esp: OK\n");
-  respond("OK" CRLF);
-}
-
-
-static void error(void) {
-  log_wrn("esp: ERROR\n");
-  respond("ERROR" CRLF);
 }
 
 
