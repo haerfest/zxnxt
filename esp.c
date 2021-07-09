@@ -83,13 +83,11 @@ static void respond(const char* response) {
 
 
 static void ok(void) {
-  log_wrn("esp: OK\n");
   respond("OK" CRLF);
 }
 
 
 static void error(void) {
-  log_wrn("esp: ERROR\n");
   respond("ERROR" CRLF);
 }
 
@@ -101,7 +99,6 @@ static void copy_to_rx(size_t n) {
 
   /* Copy data to rx buffer. */
   respond_n(self.rx_temp, HEADER_SIZE + n);
-  log_wrn("esp: rcv %lu bytes\n", n);
 }
 
 
@@ -122,7 +119,6 @@ static int rx_thread(void *ptr) {
     socket = self.socket;
     SDL_UnlockMutex(self.socket_mutex);
 
-    log_wrn("esp: got socket change (%d) or finit (%d)\n", socket != NULL, self.do_finit);
     i = HEADER_SIZE;
 
     while (!self.do_finit) {
@@ -139,12 +135,10 @@ static int rx_thread(void *ptr) {
       } else if (result == 1) {
         /* Our socket should be ready. */
         if (!SDLNet_SocketReady(socket)) {
-          log_wrn("r");
           break;
         }
 
         if (SDLNet_TCP_Recv(socket, &self.rx_temp[i], 1) != 1) {
-          log_wrn("R");
           break;
         }
         
@@ -156,7 +150,6 @@ static int rx_thread(void *ptr) {
         }
       } else {
         /* Error */
-        log_wrn("E");
         break;
       }
     }
@@ -220,7 +213,7 @@ exit_socket_mutex:
 exit_rx_temp:
   free(self.rx_temp);
 exit:
-  log_wrn("esp: out of memory\n");
+  log_err("esp: out of memory\n");
   return 1;
 }
 
@@ -228,7 +221,6 @@ exit:
 static void close_socket(void) {
   SDL_LockMutex(self.socket_mutex);
 
-  log_wrn("esp: closing socket\n");
   SDLNet_TCP_Close(self.socket);
   SDLNet_TCP_DelSocket(self.socket_set, self.socket);
 
@@ -427,16 +419,7 @@ static void send_tx(void) {
 
   (void) buffer_read_n(&self.tx, self.length, NULL);
 
-  {
-    size_t i;
-    log_wrn("esp: sending '");
-    for (i = 0; i < self.length; i++) {
-      log_wrn("%c", isprint(packet[i]) ? packet[i] : '.');
-    }
-    log_wrn("'\n");
-  }
   if (SDLNet_TCP_Send(self.socket, packet, self.length) < self.length) {
-    log_wrn("SDLNet_TCP_Send: %s\n", SDLNet_GetError());
     respond("SEND FAIL" CRLF);
   } else {
     respond("SEND OK" CRLF);
@@ -471,7 +454,6 @@ static void at_cipsend(void) {
       }
       length[i] = 0;
       self.length = atoi((const char *) length);
-      log_wrn("esp: length=%lu\n", self.length);
       if (self.length > MAX_PACKET_LENGTH) {
         error();
         return;
@@ -511,15 +493,6 @@ static void at(void) {
   const size_t n_handlers = sizeof(handlers) / sizeof(*handlers);
   char         prefix[MAX_AT_PREFIX_LENGTH + 1];
   size_t       i, j;
-
-  {
-    u8_t value;
-    log_wrn("esp: command '");
-    for (j = 0; buffer_peek_n(&self.tx, j, 1, &value); j++) {
-      log_wrn("%c", isprint(value) ? value : '.');
-    }
-    log_wrn("'\n");
-  }
 
   /* Command syntax must be one of:
    * 1. AT<cmd>?
