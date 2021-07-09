@@ -274,6 +274,9 @@ void cpu_nmi(cpu_nmi_reason_t reason) {
 }
 
 
+/**
+ * http://z80.info/interrup.htm
+ */
 static void cpu_irq_pending(void) {
   self.requests &= ~CPU_REQUEST_IRQ;
 
@@ -286,15 +289,19 @@ static void cpu_irq_pending(void) {
   IFF1 = IFF2 = 0;
 
   /* Save the program counter. */
-  memory_write(--SP, PCH); T(3);
-  memory_write(--SP, PCL); T(3);
+  --SP;
+  T(7);
+  memory_write(SP, PCH);
+  --SP;
+  T(3);
+  memory_write(SP, PCL);
+  T(3);
 
   switch (IM) {
     case 0:
       /* Pretend $FF on the bus, which is RST $38, effectively IM 1. */
     case 1:
       PC = 0x0038;
-      T(13);
       break;
 
     default:
@@ -312,8 +319,10 @@ static void cpu_irq_pending(void) {
        *   game.
        */
       const u16_t vector = I << 8 | 0xFF;
-      PC = memory_read(vector + 1) << 8 | memory_read(vector);
-      T(19);
+      PC = memory_read(vector);
+      T(3);
+      PC |= (memory_read(vector + 1) << 8);
+      T(3);
     }
     break;
   }
