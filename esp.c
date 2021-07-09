@@ -12,8 +12,8 @@
 #define MAX_AT_PREFIX_LENGTH    20
 #define MAX_PACKET_LENGTH     2048
 
-#define TX_SIZE  (8 * 1024)
-#define RX_SIZE  (8 * 1024)
+#define TX_SIZE  MAX_PACKET_LENGTH
+#define RX_SIZE  MAX_PACKET_LENGTH
 
 #define CR       '\r'
 #define LF       '\n'
@@ -31,6 +31,8 @@ static void send_tx(void);
 typedef struct {
   buffer_t     tx;
   buffer_t     rx;
+  u8_t*        rx_temp;
+  size_t       rx_temp_index;
   tx_handler_t tx_handler;
 
   u32_t        baudrate;
@@ -39,6 +41,8 @@ typedef struct {
   int          use_odd_parity;
   int          use_two_stop_bits;
   int          do_echo;
+
+  SDLNet_SocketSet socket_set;
 
   TCPsocket    socket;
   SDL_mutex*   socket_mutex;
@@ -53,9 +57,44 @@ typedef struct {
 static esp_t self;
 
 
+#define HEADER       "+IPD,0000:"
+#define HEADER_SIZE  10
+
+
+static void copy_to_rx(size_t n) {
+  size_t i;
+
+  /* Patch size. */
+  snprintf((char *) &self.rx_temp[5], 4 + 1, "%04lu", n);
+  self.rx_temp[HEADER_SIZE - 1] = ':';
+
+#if 0
+  /* Terminate string. */
+  self.rx_temp[HEADER_SIZE + n] = 0;
+  log_wrn("esp: recv '%s'\n", (char *) self.rx_temp);
+#endif
+
+  /* Copy data to rx buffer. */
+  for (i = 0; (i < HEADER_SIZE + n) && !self.do_finit; i++) {
+    if ((buffer_write(&self.rx, self.rx_temp[i]) == 0) && !self.do_finit) {
+      SDL_LockMutex(self.rx.mutex);
+      while (self.rx.n_elements == self.rx.size && !self.do_finit) {
+        SDL_CondWaitTimeout(self.rx.element_removed, self.rx.mutex, 1000);
+      }
+      SDL_UnlockMutex(self.rx.mutex);
+    }
+  }
+
+  log_wrn("esp: rcv %lu bytes\n", n);
+}
+
+
 static int rx_thread(void *ptr) {
   TCPsocket socket;
-  u8_t      value;
+  size_t    i;
+
+  /* Prepend the header. */
+  snprintf((char *) self.rx_temp, HEADER_SIZE, "%s", HEADER);
 
   while (!self.do_finit) {
 
@@ -67,18 +106,38 @@ static int rx_thread(void *ptr) {
     socket = self.socket;
     SDL_UnlockMutex(self.socket_mutex);
 
-    if (self.do_finit) {
-      break;
-    }
+    i = HEADER_SIZE;
 
-    /* Read data and copy to rx buffer. */
-    while ((SDLNet_TCP_Recv(socket, &value, 1) == 1) && !self.do_finit) {
-      if (buffer_write(&self.rx, value) == 0) {
-        SDL_LockMutex(self.rx.mutex);
-        while (self.rx.n_elements == self.rx.size && !self.do_finit) {
-          SDL_CondWaitTimeout(self.rx.element_removed, self.rx.mutex, 1000);
+    while (!self.do_finit) {
+      /* Wait until there is activity. */
+      const int result = SDLNet_CheckSockets(self.socket_set, 20);
+
+      if (result == 0) {
+        /* Timeout: copy to rx what we have. */
+        const size_t n = i - HEADER_SIZE;
+        if (n > 0) {
+          copy_to_rx(n);
+          i = HEADER_SIZE;
         }
-        SDL_UnlockMutex(self.rx.mutex);
+      } else if (result == 1) {
+        /* Our socket should be ready. */
+        if (!SDLNet_SocketReady(socket)) {
+          break;
+        }
+
+        if (SDLNet_TCP_Recv(socket, &self.rx_temp[i], 1) != 1) {
+          break;
+        }
+        
+        if (++i == RX_SIZE) {
+          /* Buffer full: copy to rx what we have. */
+          const size_t n = i - HEADER_SIZE;
+          copy_to_rx(n);
+          i = HEADER_SIZE;
+        }
+      } else {
+        /* Error */
+        break;
       }
     }
   }
@@ -88,7 +147,8 @@ static int rx_thread(void *ptr) {
 
 
 int esp_init(void) {
-  self.socket = NULL;
+  self.socket_set = SDLNet_AllocSocketSet(1);
+  self.socket     = NULL;
   self.do_finit   = 0;
 
   if (buffer_init(&self.rx, RX_SIZE) != 0) {
@@ -100,6 +160,7 @@ int esp_init(void) {
     return 1;
   }   
 
+  self.rx_temp   = malloc(RX_SIZE + 1);
   self.rx_thread = SDL_CreateThread(rx_thread, "rx_thread", NULL);
 
   esp_reset(E_RESET_HARD);
@@ -111,7 +172,10 @@ int esp_init(void) {
 static void close_socket(void) {
   SDL_LockMutex(self.socket_mutex);
 
+  log_wrn("esp: closing socket\n");
   SDLNet_TCP_Close(self.socket);
+  SDLNet_TCP_DelSocket(self.socket_set, self.socket);
+
   self.socket = NULL;
 
   SDL_CondSignal(self.socket_changed);
@@ -290,6 +354,7 @@ static void at_cipstart(void) {
     error();
     return;
   }
+  SDLNet_TCP_AddSocket(self.socket_set, self.socket);
 
   SDL_CondSignal(self.socket_changed);
   SDL_UnlockMutex(self.socket_mutex);
@@ -304,6 +369,7 @@ static void at_cipstart(void) {
 static void at_cipclose(void) {
   if (self.socket) {
     close_socket();
+    respond("CLOSED" CRLF);
   }
 
   ok();
