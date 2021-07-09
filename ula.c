@@ -801,20 +801,21 @@ static void ula_contend_48k(void) {
   const u32_t delays[8] = {
     6, 5, 4, 3, 2, 1, 0, 0
   };
-  u32_t relative_tstate;
+  const u32_t tstates = self.tstates_x4 / 4;
+  u32_t       relative_tstate;
 
-  if (self.tstates_x4 < 14335 * 4 || self.tstates_x4 >= (14335 + 192 * 224) * 4) {
+  if (tstates < 14335 || tstates >= 14335 + 192 * 224) {
     /* Outside visible area. */
     return;
   }
 
-  relative_tstate = ((self.tstates_x4 / 4) - 14335) % 224;
+  relative_tstate = (tstates - 14335) % 224;
   if (relative_tstate >= 128) {
     /* In one of the borders or horizontal blanking. */
     return;
   }
 
-  clock_run(delays[relative_tstate & 0x07]);
+  clock_run(delays[relative_tstate % 8]);
 }
 
 
