@@ -803,6 +803,7 @@ static void ula_contend_48k(void) {
   };
   const u32_t tstates = self.tstates_x4 / 4;
   u32_t       relative_tstate;
+  u32_t       delay;
 
   if (tstates < 14335 || tstates >= 14335 + 192 * 224) {
     /* Outside visible area. */
@@ -815,7 +816,10 @@ static void ula_contend_48k(void) {
     return;
   }
 
-  clock_run(delays[relative_tstate % 8]);
+  delay = delays[relative_tstate % 8];
+  if (delay) {
+    clock_run(delay);
+  }
 }
 
 
