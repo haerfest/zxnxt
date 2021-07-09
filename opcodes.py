@@ -249,7 +249,8 @@ def daa() -> C:
 def dec_pdd(xy: Optional[str] = None) -> C:
     return f'''
         WZ  = {wz(xy)};
-        TMP = memory_read(WZ) - 1; T(4);
+        TMP = memory_read(WZ) - 1; T(3);
+        memory_contend(WZ);        T(1);
         memory_write(WZ, TMP);     T(3);
         F = SZ53(TMP) | HF_SUB(TMP + 1, 1, TMP) | (TMP == 0x7F) << VF_SHIFT | NF_MASK | (F & CF_MASK);
     '''
@@ -271,7 +272,12 @@ def djnz() -> C:
         T(1);
         Z = memory_read(PC++); T(3);
         if (--B) {{
-            PC += (s8_t) Z; T(5);
+            memory_contend(PC); T(1);
+            memory_contend(PC); T(1);
+            memory_contend(PC); T(1);
+            memory_contend(PC); T(1);
+            memory_contend(PC); T(1);
+            PC += (s8_t) Z;
         }}
     '''
 
@@ -333,7 +339,8 @@ def in_r_C(r: str) -> C:
 def inc_pdd(xy: Optional[str] = None) -> C:
     return f'''
         WZ  = {wz(xy)};
-        TMP = memory_read(WZ) + 1; T(4);
+        TMP = memory_read(WZ) + 1; T(3);
+        memory_contend(WZ);        T(1);
         memory_write(WZ, TMP);     T(3);
         F = SZ53(TMP) | HF_ADD(TMP - 1, 1, TMP) | (TMP == 0x80) << VF_SHIFT | (F & CF_MASK);
     '''
@@ -376,7 +383,14 @@ def jr_c_e(cond: Optional[str] = None) -> C:
     if cond:
         s += f'if ({cond}) {{\n'
     
-    s += 'PC += (s8_t) Z; T(5);'
+    s += '''
+       memory_contend(PC); T(1);
+       memory_contend(PC); T(1);
+       memory_contend(PC); T(1);
+       memory_contend(PC); T(1);
+       memory_contend(PC); T(1);
+       PC += (s8_t) Z;
+    '''
 
     if cond:
         s += '}'
@@ -519,11 +533,18 @@ def ldx(op: str) -> C:
 def ldxr(op: str) -> C:
     return f'''
         TMP  = memory_read(HL{op}{op}); T(3);
-        memory_write(DE{op}{op}, TMP);  T(5);
+        memory_write(DE{op}{op}, TMP);  T(3);
+        memory_contend(DE); T(1);
+        memory_contend(DE); T(1);
         F &= ~(HF_MASK | VF_MASK | NF_MASK);
         F |= (--BC != 0) << VF_SHIFT;
         if (BC) {{
-            PC -= 2; T(5);
+            PC -= 2;
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
         }}
     '''
 
@@ -727,13 +748,12 @@ def rl_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ);      T(1);
         carry = TMP >> 7;
         TMP   = TMP << 1 | (F & CF_MASK) >> CF_SHIFT;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def rl_r(r: str) -> C:

@@ -9,6 +9,7 @@
 #include "mmu.h"
 #include "memory.h"
 #include "rom.h"
+#include "ula.h"
 #include "utils.h"
 
 
@@ -147,6 +148,14 @@ static writer_t pick_writer(int page) {
   }
 
   return mmu_write;
+}
+
+
+void memory_contend(u16_t address) {
+  const u8_t page = address / ADDRESS_PAGE_SIZE;
+  const u8_t bank = page / 2;
+
+  ula_contend_bank(bank);
 }
 
 
