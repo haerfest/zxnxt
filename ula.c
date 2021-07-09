@@ -326,7 +326,6 @@ typedef struct {
   int                        do_contend;
   u32_t                      tstates_x4;
   int                        is_timex_enabled;
-  int                        is_7mhz_tick;
   int                        is_displaying_content;
   int                        is_enabled;
   u16_t                      transparency_rgb8;
@@ -626,7 +625,6 @@ int ula_init(u8_t* sram) {
   self.sram                = sram;
   self.speaker_state       = 0;
   self.audio_last_sample   = 0;
-  self.is_7mhz_tick        = 1;
   self.display_timing      = E_MACHINE_TYPE_ZX_48K;
   self.is_60hz             = 0;
   self.is_hdmi             = 0;

@@ -207,7 +207,7 @@ void slu_mix_layer2(const palette_entry_t* layer2_rgb, const palette_entry_t* mi
 }
 
 
-u32_t slu_run(u32_t ticks_14mhz) {
+void slu_run(u32_t ticks_14mhz) {
   const palette_entry_t black = {
     .rgb8               = 0,
     .rgb9               = 0,
@@ -454,9 +454,6 @@ u32_t slu_run(u32_t ticks_14mhz) {
     
     self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgb_out;
   }
-
-  /* TODO Deal with ULA using 7 MHz clock, not always consuming all ticks. */
-  return ticks_14mhz;
 }
 
 
