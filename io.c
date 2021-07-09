@@ -1,4 +1,5 @@
 #include "ay.h"
+#include "clock.h"
 #include "divmmc.h"
 #include "dma.h"
 #include "nextreg.h"
@@ -87,7 +88,48 @@ void io_mf_ports_set(u8_t enable, u8_t disable) {
 }
 
 
+/**
+ * https://worldofspectrum.org/faq/reference/48kreference.htm#IOContention
+ */
+static void io_contend(u16_t address) {
+  const u8_t high_byte = address >> 8;
+  const u8_t low_bit   = address & 1;
+
+  if (high_byte >= 0x40) {
+    if (low_bit) {
+      /* N:4 */
+      clock_run(4);
+    } else {
+      /* N:1, C:3 */
+      clock_run(1);
+      ula_contend();
+      clock_run(3);
+    }
+  } else {
+    if (low_bit) {
+      /* C:1, C:1, C:1, C:1 */
+      ula_contend();
+      clock_run(1);
+      ula_contend();
+      clock_run(1);
+      ula_contend();
+      clock_run(1);
+      ula_contend();
+      clock_run(1);
+    } else {
+      /* C:1, C:3 */
+      ula_contend();
+      clock_run(1);
+      ula_contend();
+      clock_run(3);
+    }
+  }
+}
+
+
 u8_t io_read(u16_t address) {
+  io_contend(address);
+
   if ((address & 0x0001) == 0x0000) {
     return ula_read(address);
   }
@@ -233,6 +275,8 @@ u8_t io_read(u16_t address) {
 
 
 void io_write(u16_t address, u8_t value) {
+  io_contend(address);
+
   if ((address & 0x0001) == 0x0000) {
     ula_write(address, value);
     return;

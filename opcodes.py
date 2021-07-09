@@ -320,13 +320,13 @@ def im(mode: int) -> C:
 
 def in_A_n() -> C:
     return '''
-        Z = memory_read(PC++);   T(3);
-        A = io_read(A << 8 | Z); T(4);
+        Z = memory_read(PC++); T(3);
+        A = io_read(A << 8 | Z);
     '''
 
 def in_r_C(r: str) -> C:
     return f'''
-        {r} = io_read(BC); T(4);
+        {r} = io_read(BC);
         F = SZ53P({r}) | (F & CF_MASK);
     '''
 
@@ -350,8 +350,8 @@ def inc_ss(ss: str) -> C:
 def inx(op: str) -> C:
     return f'''
         T(1);
-        Z = io_read(BC);             T(3);
-        memory_write(HL{op}{op}, Z); T(4);
+        Z = io_read(BC);
+        memory_write(HL{op}{op}, Z); T(3);
         --B;
         F = SZ53P(B) | NF_MASK | (F & CF_MASK);
     '''
@@ -359,8 +359,8 @@ def inx(op: str) -> C:
 def inxr(op: str) -> C:
     return f'''
         T(1);
-        Z = io_read(BC);             T(3);
-        memory_write(HL{op}{op}, Z); T(4);
+        Z = io_read(BC);
+        memory_write(HL{op}{op}, Z); T(3);
         if (--B) {{
             PC -= 2; T(5);
         }} else {{
@@ -405,7 +405,7 @@ def jp_pss(ss: str) -> C:
 def jpc() -> C:
     return '''
         PC = (PC & 0xC000) + (io_read(BC) << 6);
-        T(5);
+        T(1);  /* io_read takes care of other 4 */
     '''
 
 def ld_A_I() -> C:
@@ -611,7 +611,7 @@ def nreg_reg_value() -> C:
 def otib() -> C:
     return '''
         TMP = memory_read(HL++); T(4);
-        io_write(BC, TMP);       T(4);
+        io_write(BC, TMP);
     '''
     
 def otxr(op: str) -> C:
@@ -619,7 +619,7 @@ def otxr(op: str) -> C:
         T(1);
         Z = memory_read(HL{op}{op}); T(3);
         --B;
-        io_write(BC, Z);             T(4);
+        io_write(BC, Z);
         if (B) {{
             PC -= 2; T(5);
         }} else {{
@@ -628,12 +628,12 @@ def otxr(op: str) -> C:
     '''
 
 def out_C_r(r: str) -> C:
-    return f'io_write(BC, {r}); T(4 + 4);'
+    return f'io_write(BC, {r});'
 
 def out_n_a() -> C:
     return '''
         WZ = A << 8 | memory_read(PC++); T(3);
-        io_write(WZ, A);                 T(4);
+        io_write(WZ, A);
     '''
 
 def outx(op: str) -> C:
@@ -641,7 +641,7 @@ def outx(op: str) -> C:
         T(1);
         Z = memory_read(HL{op}{op}); T(3);
         --B;
-        io_write(BC, Z);             T(4);
+        io_write(BC, Z);
         F = SZ53P(B) | NF_MASK | (F & CF_MASK);    
     '''
 

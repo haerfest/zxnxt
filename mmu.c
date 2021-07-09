@@ -78,7 +78,7 @@ static u32_t mmu_translate(u16_t address) {
 
   /* Assertion: self.pages[slot] != MMU_ROM_PAGE. */
 
-  ula_contend(bank);
+  ula_contend_bank(bank);
 
   return self.pages[slot] * PAGE_SIZE + offset;
 }

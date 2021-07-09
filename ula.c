@@ -835,11 +835,20 @@ static void ula_contend_128k(void) {
 }
 
 
-static void ula_contend_plus_2(void) {
-}
+typedef void (*contend_handler)(void);
 
 
-void ula_contend(u8_t bank) {
+void ula_contend(void) {
+  const contend_handler handlers[E_MACHINE_TYPE_LAST - E_MACHINE_TYPE_FIRST + 1] = {
+    NULL,
+    ula_contend_48k,
+    ula_contend_128k,
+    NULL,
+    NULL
+  };
+
+  contend_handler handler;
+
   if (!self.do_contend) {
     /* Contention can be disabled by writing to a Next register. */
     return;
@@ -850,6 +859,14 @@ void ula_contend(u8_t bank) {
     return;
   }
 
+  handler = handlers[self.display_timing];
+  if (handler) {
+    handler();
+  }
+}
+
+
+void ula_contend_bank(u8_t bank) {
   if (bank > 7) {
     /* Only banks 0-7 can be contended. */
     return;
@@ -859,21 +876,21 @@ void ula_contend(u8_t bank) {
     case E_MACHINE_TYPE_ZX_48K:
       if (bank == 5) {
         /* Only bank 5 is contended. */
-        ula_contend_48k();
+        ula_contend();
       }
       break;
 
     case E_MACHINE_TYPE_ZX_128K_PLUS2:
       if ((bank & 1) == 1) {
         /* Only odd banks are contended. */
-        ula_contend_128k();
+        ula_contend();
       }
       break;
 
     case E_MACHINE_TYPE_ZX_PLUS2A_PLUS2B_PLUS3:
       if (bank > 3) {
         /* Only banks four and above are contended. */
-        ula_contend_plus_2();
+        ula_contend();
       }
       break;
 
