@@ -1032,3 +1032,8 @@ u8_t ula_floating_bus_read(void) {
     ? self.attribute_byte
     : 0xFF;
 }
+
+
+u32_t ula_tstates_get(void) {
+  return self.tstates_x4 / 4;
+}

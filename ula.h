@@ -52,6 +52,7 @@ void              ula_offset_x_write(u8_t value);
 u8_t              ula_offset_y_read(void);
 void              ula_offset_y_write(u8_t value);
 u8_t              ula_floating_bus_read(void);
+u32_t             ula_tstates_get(void);
 
 
 #endif  /* __ULA_H */
