@@ -167,27 +167,61 @@ static int rx_thread(void *ptr) {
 
 
 int esp_init(void) {
-  self.socket_set     = SDLNet_AllocSocketSet(1);
-  self.socket_changed = SDL_CreateCond();
-  self.socket_mutex   = SDL_CreateMutex();
-  self.socket         = NULL;
-  self.do_finit       = 0;
+  self.socket   = NULL;
+  self.do_finit = 0;
 
   if (buffer_init(&self.rx, RX_SIZE) != 0) {
-    return 1;
+    goto exit;
   }
 
   if (buffer_init(&self.tx, TX_SIZE) != 0) {
-    buffer_finit(&self.rx);
-    return 1;
+    goto exit_rx;
   }   
 
-  self.rx_temp   = malloc(RX_SIZE + 1);
+  self.socket_set = SDLNet_AllocSocketSet(1);
+  if (self.socket_set == NULL) {
+    goto exit_tx;
+  }
+
+  self.socket_changed = SDL_CreateCond();
+  if (self.socket_changed == NULL) {
+    goto exit_socket_set;
+  }
+  
+  self.socket_mutex = SDL_CreateMutex();
+  if (self.socket_mutex == NULL) {
+    goto exit_socket_changed;
+  }
+
+  self.rx_temp = malloc(RX_SIZE + 1);
+  if (self.rx_temp == NULL) {
+    goto exit_socket_mutex;
+  }
+  
   self.rx_thread = SDL_CreateThread(rx_thread, "rx_thread", NULL);
+  if (self.rx_thread == NULL) {
+    goto exit_rx_temp;
+  }
 
   esp_reset(E_RESET_HARD);
 
   return 0;
+
+exit_rx:
+  buffer_finit(&self.rx);
+exit_tx:
+  buffer_finit(&self.tx);
+exit_socket_set:
+  SDLNet_FreeSocketSet(self.socket_set);
+exit_socket_changed:
+  SDL_DestroyCond(self.socket_changed);
+exit_socket_mutex:
+  SDL_DestroyMutex(self.socket_mutex);
+exit_rx_temp:
+  free(self.rx_temp);
+exit:
+  log_wrn("esp: out of memory\n");
+  return 1;
 }
 
 
@@ -216,6 +250,10 @@ void esp_finit(void) {
 
   buffer_finit(&self.rx);
   buffer_finit(&self.tx);
+  SDLNet_FreeSocketSet(self.socket_set);
+  SDL_DestroyCond(self.socket_changed);
+  SDL_DestroyMutex(self.socket_mutex);
+  free(self.rx_temp);
 }
 
 
