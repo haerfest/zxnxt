@@ -95,7 +95,7 @@ static void io_contend(u16_t address) {
   const u8_t high_byte = address >> 8;
   const u8_t low_bit   = address & 1;
 
-  if (high_byte >= 0x40) {
+  if (high_byte < 0x40 || high_byte > 0x7F) {
     if (low_bit) {
       /* N:4 */
       clock_run(4);
@@ -105,24 +105,22 @@ static void io_contend(u16_t address) {
       ula_contend();
       clock_run(3);
     }
+  } else if (low_bit) {
+    /* C:1, C:1, C:1, C:1 */
+    ula_contend();
+    clock_run(1);
+    ula_contend();
+    clock_run(1);
+    ula_contend();
+    clock_run(1);
+    ula_contend();
+    clock_run(1);
   } else {
-    if (low_bit) {
-      /* C:1, C:1, C:1, C:1 */
-      ula_contend();
-      clock_run(1);
-      ula_contend();
-      clock_run(1);
-      ula_contend();
-      clock_run(1);
-      ula_contend();
-      clock_run(1);
-    } else {
-      /* C:1, C:3 */
-      ula_contend();
-      clock_run(1);
-      ula_contend();
-      clock_run(3);
-    }
+    /* C:1, C:3 */
+    ula_contend();
+    clock_run(1);
+    ula_contend();
+    clock_run(3);
   }
 }
 
