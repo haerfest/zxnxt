@@ -1654,14 +1654,20 @@ def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str
         # Special opcode where 3rd byte is parameter and 4th byte needed for
         # decoding. Read 4th byte, but keep PC at 3rd byte.
         return f'''
-const u8_t opcode = memory_read(PC + 1); T(4);
+const u8_t opcode = memory_read(PC + 1);
+T(3);
+memory_contend(I << 8 | R);
+T(1);
 {name}[opcode]();
 PC++;
 '''
 
     # Return the body that uses the table.
     return f'''
-const u8_t opcode = memory_read(PC++); T(4);
+const u8_t opcode = memory_read(PC++);
+T(3);
+memory_contend(I << 8 | R);
+T(1);
 {name}[opcode]();
 '''
 
