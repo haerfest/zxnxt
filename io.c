@@ -93,31 +93,41 @@ void io_mf_ports_set(u8_t enable, u8_t disable) {
  */
 static void io_contend(u16_t address) {
   const u8_t high_byte = address >> 8;
-  const u8_t low_bit   = address & 1;
+  const u8_t A0        = address & 1;
 
-  if (high_byte < 0x40 || high_byte > 0x7F) {
-    if (low_bit) {
-      /* N:4 */
-      clock_run(4);
-    } else {
-      /* N:1, C:3 */
-      clock_run(1);
+  if (high_byte >= 0x40 && high_byte <= 0x7F) {
+    /* T1: Contend T1 because the ULA cannot yet tell the difference between a
+     * lower 16 KiB memory request and an I/O request. */
+    ula_contend();
+    clock_run(1);
+
+    /* T2: Now at T2 the ULA knows it's an I/O request and thus it will contend
+     * T2: */
+    ula_contend();
+    clock_run(1);
+   
+    if (A0) {
+      /* Tw: With A0 high, the contention cancellation is never triggered, so
+       * Tw and T3 are also contended: C:1 C:1 C:1 C:1. */
       ula_contend();
-      clock_run(3);
+      clock_run(1);
+
+      /* T3 */
+      ula_contend();
+      clock_run(1);
+    } else {
+      /* Tw: With A0 low, the contention ends after T2 because by now the ULA
+       * has finished reading any video data from memory, and can handle Tw and
+       * T3 at the Z80's normal pace: C:1 C:3. */
+      clock_run(2);
     }
-  } else if (low_bit) {
-    /* C:1, C:1, C:1, C:1 */
-    ula_contend();
-    clock_run(1);
-    ula_contend();
-    clock_run(1);
-    ula_contend();
-    clock_run(1);
-    ula_contend();
-    clock_run(1);
+  } else if (A0) {
+    /* It's not a potentially contended memory request, and with A0 high
+     * nothing will be expected of the ULA, so no contention necessary: N:4. */
+    clock_run(4);
   } else {
-    /* C:1, C:3 */
-    ula_contend();
+    /* As above, except that with A0 low it may turn out to be a request for
+     * the ULA, so contend T2 and let Tw and T3 continue normally: N:1 C:3. */
     clock_run(1);
     ula_contend();
     clock_run(3);
