@@ -201,6 +201,7 @@ typedef struct {
    * calculate things every time. */
   u8_t sz53[256];
   u8_t sz53p[256];
+
 } cpu_t;
 
 
@@ -278,6 +279,12 @@ void cpu_nmi(cpu_nmi_reason_t reason) {
  * http://z80.info/interrup.htm
  */
 static void cpu_irq_pending(void) {
+  /* We just executed an EI, need one instruction delay to allow
+   * RETN to complete first. */ 
+  if (self.irq_delay) {
+    return;
+  }
+
   self.requests &= ~CPU_REQUEST_IRQ;
 
   /* Interrupts must be enabled. */
@@ -407,12 +414,14 @@ void cpu_step(void) {
       cpu_nmi_pending();
     }
 
-    /* After EI the next RETN must complete before servicing IRQ. */
-    if (self.irq_delay) {
-      self.irq_delay--;
-    } else if (self.requests & CPU_REQUEST_IRQ) {
+    if (self.requests & CPU_REQUEST_IRQ) {
       cpu_irq_pending();
     }
+  }
+
+  /* After EI the next RETN must complete before servicing IRQ. */
+  if (self.irq_delay) {
+    self.irq_delay = 0;
   }
 }
 
