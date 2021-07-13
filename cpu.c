@@ -91,8 +91,10 @@
 #define IFF1 self.iff1
 #define IFF2 self.iff2
 
-#define I    self.i
-#define R    self.r
+#define I    self.ir.b.h
+#define R    self.ir.b.l
+#define IR   self.ir.w
+
 #define IM   self.im
 
 #define TMP  self.tmp
@@ -180,9 +182,7 @@ typedef struct {
   int iff2;
 
   /* Interrupt table start and memory refresh registers. */
-  u8_t i;
-  u8_t r;
-
+  reg16_t ir;
 
   /* Requests from outside. */
   int requests;
