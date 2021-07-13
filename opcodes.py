@@ -156,7 +156,8 @@ def call(cond: Optional[str] = None) -> C:
         s += f'if ({cond}) {{\n'
 
     s += '''
-        memory_write(--SP, PCH); T(4);
+        memory_contend(PC);      T(1);
+        memory_write(--SP, PCH); T(3);
         memory_write(--SP, PCL); T(3);
         PC = WZ;
     '''
@@ -199,24 +200,40 @@ def cp_r(r: str) -> C:
 def cpx(op: str) -> C:
     return f'''
       u16_t result;
-      Z      = memory_read(HL{op}{op}); T(3);
+      Z = memory_read(HL); T(3);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
       result = A - Z;
       --BC;
-      F      = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | (BC != 0) << VF_SHIFT | NF_MASK | (F & CF_MASK);
-      T(5);
+      F = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | (BC != 0) << VF_SHIFT | NF_MASK | (F & CF_MASK);
+      HL{op}{op};
     '''
     
 def cpxr(op: str) -> C:
     return f'''
       u16_t result;
-      Z      = memory_read(HL{op}{op}); T(3);
+      Z = memory_read(HL); T(3);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
+      memory_contend(HL); T(1);
       result = A - Z;
-      --BC; T(5);
+      --BC;
       if (!(BC == 0 || result == 0)) {{
-          PC -= 2; T(5);
+          memory_contend(HL); T(1);
+          memory_contend(HL); T(1);
+          memory_contend(HL); T(1);
+          memory_contend(HL); T(1);
+          memory_contend(HL); T(1);
+          PC -= 2;
       }} else {{
           F = SZ53(result & 0xFF) | HF_SUB(A, Z, result) | (BC != 0) << VF_SHIFT | NF_MASK | (F & CF_MASK);
       }}
+      HL{op}{op};
     '''
 
 def cpl() -> C:
@@ -297,9 +314,11 @@ def ex(r1: str, r2: str) -> C:
 def ex_pSP_dd(dd: str) -> C:
     return f'''
         Z = memory_read(SP);            T(3);
-        W = memory_read(SP + 1);        T(3);
-        memory_write(SP,     {lo(dd)}); T(4);
-        memory_write(SP + 1, {hi(dd)}); T(5);
+        W = memory_read(SP + 1);        T(4);
+        memory_write(SP,     {lo(dd)}); T(3);
+        memory_write(SP + 1, {hi(dd)}); T(3);
+        memory_contend(SP + 1); T(1);
+        memory_contend(SP + 1); T(1);
         {hi(dd)} = W;
         {lo(dd)} = Z;
     '''
@@ -358,21 +377,38 @@ def inx(op: str) -> C:
     return f'''
         T(1);
         Z = io_read(BC);
-        memory_write(HL{op}{op}, Z); T(3);
+        memory_write(HL, Z); T(3);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
         --B;
         F = SZ53P(B) | NF_MASK | (F & CF_MASK);
+        HL{op}{op};
     '''
 
 def inxr(op: str) -> C:
     return f'''
         T(1);
         Z = io_read(BC);
-        memory_write(HL{op}{op}, Z); T(3);
+        memory_write(HL, Z); T(3);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
         if (--B) {{
-            PC -= 2; T(5);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            PC -= 2;
         }} else {{
             F |= ZF_MASK | NF_MASK;
         }}
+        HL{op}{op};
     '''
 
 def jr_c_e(cond: Optional[str] = None) -> C:
@@ -525,7 +561,9 @@ def ldws() -> C:
 def ldx(op: str) -> C:
     return f'''
         TMP = memory_read(HL{op}{op}); T(3);
-        memory_write(DE{op}{op}, TMP); T(5);
+        memory_write(DE{op}{op}, TMP); T(3);
+        memory_contend(DE); T(1);
+        memory_contend(DE); T(1);
         F &= ~(HF_MASK | VF_MASK | NF_MASK);
         F |= (--BC != 0) << VF_SHIFT;
     '''
@@ -634,18 +672,24 @@ def otib() -> C:
         TMP = memory_read(HL++); T(4);
         io_write(BC, TMP);
     '''
-    
+
 def otxr(op: str) -> C:
     return f'''
         T(1);
-        Z = memory_read(HL{op}{op}); T(3);
+        Z = memory_read(HL); T(3);
         --B;
         io_write(BC, Z);
         if (B) {{
-            PC -= 2; T(5);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            memory_contend(HL);  T(1);
+            PC -= 2;
         }} else {{
             F |= ZF_MASK | NF_MASK;
         }}
+        HL{op}{op};
     '''
 
 def out_C_r(r: str) -> C:
@@ -660,10 +704,11 @@ def out_n_a() -> C:
 def outx(op: str) -> C:
     return f'''
         T(1);
-        Z = memory_read(HL{op}{op}); T(3);
+        Z = memory_read(HL); T(3);
         --B;
         io_write(BC, Z);
         F = SZ53P(B) | NF_MASK | (F & CF_MASK);    
+        HL{op}{op};
     '''
 
 def pop_qq(qq: str) -> C:
@@ -804,10 +849,13 @@ def rlca() -> C:
 def rld() -> C:
     return '''
         Z = memory_read(HL); T(3);
-        memory_write(HL, Z << 4 | (A & 0x0F)); T(4);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_write(HL, Z << 4 | (A & 0x0F)); T(3);
         A = (A & 0xF0) | Z >> 4;
         F = SZ53P(A) | (F & CF_MASK);
-        T(3);
     '''
 
 def rr_pss(xy: Optional[str] = None) -> C:
@@ -871,10 +919,13 @@ def rrca() -> C:
 def rrd() -> C:
     return '''
         Z = memory_read(HL); T(3);
-        memory_write(HL, (A & 0x0F) << 4 | Z >> 4); T(4);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_contend(HL);  T(1);
+        memory_write(HL, (A & 0x0F) << 4 | Z >> 4); T(3);
         A = (A & 0xF0) | (Z & 0x0F);
         F = SZ53P(A) | (F & CF_MASK);
-        T(3);
     '''
 
 def rst(address: int) -> C:
