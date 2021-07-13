@@ -26,7 +26,7 @@ def lo(dd: str) -> str:
 
 def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL') -> C:
     if rr == 'HL' and xy:
-        return f'{xy} + (s8_t) memory_read(PC++); T(3 + 5)'
+        return f'{xy} + (s8_t) memory_read(PC++); T(3); memory_contend(PC); T(1); memory_contend(PC); T(1); memory_contend(PC); T(1); memory_contend(PC); T(1); memory_contend(PC); T(1);'
     else:
         return rr
 
@@ -123,9 +123,10 @@ def bit_b_r(b: int, r: str) -> C:
 def bit_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
         WZ = {wz(xy)};
+        TMP = memory_read(WZ); T(3);
+        memory_contend(WZ);    T(1);
         F &= ~(ZF_MASK | NF_MASK);
-        F |= (memory_read(WZ) & 1 << {b} ? 0 : ZF_MASK) | HF_MASK; T(4);
-        T(4);
+        F |= (TMP & 1 << {b} ? 0 : ZF_MASK) | HF_MASK; T(4);
     '''
 
 def brlc() -> C:
@@ -752,7 +753,9 @@ def pxdn() -> C:
 def res_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
         WZ = {wz(xy)};
-        memory_write(WZ, memory_read(WZ) & ~(1 << {b})); T(4 + 3);
+        TMP = memory_read(WZ); T(3);
+        memory_contend(WZ);    T(1);
+        memory_write(WZ, TMP & ~(1 << {b})); T(3);
     '''
 
 def res_b_r(b: int, r: str) -> C:
@@ -821,13 +824,12 @@ def rlc_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ);      T(1);
         carry = TMP >> 7;
         TMP   = TMP << 1 | carry;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def rlc_r(r: str) -> C:
@@ -862,13 +864,12 @@ def rr_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ);      T(1);
         carry = TMP & 0x01;
         TMP   = TMP >> 1 | (F & CF_MASK) >> CF_SHIFT << 7;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def rr_r(r: str) -> C:
@@ -891,13 +892,12 @@ def rrc_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ); T(1);
         carry = TMP & 0x01;
         TMP   = TMP >> 1 | carry << 7;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP); T(3);
     '''
 
 def rrc_r(r: str) -> C:
@@ -981,8 +981,10 @@ def scf() -> C:
 
 def set_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
-      WZ = {wz(xy)};
-      memory_write(WZ, memory_read(WZ) | 1 << {b}); T(4 + 3);
+      WZ  = {wz(xy)};
+      TMP = memory_read(WZ); T(3);
+      memory_contend(WZ);    T(1);
+      memory_write(WZ, TMP | 1 << {b}); T(3);
     '''
 
 def set_b_r(b: int, r: str) -> C:
@@ -995,13 +997,12 @@ def sla_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ);      T(1);
         carry = TMP >> 7;
         TMP <<= 1;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def sla_r(r: str) -> C:
@@ -1015,13 +1016,12 @@ def sll_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ);      T(1);
         carry = TMP >> 7;
         TMP   = TMP << 1 | 1;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def sll_r(r: str) -> C:
@@ -1035,13 +1035,12 @@ def sra_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ);      T(1);
         carry = TMP & 0x01;
         TMP   = (TMP & 0x80) | TMP >> 1;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def sra_r(r: str) -> C:
@@ -1055,13 +1054,12 @@ def srl_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
         WZ    = {wz(xy)};
-        TMP   = memory_read(WZ);
+        TMP   = memory_read(WZ); T(3);
+        memory_contend(WZ);      T(1);
         carry = TMP & 0x01;
         TMP >>= 1;
         F     = SZ53P(TMP) | carry << CF_SHIFT;
-        T(4);
-        memory_write(WZ, TMP);
-        T(3);
+        memory_write(WZ, TMP);   T(3);
     '''
 
 def srl_r(r: str) -> C:
@@ -1705,8 +1703,10 @@ def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str
         # Special opcode where 3rd byte is parameter and 4th byte needed for
         # decoding. Read 4th byte, but keep PC at 3rd byte.
         return f'''
-const u8_t opcode = memory_read(PC + 1);
-T(4);
+memory_contend(PC); T(3);
+const u8_t opcode = memory_read(PC + 1); T(3);
+memory_contend(PC + 1); T(1);
+memory_contend(PC + 1); T(1);
 {name}[opcode]();
 PC++;
 '''
