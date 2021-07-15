@@ -24,9 +24,24 @@ def hi(dd: str) -> str:
 def lo(dd: str) -> str:
     return f'{dd}L' if dd in ['IX', 'IY'] else dd[1]
 
-def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL') -> C:
+def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL', d_in_tmp: Optional[bool] = False) -> C:
     if rr == 'HL' and xy:
-        return f'{xy} + (s8_t) memory_read(PC++); T(3); memory_contend(PC); T(1); memory_contend(PC); T(1); memory_contend(PC); T(1); memory_contend(PC); T(1); memory_contend(PC); T(1);'
+        # It's an IX+d or IY+d.
+        if d_in_tmp:
+            # It's DD CB d nn or FD CB d nn and we already read the (conended)
+            # displacement into TMP.
+            return f'{xy} + (s8_t) TMP'
+        else:
+            # It's a regular IX+d or IY+d opcode, and we need to read the
+            # (contended) displacement now.
+            return f'''{xy} + (s8_t) memory_read(PC); T(3);
+                       memory_contend(PC); T(1);
+                       memory_contend(PC); T(1);
+                       memory_contend(PC); T(1);
+                       memory_contend(PC); T(1);
+                       memory_contend(PC); T(1);
+                       PC++
+                    '''
     else:
         return rr
 
@@ -122,7 +137,7 @@ def bit_b_r(b: int, r: str) -> C:
 
 def bit_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
-        WZ = {wz(xy)};
+        WZ = {wz(xy,d_in_tmp=True)};
         TMP = memory_read(WZ); T(3);
         memory_contend(WZ);    T(1);
         F &= ~(ZF_MASK | NF_MASK);
@@ -752,7 +767,7 @@ def pxdn() -> C:
 
 def res_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
-        WZ = {wz(xy)};
+        WZ = {wz(xy,d_in_tmp=True)};
         TMP = memory_read(WZ); T(3);
         memory_contend(WZ);    T(1);
         memory_write(WZ, TMP & ~(1 << {b})); T(3);
@@ -795,7 +810,7 @@ def retn() -> C:
 def rl_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ);      T(1);
         carry = TMP >> 7;
@@ -823,7 +838,7 @@ def rla() -> C:
 def rlc_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ);      T(1);
         carry = TMP >> 7;
@@ -863,7 +878,7 @@ def rld() -> C:
 def rr_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ);      T(1);
         carry = TMP & 0x01;
@@ -891,7 +906,7 @@ def rra() -> C:
 def rrc_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ); T(1);
         carry = TMP & 0x01;
@@ -981,7 +996,7 @@ def scf() -> C:
 
 def set_b_pss(b: int, xy: Optional[str] = None) -> C:
     return f'''
-      WZ  = {wz(xy)};
+      WZ  = {wz(xy,d_in_tmp=True)};
       TMP = memory_read(WZ); T(3);
       memory_contend(WZ);    T(1);
       memory_write(WZ, TMP | 1 << {b}); T(3);
@@ -996,7 +1011,7 @@ def stae() -> C:
 def sla_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ);      T(1);
         carry = TMP >> 7;
@@ -1015,7 +1030,7 @@ def sla_r(r: str) -> C:
 def sll_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ);      T(1);
         carry = TMP >> 7;
@@ -1034,7 +1049,7 @@ def sll_r(r: str) -> C:
 def sra_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ);      T(1);
         carry = TMP & 0x01;
@@ -1053,7 +1068,7 @@ def sra_r(r: str) -> C:
 def srl_pss(xy: Optional[str] = None) -> C:
     return f'''
         u8_t carry;
-        WZ    = {wz(xy)};
+        WZ    = {wz(xy,d_in_tmp=True)};
         TMP   = memory_read(WZ); T(3);
         memory_contend(WZ);      T(1);
         carry = TMP & 0x01;
@@ -1560,8 +1575,7 @@ def generate(instructions: Table, prefix: List[Opcode], functions: Dict[str, C],
 
         if isinstance(entry, tuple):
             comment, implementation = entry
-            body                     = implementation()
-
+            body                    = implementation()
         elif isinstance(entry, dict):
             comment = 'prefix'
             body    = generate(entry, prefix + [opcode], functions, tables)
@@ -1585,21 +1599,22 @@ def generate(instructions: Table, prefix: List[Opcode], functions: Dict[str, C],
     tables[name] = body
 
     if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
-        # Special opcode where 3rd byte is parameter and 4th byte needed for
-        # decoding. Read 4th byte, but keep PC at 3rd byte.
+        # These prefixes indicate IX+d or IY+d displacements. The displacement
+        # is the third byte, while the fourth byte is the opcode. To honor
+        # memory contention, we have to read them in this order. We read the
+        # displacement into TMP.
         return f'''
-memory_contend(PC); T(3);
-const u8_t opcode = memory_read(PC + 1); T(3);
-memory_contend(PC + 1); T(1);
-memory_contend(PC + 1); T(1);
-{name}[opcode]();
+TMP = memory_read(PC++); T(3);  /* displacement */
+const u8_t opcode = memory_read(PC); T(3);
+memory_contend(PC); T(1);
+memory_contend(PC); T(1);
 PC++;
+{name}[opcode]();
 '''
 
     # Return the body that uses the table.
     return f'''
-const u8_t opcode = memory_read(PC++);
-T(4);
+const u8_t opcode = memory_read(PC++); T(4);
 {name}[opcode]();
 '''
 
