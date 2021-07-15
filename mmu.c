@@ -71,12 +71,18 @@ void mmu_bank_set(u8_t slot, u8_t bank) {
 }
 
 
+void mmu_contend(u16_t address) {
+  const u8_t  slot = address / PAGE_SIZE;
+  const u8_t  bank = self.pages[slot] / 2;
+
+  ula_contend_bank(bank);
+}
+
+
 static u32_t mmu_translate(u16_t address) {
   const u8_t  slot   = address / PAGE_SIZE;
   const u16_t offset = address & (PAGE_SIZE - 1);
   const u8_t  bank   = self.pages[slot] / 2;
-
-  /* Assertion: self.pages[slot] != MMU_ROM_PAGE. */
 
   ula_contend_bank(bank);
 

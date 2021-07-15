@@ -16,6 +16,7 @@ void  mmu_page_set(u8_t slot, u8_t page);
 void  mmu_bank_set(u8_t slot, u8_t bank);
 u8_t  mmu_read(u16_t address);
 void  mmu_write(u16_t address, u8_t value);
+void  mmu_contend(u16_t address);
 
 
 #endif  /* __MMU_H */

@@ -152,10 +152,7 @@ static writer_t pick_writer(int page) {
 
 
 void memory_contend(u16_t address) {
-  const u8_t page = address / ADDRESS_PAGE_SIZE;
-  const u8_t bank = page / 2;
-
-  ula_contend_bank(bank);
+  mmu_contend(address);
 }
 
 
