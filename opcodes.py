@@ -24,7 +24,7 @@ def hi(dd: str) -> str:
 def lo(dd: str) -> str:
     return f'{dd}L' if dd in ['IX', 'IY'] else dd[1]
 
-def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL', d_in_tmp: Optional[bool] = False) -> C:
+def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL', d_in_tmp: Optional[bool] = False, n_contends: Optional[int] = 5) -> C:
     if rr == 'HL' and xy:
         # It's an IX+d or IY+d.
         if d_in_tmp:
@@ -34,14 +34,11 @@ def wz(xy: Optional[str] = None, rr: Optional[str] = 'HL', d_in_tmp: Optional[bo
         else:
             # It's a regular IX+d or IY+d opcode, and we need to read the
             # (contended) displacement now.
-            return f'''{xy} + (s8_t) memory_read(PC); T(3);
-                       memory_contend(PC); T(1);
-                       memory_contend(PC); T(1);
-                       memory_contend(PC); T(1);
-                       memory_contend(PC); T(1);
-                       memory_contend(PC); T(1);
-                       PC++
-                    '''
+            s = f'{xy} + (s8_t) memory_read(PC); T(3);'
+            for _ in range(n_contends):
+                s += ' memory_contend(PC); T(1);'
+            s += ' PC++'
+            return s
     else:
         return rr
 
@@ -79,9 +76,9 @@ def adc_A_r(r: str) -> C:
 def adc_HL_ss(ss: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
-        const u32_t result = HL + {ss} + carry; T(4);
+        const u32_t result = HL + {ss} + carry;
         F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x20) | (result & 0x08) | HF_ADD(H, {hi(ss)}, result >> 8) | VF_ADD(H, {hi(ss)}, result >> 8) | (result & 0x10000) >> 16 << CF_SHIFT;
-        HL = result & 0xFFFF; T(3);
+        HL = result & 0xFFFF; T(7);
     '''
 
 def add_A_n() -> C:
@@ -123,9 +120,10 @@ def add_dd_ss(dd: str, ss: str) -> C:
     return f'''
         const u16_t prev  = {dd};
         const u8_t  carry = {dd} > 0xFFFF - {ss};
-        {dd} += {ss}; T(4 + 3);
+        {dd} += {ss};
         F &= ~(HF_MASK | NF_MASK | CF_MASK);
         F |= HF_ADD(prev >> 8, {ss} >> 8, {dd} >> 8) | carry;
+        T(7);
     '''
 
 def bit_b_r(b: int, r: str) -> C:
@@ -172,7 +170,7 @@ def call(cond: Optional[str] = None) -> C:
         s += f'if ({cond}) {{\n'
 
     s += '''
-        memory_contend(PC);      T(1);
+        memory_contend(PC - 1);  T(1);
         memory_write(--SP, PCH); T(3);
         memory_write(--SP, PCL); T(3);
         PC = WZ;
@@ -303,7 +301,7 @@ def di() -> C:
 def djnz() -> C:
     return f'''
         T(1);
-        Z = memory_read(PC++); T(3);
+        Z = memory_read(PC); T(3);
         if (--B) {{
             memory_contend(PC); T(1);
             memory_contend(PC); T(1);
@@ -312,6 +310,7 @@ def djnz() -> C:
             memory_contend(PC); T(1);
             PC += (s8_t) Z;
         }}
+        PC++;
     '''
 
 def ei() -> C:
@@ -429,7 +428,7 @@ def inxr(op: str) -> C:
 
 def jr_c_e(cond: Optional[str] = None) -> C:
     s = '''
-        Z = memory_read(PC++); T(3);
+        Z = memory_read(PC); T(3);
     '''
 
     if cond:
@@ -446,6 +445,10 @@ def jr_c_e(cond: Optional[str] = None) -> C:
 
     if cond:
         s += '}'
+
+    s += '''
+       PC++;
+    '''
 
     return s
 
@@ -527,11 +530,23 @@ def ld_pdd_r(dd: str, r: str, xy: Optional[str] = None) -> C:
     '''
 
 def ld_pss_n(xy: Optional[str] = None) -> C:
-    return f'''
-        WZ  = {wz(xy)};
-        TMP = memory_read(PC++); T(3);
-        memory_write(WZ, TMP);   T(3);
+    s = f'''
+        WZ  = {wz(xy,n_contends=0)};
+        TMP = memory_read(PC); T(3);
     '''
+
+    if xy in ['IX', 'IY']:
+        s += '''
+            memory_contend(PC); T(1);
+            memory_contend(PC); T(1);
+        '''
+
+    s += '''
+        memory_write(WZ, TMP);   T(3);
+        PC++;
+    '''
+
+    return s
 
 def ld_pnn_a() -> C:
     return '''
@@ -576,29 +591,33 @@ def ldws() -> C:
 
 def ldx(op: str) -> C:
     return f'''
-        TMP = memory_read(HL{op}{op}); T(3);
-        memory_write(DE{op}{op}, TMP); T(3);
-        memory_contend(DE); T(1);
-        memory_contend(DE); T(1);
+        TMP = memory_read(HL); T(3);
+        memory_write(DE, TMP); T(3);
+        memory_contend(DE);    T(1);
+        memory_contend(DE);    T(1);
+        HL{op}{op};
+        DE{op}{op};
         F &= ~(HF_MASK | VF_MASK | NF_MASK);
         F |= (--BC != 0) << VF_SHIFT;
     '''
 
 def ldxr(op: str) -> C:
     return f'''
-        TMP  = memory_read(HL{op}{op}); T(3);
-        memory_write(DE{op}{op}, TMP);  T(3);
-        memory_contend(DE); T(1);
-        memory_contend(DE); T(1);
+        TMP  = memory_read(HL); T(3);
+        memory_write(DE, TMP);  T(3);
+        memory_contend(DE);     T(1);
+        memory_contend(DE);     T(1);
+        HL{op}{op}; 
+        DE{op}{op};
         F &= ~(HF_MASK | VF_MASK | NF_MASK);
         F |= (--BC != 0) << VF_SHIFT;
         if (BC) {{
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
+            memory_contend(DE); T(1);
             PC -= 2;
-            memory_contend(DE); T(1);
-            memory_contend(DE); T(1);
-            memory_contend(DE); T(1);
-            memory_contend(DE); T(1);
-            memory_contend(DE); T(1);
         }}
     '''
 
@@ -947,8 +966,8 @@ def rst(address: int) -> C:
     return f'''
         T(1);
         memory_write(--SP, PCH); T(3);
-        memory_write(--SP, PCL);
-        PC = 0x{address:02X};    T(3);
+        memory_write(--SP, PCL); T(3);
+        PC = 0x{address:02X};
     '''
 
 def sbc_A_n() -> C:
@@ -983,9 +1002,9 @@ def sbc_A_r(r: str) -> C:
 def sbc_HL_ss(ss: str) -> C:
     return f'''
         const u8_t  carry  = (F & CF_MASK) >> CF_SHIFT;
-        const u32_t result = HL - {ss} - carry; T(4);
+        const u32_t result = HL - {ss} - carry;
         F  = (result & 0x8000) >> 15 << SF_SHIFT | (result == 0) << ZF_SHIFT | (result & 0x20) | (result & 0x08) | HF_SUB(H, {hi(ss)}, result >> 8) | VF_SUB(H, {hi(ss)}, result >> 8) | NF_MASK | (HL < {ss} + carry) << CF_SHIFT;
-        HL = result & 0xFFFF; T(3);
+        HL = result & 0xFFFF; T(7);
     '''
 
 def scf() -> C:
