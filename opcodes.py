@@ -1552,122 +1552,7 @@ def table(xy: Optional[str] = None) -> Table:
     return t
 
 
-def make_disassembler(mnemonic: str) -> Tuple[str, int]:
-    tokens = {
-        'n'    : (2, lambda offset: f'memory_read(PC + {offset})'),
-        'nn'   : (4, lambda offset: f'memory_read(PC + {offset} + 1) << 8 | memory_read(PC + {offset})'),
-        'mm'   : (4, lambda offset: f'memory_read(PC + {offset}) << 8 | memory_read(PC + {offset} + 1)'),
-        'e'    : (4, lambda offset: f'PC + {offset} + 1 + (s8_t) memory_read(PC + {offset})'),
-        'd'    : (2, lambda offset: f'memory_read(PC + {offset})'),
-        'reg'  : (2, lambda offset: f'memory_read(PC + {offset})'),
-        'value': (2, lambda offset: f'memory_read(PC + {offset})'),
-    }
-
-    statement = 'log_dbg("'
-    args      = []
-
-    offset = 0
-    for part in re.split('([a-z]+)', mnemonic):
-        if part in tokens:
-            width, argument = tokens[part]
-            statement += f'$%0{width}X'
-            args.append(argument(offset))
-            offset += width // 2
-        else:
-            statement += part
-
-    statement += '\\n"'
-    if args:
-        statement += ', '
-        statement += ', '.join(args)
-    statement += ');'
-
-    return statement, offset
-
-
-def make_dumper(prefix: List[Opcode], opcode: Opcode, length: int) -> str:
-    s = 'log_dbg("'
-    s += ' '.join(f'{p:02X}' for p in prefix + [opcode])
-    s += ' %02X' * length
-    for i in range(4 - len(prefix) - length):
-        s += '   '
-    s += '"'
-    if length > 0:
-        s += ', ' + ', '.join(f'memory_read(PC + {i})' for i in range(length))
-    return s + ');'
-
-
-def generate(instructions: Table, f: io.TextIOBase, prefix: Optional[List[Opcode]] = None) -> None:
-    prefix         = prefix or []
-    prefix_len     = len(prefix)
-    prefix_str     = ''.join(f'${opcode:02X} ' for opcode in prefix)
-    prefix_comment = f'/* {prefix_str}*/ ' if prefix else ''
-
-    # Show on the registers before and after each instruction execution,
-    # as well as a disassembly of each executed instruction.
-    debug = False
-
-    if debug:
-        if not prefix:
-            f.write('''
-log_dbg("     AF %04X BC %04X DE %04X HL %04X IX %04X IY %04X F %s%s-%s-%s%s%s\\n", AF, BC, DE, HL, IX, IY, SF ? "S" : "s", ZF ? "Z" : "z", HF ? "H" : "h", PF ? "P/V" : "p/v", NF ? "N" : "n", CF ? "C" : "c");
-log_dbg("     AF'%04X BC'%04X DE'%04X HL'%04X PC %04X SP %04X I %02X\\n", AF_, BC_, DE_, HL_, PC, SP, I);
-log_dbg("     ROM %d  DIVMMC %02X  PAGES %02X %02X %02X %02X %02X %02X %02X %02X\\n", 0xFF, divmmc_control_read(0xE3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
-log_dbg("%04X ", PC);
-''')
-
-    if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
-        # Special opcode where 3rd byte is parameter and 4th byte needed for
-        # decoding. Read 4th byte, but keep PC at 3rd byte.
-        read_opcode    = 'opcode = memory_read(PC + 1)'
-        post_increment = 'PC++;'
-    else:
-        read_opcode    = 'opcode = memory_read(PC++)'
-        post_increment = ''
-
-    f.write(f'''
-{read_opcode};
-T(4);
-''')
-    if not prefix:
-        f.write('R = (R & 0x80) | ((R + 1) & 0x7F);\n')
-    f.write('switch (opcode) {\n')
-
-    for opcode in sorted(instructions):
-        item = instructions[opcode]
-        if isinstance(item, tuple):
-            mnemonic, spec       = item
-            disassembler, length = make_disassembler(mnemonic)
-            dumper               = make_dumper(prefix, opcode, length)
-            c = spec() if callable(spec) else spec
-            if c is not None:
-                f.write(f'''
-case {prefix_comment}0x{opcode:02X}:  /* {mnemonic} */
-  {{
-    {dumper       if debug else ''}
-    {disassembler if debug else ''}
-    {c}
-  }}
-  {post_increment}
-  break;
-
-''')
-
-        elif isinstance(item, dict):
-            f.write(f'case 0x{opcode:02X}:\n')
-            generate(item, f, prefix + [opcode])
-
-    optional_break = 'break;' if prefix else ''
-    f.write(f'''
-default:
-  log_err("cpu: unknown opcode {prefix_str}$%02X at $%04X\\n", opcode, PC - 1 - {prefix_len});
-  return -1;
-}}
-{optional_break}
-''')
-
-
-def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str, C], tables: Dict[str, C]) -> C:
+def generate(instructions: Table, prefix: List[Opcode], functions: Dict[str, C], tables: Dict[str, C]) -> C:
     table = {}
 
     for opcode, entry in instructions.items():
@@ -1679,7 +1564,7 @@ def generate_fast(instructions: Table, prefix: List[Opcode], functions: Dict[str
 
         elif isinstance(entry, dict):
             comment = 'prefix'
-            body    = generate_fast(entry, prefix + [opcode], functions, tables)
+            body    = generate(entry, prefix + [opcode], functions, tables)
 
         functions[name] = (comment, body)
         table[opcode]   = name
@@ -1719,11 +1604,11 @@ T(4);
 '''
 
 
-def main_fast() -> None:
+def main() -> None:
     functions    = {}
     tables       = {}
     instructions = table()
-    decoder      = generate_fast(instructions, [], functions, tables)
+    decoder      = generate(instructions, [], functions, tables)
 
     with open('opcodes.c', 'w') as f:
         f.write('typedef void (*opcode_impl_t)(void);\n')
@@ -1758,10 +1643,5 @@ void cpu_execute_next_opcode(void) {{
 ''')
 
 
-def main() -> None:
-    with open('opcodes.c', 'w') as f:
-        generate(table(), f)
-
-
 if __name__ == '__main__':
-    main_fast()
+    main()
