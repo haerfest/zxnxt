@@ -152,12 +152,12 @@ static void nextreg_reset_write(u8_t value) {
   }
 
   if (value & 0x08) {
-    cpu_nmi(E_CPU_NMI_REASON_MF);
+    cpu_nmi(E_CPU_NMI_MF);
     return;
   }
 
   if (value & 0x04) {
-    cpu_nmi(E_CPU_NMI_REASON_DIVMMC);
+    cpu_nmi(E_CPU_NMI_DIVMMC);
     return;
   }
 }

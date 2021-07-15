@@ -148,9 +148,13 @@ typedef union {
 } reg16_t;
 
 
-#define CPU_REQUEST_RESET  0x01
-#define CPU_REQUEST_IRQ    0x02
-#define CPU_REQUEST_NMI    0x04
+#define CPU_REQUEST_RESET       0x01
+#define CPU_REQUEST_IRQ_ULA     0x02
+#define CPU_REQUEST_IRQ_LINE    0x04
+#define CPU_REQUEST_IRQ         (CPU_REQUEST_IRQ_ULA | CPU_REQUEST_IRQ_LINE)
+#define CPU_REQUEST_NMI_MF      0x08
+#define CPU_REQUEST_NMI_DIVMMC  0x10
+#define CPU_REQUEST_NMI         (CPU_REQUEST_NMI_MF | CPU_REQUEST_NMI_DIVMMC)
 
 
 typedef struct {
@@ -188,11 +192,8 @@ typedef struct {
   int requests;
 
   /* IRQ. */
-  u8_t  im;                      /* Interrupt mode.                                      */
-  int   irq_delay;               /* Number of instructions by which IRQ must be delayed. */
-
-  /* NMI. */
-  cpu_nmi_reason_t nmi_reason;   /* Reason for NMI.          */
+  u8_t im;                      /* Interrupt mode.                                      */
+  int  irq_delay;               /* Number of instructions by which IRQ must be delayed. */
 
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
@@ -223,7 +224,7 @@ static void cpu_fill_tables(void) {
 
 
 static void cpu_reset_internal(void) {
-  self.requests &= ~CPU_REQUEST_RESET;
+  self.requests = 0;
 
   IFF1 = 0;
   IFF2 = 0;
@@ -233,6 +234,11 @@ static void cpu_reset_internal(void) {
   IM   = 0;
 
   T(3);
+}
+
+
+void cpu_reset(void) {
+  self.requests |= CPU_REQUEST_RESET;
 }
 
 
@@ -259,24 +265,36 @@ void cpu_finit(void) {
 }
 
 
-void cpu_reset(void) {
-  self.requests |= CPU_REQUEST_RESET;
+void cpu_irq(cpu_irq_t irq, int active) {
+  switch (irq) {
+    case E_CPU_IRQ_ULA:
+      self.requests = active ? (self.requests | CPU_REQUEST_IRQ_ULA) : (self.requests & ~CPU_REQUEST_IRQ_ULA);
+      break;
+
+    case E_CPU_IRQ_LINE:
+      self.requests = active ? (self.requests | CPU_REQUEST_IRQ_LINE) : (self.requests & ~CPU_REQUEST_IRQ_LINE);
+      break;
+  }
 }
 
 
-void cpu_irq(void) {
-  self.requests |= CPU_REQUEST_IRQ;
-}
+void cpu_nmi(cpu_nmi_t nmi) {
+  switch (nmi) {
+    case E_CPU_NMI_MF:
+      self.requests |= CPU_REQUEST_NMI_MF;
+      break;
 
-
-void cpu_nmi(cpu_nmi_reason_t reason) {
-  self.requests  |= CPU_REQUEST_NMI;
-  self.nmi_reason = reason;
+    case E_CPU_NMI_DIVMMC:
+      self.requests |= CPU_REQUEST_NMI_DIVMMC;
+      break;
+  }
 }
 
 
 /**
  * http://z80.info/interrup.htm
+ *
+ * IRQs are level-triggered, so don't clear on handling.
  */
 static void cpu_irq_pending(void) {
   /* We just executed an EI, need one instruction delay to allow
@@ -284,8 +302,6 @@ static void cpu_irq_pending(void) {
   if (self.irq_delay) {
     return;
   }
-
-  self.requests &= ~CPU_REQUEST_IRQ;
 
   /* Interrupts must be enabled. */
   if (IFF1 == 0) {
@@ -337,8 +353,6 @@ static void cpu_irq_pending(void) {
 
 
 static void cpu_nmi_pending(void) {
-  self.requests &= ~CPU_REQUEST_NMI;
-
   /* Save the IFF1 state. */
   IFF2 = IFF1;
 
@@ -355,9 +369,12 @@ static void cpu_nmi_pending(void) {
   /* Jump to the NMI routine. */ 
   PC = 0x0066;
 
-  if (self.nmi_reason == E_CPU_NMI_REASON_MF) {
+  if (self.requests & CPU_REQUEST_NMI_MF) {
     mf_activate();
   }
+
+  /* NMI is edge triggered, so clears on handling. */
+  self.requests &= ~CPU_REQUEST_NMI;
 }
 
 
@@ -400,21 +417,26 @@ static void cpu_trace(void) {
 
 #endif  /* TRACE */
 
+u64_t prev_ticks = 0;
+int   trace = 0;
 
 void cpu_step(void) {
+#if 0
+  if (PC == 0xC151) { prev_ticks = clock_ticks(); log_wrn("cpu: @ $%04X\n", PC); }
+  if (PC == 0xC154) log_wrn("cpu: @ $%04X 28MHz ticks=%llu diff28MHz=%llu diff3.5MHz=%llu\n", PC, clock_ticks(), clock_ticks() - prev_ticks, (clock_ticks() - prev_ticks) / 8);
+  if (PC == 0xC000) trace = 1;
+  if (trace) log_wrn("cpu: PC=$%04X HL=%d BC=%d\n", PC, HL, BC);
+#endif
+
   cpu_trace();
   cpu_execute_next_opcode();
 
   if (self.requests) {
     if (self.requests & CPU_REQUEST_RESET) {
       cpu_reset_internal();
-    }
-
-    if (self.requests & CPU_REQUEST_NMI) {
+    } else if (self.requests & CPU_REQUEST_NMI) {
       cpu_nmi_pending();
-    }
-
-    if (self.requests & CPU_REQUEST_IRQ) {
+    } else if (self.requests & CPU_REQUEST_IRQ) {
       cpu_irq_pending();
     }
   }

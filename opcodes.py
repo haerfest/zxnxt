@@ -349,7 +349,7 @@ def exx() -> C:
 
 def halt() -> C:
     return '''
-        if ((self.requests ^ CPU_REQUEST_IRQ) || (IFF1 == 0)) {
+        if (!(self.requests & CPU_REQUEST_IRQ) || (IFF1 == 0)) {
           PC--;
         }
     '''

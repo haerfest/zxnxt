@@ -309,7 +309,7 @@ typedef struct {
   ula_display_mode_t         display_mode;
   ula_display_mode_t         display_mode_requested;
   u8_t*                      attribute_ram;
-  u8_t                       attribute_byte;
+  u8_t                       floating_bus;
   u8_t                       border_colour;
   u8_t                       speaker_state;
   palette_t                  palette;
@@ -385,9 +385,22 @@ static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column)
   const u8_t  display_byte     = self.display_ram[display_offset];
   const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
   const int   is_foreground    = display_byte & mask;
+  const u32_t tstates          = self.tstates_x4 / 4;
 
-  /* For floating-bus support. */
-  self.attribute_byte = attribute_byte;
+  /* 14337 = read display byte 1
+   * 14338 = read attribute 1
+   * 14339 = read display byte 2
+   * 14340 = read attribute 2
+   * 14341 = no activity
+   * 14342 = no activity
+   * 14343 = no activity
+   * 14344 = no activity
+   */
+  if (tstates < 14339) {
+    self.floating_bus = 0xFF;
+  } else {
+    self.floating_bus = ((tstates - 14339) % 224) % 8;
+  }
 
   if (self.is_ula_next_mode) {
     if (is_foreground) {
@@ -418,9 +431,6 @@ static const palette_entry_t* ula_display_mode_hi_colour(u32_t row, u32_t column
   const u8_t  display_byte     = self.display_ram[attribute_offset];
   const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
   const int   is_foreground    = display_byte & mask;
-
-  /* For floating-bus support. */
-  self.attribute_byte = attribute_byte;
 
   if (self.is_ula_next_mode) {
     if (is_foreground) {
@@ -552,11 +562,11 @@ int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buf
   if (beam_row == self.display_spec->vsync_row && beam_column == self.display_spec->vsync_column) {
     copper_irq();
     if (!self.disable_ula_irq) {
-      cpu_irq();
+      cpu_irq(E_CPU_IRQ_ULA, 1);
     }
     self.tstates_x4 = 0;
-  } else if (self.tstates_x4 / 4 < N_IRQ_TSTATES && !self.disable_ula_irq) {
-    cpu_irq();
+  } else if (self.tstates_x4 == N_IRQ_TSTATES * 4) {
+    cpu_irq(E_CPU_IRQ_ULA, 0);
   }
 
   /* Need to know this for floating bus support. */
@@ -701,7 +711,11 @@ u8_t ula_timex_read(u16_t address) {
 
 
 void ula_timex_write(u16_t address, u8_t value) {
-  self.disable_ula_irq   = (value & 0x40) >> 6;
+  self.disable_ula_irq = (value & 0x40) >> 6;
+  if (self.disable_ula_irq) {
+    cpu_irq(E_CPU_IRQ_ULA, 0);
+  }
+
   self.hi_res_ink_colour = (value & 0x38) >> 3;
 
   switch (value & 0x07) {
@@ -1028,9 +1042,7 @@ void ula_offset_y_write(u8_t value) {
  * Short Circuit.
  */
 u8_t ula_floating_bus_read(void) {
-  return self.is_displaying_content
-    ? self.attribute_byte
-    : 0xFF;
+  return self.floating_bus;
 }
 
 

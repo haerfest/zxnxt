@@ -73,14 +73,12 @@ void slu_finit(void) {
 
 
 void slu_reset(reset_t reset) {
-  self.layer_priority   = E_SLU_LAYER_PRIORITY_SLU;
-  self.blend_mode       = E_BLEND_MODE_ULA;
-  self.stencil_mode     = 0;
-  self.line_irq_active  = 0;
-  self.line_irq_enabled = 0;
-  self.line_irq_row     = 0;
-  self.fallback_rgba    = palette_rgb8_rgb16(0xE3);
+  self.layer_priority = E_SLU_LAYER_PRIORITY_SLU;
+  self.blend_mode     = E_BLEND_MODE_ULA;
+  self.stencil_mode   = 0;
+  self.fallback_rgba  = palette_rgb8_rgb16(0xE3);
 
+  slu_line_interrupt_enable_set(0);
   slu_transparent_set(0xE3);
 }
 
@@ -155,14 +153,8 @@ static void slu_beam_advance(void) {
  * > signal.
  */
 static void slu_irq(void) {
-  if (self.line_irq_enabled && ((self.beam_row == self.display_rows - 1 && self.line_irq_row == 0) || self.beam_row == self.line_irq_row - 1)) {
-    if (self.beam_column >= 256 * 2) {
-      self.line_irq_active = 1;
-      cpu_irq();
-    }
-  } else {
-    self.line_irq_active = 0;
-  }
+  self.line_irq_active = (self.line_irq_enabled && ((self.beam_row == self.display_rows - 1 && self.line_irq_row == 0) || self.beam_row == self.line_irq_row - 1) && self.beam_column >= 256 * 2);
+  cpu_irq(E_CPU_IRQ_LINE, self.line_irq_active);
 }
 
 
@@ -527,6 +519,7 @@ void slu_line_interrupt_enable_set(int enable) {
   self.line_irq_enabled = enable;
   if (!self.line_irq_enabled) {
     self.line_irq_active = 0;
+    cpu_irq(E_CPU_IRQ_LINE, 0);
   }  
 }
 
