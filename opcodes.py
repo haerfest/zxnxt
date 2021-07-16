@@ -1586,93 +1586,73 @@ def table(xy: Optional[str] = None) -> Table:
     return t
 
 
-def generate(instructions: Table, prefix: List[Opcode], functions: Dict[str, C], tables: Dict[str, C]) -> C:
-    table = {}
+def generate(table: Table, prefix: List[Opcode]) -> Tuple[List[str], str]:
+    fns  = []
+    body = ''
 
-    for opcode, entry in instructions.items():
-        name = 'opcode_' + '_'.join(f'{op:02X}' for op in prefix + [opcode])
+    for opcode in sorted(table):
+        pfx     = prefix + [opcode]
+        pfx_str = ''.join(f'{n:02X}' for n in pfx)
 
-        if isinstance(entry, tuple):
-            comment, implementation = entry
-            body                    = implementation()
-        elif isinstance(entry, dict):
-            comment = 'prefix'
-            body    = generate(entry, prefix + [opcode], functions, tables)
+        thing = table[opcode]
+        if isinstance(thing, tuple):
+            # An implementation.
+            comment, fn = thing
+            formatted   = ' '.join(fn().replace('\n', ' ').split())
+            body += f'    case 0x{opcode:02X}: /* {comment:<14s} */ {{ {formatted} }} break;\n'
 
-        functions[name] = (comment, body)
-        table[opcode]   = name
+        elif isinstance(thing, dict):
+            # Another table.
+            sub_fns, sub_body = generate(thing, pfx)
+            fns.extend(sub_fns)
 
-    missing = set(range(256)) - set(table.keys())
-    for opcode in missing:
-        name = 'opcode_' + '_'.join(f'{op:02X}' for op in prefix + [opcode])
-        body = f'''
-            log_wrn("cpu: {name} not implemented around PC $%04X\\n", PC);
-        '''
-
-        functions[name] = (comment, body)
-        table[opcode]   = name
-
-    # Write the lookup table.
-    name         = 'lookup_' + '_'.join(f'{op:02X}' for op in prefix) if prefix else 'lookup'
-    body         = ',\n'.join(table[op] for op in sorted(table))
-    tables[name] = body
-
-    if prefix == [0xDD, 0xCB] or prefix == [0xFD, 0xCB]:
-        # These prefixes indicate IX+d or IY+d displacements. The displacement
-        # is the third byte, while the fourth byte is the opcode. To honor
-        # memory contention, we have to read them in this order. We read the
-        # displacement into TMP.
-        return f'''
-TMP = memory_read(PC++); T(3);  /* displacement */
-const u8_t opcode = memory_read(PC); T(3);
-memory_contend(PC); T(1);
-memory_contend(PC); T(1);
-PC++;
-{name}[opcode]();
+            if pfx in [[0xDD, 0xCB], [0xFD, 0xCB]]:
+                reader = '''
+  TMP = memory_read(PC++); T(3);  /* displacement */
+  const u8_t opcode = memory_read(PC); T(3);
+  memory_contend(PC); T(1);
+  memory_contend(PC); T(1);
+  PC++;
 '''
+            else:
+                reader = 'const u8_t opcode = memory_read(PC++); T(4);'
 
-    # Return the body that uses the table.
-    return f'''
-const u8_t opcode = memory_read(PC++); T(4);
-{name}[opcode]();
+            fn = f'''
+static void execute_{pfx_str}(void) {{
+  {reader.strip()}
+  switch (opcode) {{
+{sub_body.rstrip()}
+    default:
+      log_wrn("cpu: opcode {pfx_str}%02X at PC=$%04X not implemented\\n", opcode, PC - 1);
+      break;
+  }}
+}}
 '''
+            fns.append(fn)
+            body += f'    case 0x{opcode:02X}: execute_{pfx_str}(); break;\n'
+        else:
+            print(f'warning: no implementation of {pfx_str}')
+
+    return fns, body
 
 
 def main() -> None:
-    functions    = {}
-    tables       = {}
-    instructions = table()
-    decoder      = generate(instructions, [], functions, tables)
+    fns, body = generate(table(), [])
 
     with open('opcodes.c', 'w') as f:
-        f.write('typedef void (*opcode_impl_t)(void);\n')
-
-        for name in sorted(functions):
-            f.write(f'static void {name}(void);\n')
-
-        f.write('\n');
-        for name in sorted(tables):
-            body = tables[name]
-            f.write(f'''
-static opcode_impl_t {name}[256] = {{
-{body}
-}};
-''')
-
-        f.write('\n');
-        for name in sorted(functions):
-            (comment, body) = functions[name];
-            f.write(f'''
-/* {comment} */
-static void {name}(void) {{
-{body}
-}}
-''')
+        for fn in fns:
+            f.write(fn)
 
         f.write(f'''
 void cpu_execute_next_opcode(void) {{
   R = (R & 0x80) | ((R + 1) & 0x7F);
-  {decoder}
+
+  const u8_t opcode = memory_read(PC++); T(4);
+  switch (opcode) {{
+{body.rstrip()}
+      log_wrn("cpu: opcode %02X at PC=$%04X not implemented\\n", opcode, PC - 1);
+      break;
+  }}
 }}
 ''')
 
