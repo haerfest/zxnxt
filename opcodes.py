@@ -607,8 +607,6 @@ def ldxr(op: str) -> C:
         memory_write(DE, TMP);  T(3);
         memory_contend(DE);     T(1);
         memory_contend(DE);     T(1);
-        HL{op}{op}; 
-        DE{op}{op};
         F &= ~(HF_MASK | VF_MASK | NF_MASK);
         F |= (--BC != 0) << VF_SHIFT;
         if (BC) {{
@@ -619,6 +617,8 @@ def ldxr(op: str) -> C:
             memory_contend(DE); T(1);
             PC -= 2;
         }}
+        HL{op}{op}; 
+        DE{op}{op};
     '''
 
 def ldxx(op: str) -> C:
