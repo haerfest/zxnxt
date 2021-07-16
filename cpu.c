@@ -417,17 +417,8 @@ static void cpu_trace(void) {
 
 #endif  /* TRACE */
 
-u64_t prev_ticks = 0;
-int   trace = 0;
 
 void cpu_step(void) {
-#if 0
-  if (PC == 0xC151) { prev_ticks = clock_ticks(); log_wrn("cpu: @ $%04X\n", PC); }
-  if (PC == 0xC154) log_wrn("cpu: @ $%04X 28MHz ticks=%llu diff28MHz=%llu diff3.5MHz=%llu\n", PC, clock_ticks(), clock_ticks() - prev_ticks, (clock_ticks() - prev_ticks) / 8);
-  if (PC == 0xC000) trace = 1;
-  if (trace) log_wrn("cpu: PC=$%04X HL=%d BC=%d\n", PC, HL, BC);
-#endif
-
   cpu_trace();
   cpu_execute_next_opcode();
 
