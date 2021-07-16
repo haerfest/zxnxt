@@ -1630,6 +1630,12 @@ static void execute_{pfx_str}(void) {{
 '''
             fns.append(fn)
             body += f'    case 0x{opcode:02X}: execute_{pfx_str}(); break;\n'
+
+        elif opcode in [0xDD, 0xFD] and prefix == [opcode]:
+            # A repeated sequence of these builds one long uninterruptible opcode.
+            me    = ''.join(f'{n:02X}' for n in prefix)
+            body += f'    case 0x{opcode:02X}: execute_{me}();\n'
+
         else:
             print(f'warning: no implementation of {pfx_str}')
 
