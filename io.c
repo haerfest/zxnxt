@@ -276,8 +276,6 @@ u8_t io_read(u16_t address) {
       break;
   }
 
-  log_wrn("io: unimplemented read from $%04X\n", address);
-
   return ula_floating_bus_read();
 }
 
@@ -520,8 +518,6 @@ void io_write(u16_t address, u8_t value) {
     default:
       break;
   }
-
-  log_wrn("io: unimplemented write of $%02X to $%04X\n", value, address);
 }
 
 
