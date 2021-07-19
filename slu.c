@@ -27,7 +27,6 @@ typedef struct {
   u32_t                beam_row;
   u32_t                beam_column;
   int                  is_beam_visible;
-  int                  do_skip_frame;
   u32_t                display_rows;
   u32_t                display_columns;
 
@@ -130,10 +129,7 @@ static void slu_beam_advance(void) {
   self.beam_row = 0;
 
   /* Update display. */
-  if (!self.do_skip_frame) {
-    slu_blit();
-  }
-  self.do_skip_frame = !self.do_skip_frame;
+  slu_blit();
 
   /* Notify the ULA that we completed a frame. */
   ula_did_complete_frame();  
@@ -269,10 +265,6 @@ void slu_run(u32_t ticks_14mhz) {
 
     if (!ula_beam_to_frame_buffer(self.beam_row, self.beam_column, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
-      continue;
-    }
-
-    if (self.do_skip_frame) {
       continue;
     }
 
