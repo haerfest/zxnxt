@@ -387,19 +387,25 @@ static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column)
   const int   is_foreground    = display_byte & mask;
   const u32_t tstates          = self.tstates_x4 / 4;
 
-  /* 14337 = read display byte 1
-   * 14338 = read attribute 1
-   * 14339 = read display byte 2
-   * 14340 = read attribute 2
-   * 14341 = no activity
-   * 14342 = no activity
-   * 14343 = no activity
-   * 14344 = no activity
+  /* 14338 = read display byte 1
+   * 14339 = read attribute 1
+   * 14340 = read display byte 2
+   * 14341 = read attribute 2
    */
-  if (tstates < 14339) {
+  if (tstates < 64 * 224 + 2 || tstates >= (64 + 192) * 224 ) {
+    /* No display data read yet, or entire picture drawn. */
+    self.floating_bus = 0xFF;
+  } else if ((tstates - (64 * 224 + 2)) % 224 >= 128) {
+    /* Right border + horizontal flyback + left border. */
     self.floating_bus = 0xFF;
   } else {
-    self.floating_bus = ((tstates - 14339) % 224) % 8;
+    switch ((tstates - (64 * 224 + 2)) % 8) {
+      case 0:  self.floating_bus = display_byte;   break;
+      case 1:  self.floating_bus = attribute_byte; break;
+      case 2:  self.floating_bus = display_byte;   break;
+      case 3:  self.floating_bus = attribute_byte; break;
+      default: self.floating_bus = 0xFF;           break;
+    }
   }
 
   if (self.is_ula_next_mode) {
@@ -615,7 +621,9 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
     *rgb = ula_display_handlers[self.display_mode](row, column);
     return;
   }
-  
+
+  self.floating_bus = 0xFF;
+
   *is_border  = 1;
   *is_clipped = 0;
 
