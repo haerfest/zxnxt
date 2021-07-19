@@ -608,7 +608,8 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
     return;
   }
 
-  if ((self.tstates_x4 / 4) % 8 == 0) {
+  /* Latch border colour every 4th T-state. */
+  if (self.tstates_x4 % (4 * 4) == 0) {
     self.border_colour = self.border_colour_latched;
   }
 
