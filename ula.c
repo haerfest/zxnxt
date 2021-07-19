@@ -310,6 +310,7 @@ typedef struct {
   ula_display_mode_t         display_mode_requested;
   u8_t*                      attribute_ram;
   u8_t                       floating_bus;
+  u8_t                       border_colour_latched;
   u8_t                       border_colour;
   u8_t                       speaker_state;
   palette_t                  palette;
@@ -607,6 +608,10 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
     return;
   }
 
+  if ((self.tstates_x4 / 4) % 8 == 0) {
+    self.border_colour = self.border_colour_latched;
+  }
+
   if (self.is_displaying_content) {
     row    -= 32;
     column -= 32 * 2;
@@ -697,8 +702,8 @@ void ula_write(u16_t address, u8_t value) {
 
   audio_add_sample(E_AUDIO_SOURCE_BEEPER, sample);
 
-  self.speaker_state = speaker_state;
-  self.border_colour = value & 0x07;
+  self.speaker_state         = speaker_state;
+  self.border_colour_latched = value & 0x07;
 }
 
 
