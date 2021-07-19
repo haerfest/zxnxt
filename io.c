@@ -88,56 +88,7 @@ void io_mf_ports_set(u8_t enable, u8_t disable) {
 }
 
 
-/**
- * https://worldofspectrum.org/faq/reference/48kreference.htm#IOContention
- */
-static void io_contend(u16_t address) {
-  const u8_t high_byte = address >> 8;
-  const u8_t A0        = address & 1;
-
-  if (high_byte >= 0x40 && high_byte <= 0x7F) {
-    /* T1: Contend T1 because the ULA cannot yet tell the difference between a
-     * lower 16 KiB memory request and an I/O request. */
-    ula_contend();
-    clock_run(1);
-
-    /* T2: Now at T2 the ULA knows it's an I/O request and thus it will contend
-     * T2: */
-    ula_contend();
-    clock_run(1);
-   
-    if (A0) {
-      /* Tw: With A0 high, the contention cancellation is never triggered, so
-       * Tw and T3 are also contended: C:1 C:1 C:1 C:1. */
-      ula_contend();
-      clock_run(1);
-
-      /* T3 */
-      ula_contend();
-      clock_run(1);
-    } else {
-      /* Tw: With A0 low, the contention ends after T2 because by now the ULA
-       * has finished reading any video data from memory, and can handle Tw and
-       * T3 at the Z80's normal pace: C:1 C:3. */
-      clock_run(2);
-    }
-  } else if (A0) {
-    /* It's not a potentially contended memory request, and with A0 high
-     * nothing will be expected of the ULA, so no contention necessary: N:4. */
-    clock_run(4);
-  } else {
-    /* As above, except that with A0 low it may turn out to be a request for
-     * the ULA, so contend T2 and let Tw and T3 continue normally: N:1 C:3. */
-    clock_run(1);
-    ula_contend();
-    clock_run(3);
-  }
-}
-
-
-u8_t io_read(u16_t address) {
-  io_contend(address);
-
+static u8_t read_internal(u16_t address) {
   if ((address & 0x0001) == 0x0000) {
     return ula_read(address);
   }
@@ -280,9 +231,65 @@ u8_t io_read(u16_t address) {
 }
 
 
-void io_write(u16_t address, u8_t value) {
-  io_contend(address);
+/**
+ * https://worldofspectrum.org/faq/reference/48kreference.htm#IOContention
+ *
+ * Four cycles: T1 T2 Tw T3.  T2 is contended, read takes place at T3.
+ */
+u8_t io_read(u16_t address) {
+  const u8_t high_byte = address >> 8;
+  const u8_t A0        = address & 1;
+  u8_t       result;
 
+  if (high_byte >= 0x40 && high_byte <= 0x7F) {
+    /* T1 */
+    ula_contend();
+    clock_run(1);
+
+    /* T2 */
+    ula_contend();
+    clock_run(1);
+
+    if (A0) {
+      /* Tw */
+      ula_contend();
+      clock_run(1);
+
+      /* T3 */
+      ula_contend();
+      result = read_internal(address);
+      clock_run(1);
+    } else {
+      /* Tw T3 */
+      clock_run(1);
+      result = read_internal(address);
+      clock_run(1);
+    }
+  } else if (A0) {
+    /* T1 T2 Tw */
+    clock_run(3);
+
+    /* T3 */
+    result = read_internal(address);
+    clock_run(1);
+  } else {
+    /* T1 */
+    clock_run(1);
+
+    /* T2 Tw */
+    ula_contend();
+    clock_run(2);
+
+    /* T3 */
+    result = read_internal(address);
+    clock_run(1);
+  }
+
+  return result;
+}
+
+
+static void write_internal(u16_t address, u8_t value) {
   if ((address & 0x0001) == 0x0000) {
     ula_write(address, value);
     return;
@@ -517,6 +524,57 @@ void io_write(u16_t address, u8_t value) {
 
     default:
       break;
+  }
+}
+
+/**
+ * Four cycles: T1 T2 Tw T3.  T2 is contended, write takes place at T2.
+ */
+void io_write(u16_t address, u8_t value) {
+  const u8_t high_byte = address >> 8;
+  const u8_t A0        = address & 1;
+
+  if (high_byte >= 0x40 && high_byte <= 0x7F) {
+    /* T1 */
+    ula_contend();
+    clock_run(1);
+
+    /* T2 */
+    ula_contend();
+    write_internal(address, value);
+    clock_run(1);
+
+    if (A0) {
+      /* Tw */
+      ula_contend();
+      clock_run(1);
+
+      /* T3 */
+      ula_contend();
+      clock_run(1);
+    } else {
+      /* Tw T3 */
+      clock_run(1);
+      clock_run(1);
+    }
+  } else if (A0) {
+    /* T1 */
+    clock_run(1);
+    write_internal(address, value);
+
+    /* T2 Tw T3 */
+    clock_run(3);
+  } else {
+    /* T1 */
+    clock_run(1);
+
+    /* T2 */
+    ula_contend();
+    write_internal(address, value);
+    clock_run(1);
+ 
+    /* Tw T3 */
+    clock_run(2);
   }
 }
 
