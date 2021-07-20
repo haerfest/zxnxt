@@ -43,7 +43,7 @@ void uart_finit(void) {
 
 
 static u32_t baudrate(u32_t prescalar) {
-  return prescalar ? clock_28mhz_get() : clock_28mhz_get() / prescalar;
+  return prescalar ? (clock_28mhz_get() / prescalar) : clock_28mhz_get();
 }
 
 
