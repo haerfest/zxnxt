@@ -12,6 +12,10 @@
 #include "ula.h"
 
 
+#define MIN(a,b)  ((a) < (b) ? (a) : (b))
+#define MAX(a,b)  ((a) > (b) ? (a) : (b))
+
+
 typedef enum blend_mode_t {
   E_BLEND_MODE_ULA = 0,
   E_BLEND_MODE_NONE,
@@ -29,6 +33,11 @@ typedef struct self_t {
   int                  is_beam_visible;
   u32_t                display_rows;
   u32_t                display_columns;
+  u32_t                dirty_row1;
+  u32_t                dirty_row2;
+  u32_t                dirty_col1;
+  u32_t                dirty_col2;
+  int                  is_dirty;
 
   /* Resettable. */
   slu_layer_priority_t layer_priority;
@@ -83,29 +92,42 @@ void slu_reset(reset_t reset) {
 
 
 static void slu_blit(void) {
-  SDL_Rect source_rect = {
-    .x = 0,
-    .y = 0,
-    .w = WINDOW_WIDTH,
-    .h = WINDOW_HEIGHT / 2
-  };
-  void* pixels;
-  int   pitch;
+  if (!self.is_dirty) {
+    return;
+  }
 
-  if (SDL_LockTexture(self.texture, NULL, &pixels, &pitch) != 0) {
+  u16_t* pixels;
+  int    pitch;
+
+  SDL_Rect src_rect = {
+    .y = self.dirty_row1,
+    .h = self.dirty_row2 - self.dirty_row1 + 1,
+    .x = self.dirty_col1,
+    .w = self.dirty_col2 - self.dirty_col1 + 1
+  };
+
+  if (SDL_LockTexture(self.texture, &src_rect, (void **) &pixels, &pitch) != 0) {
     log_err("slu: SDL_LockTexture error: %s\n", SDL_GetError());
     return;
   }
 
-  memcpy(pixels, self.frame_buffer, FRAME_BUFFER_SIZE);
+  /* Only update the dirty pixels. */
+  u16_t* src = &self.frame_buffer[src_rect.y * FRAME_BUFFER_WIDTH + src_rect.x];
+  void*  dst = pixels;
+  for (int y = 0; y < src_rect.h; y++, dst += pitch, src += FRAME_BUFFER_WIDTH) {
+    memcpy(dst, src, src_rect.w * 2);
+  }
+
   SDL_UnlockTexture(self.texture);
 
-  if (SDL_RenderCopy(self.renderer, self.texture, &source_rect, NULL) != 0) {
+  if (SDL_RenderCopy(self.renderer, self.texture, NULL, NULL) != 0) {
     log_err("slu: SDL_RenderCopy error: %s\n", SDL_GetError());
     return;
   }
 
   SDL_RenderPresent(self.renderer);
+
+  self.is_dirty = 0;
 }
 
 
@@ -436,7 +458,21 @@ void slu_run(u32_t ticks_14mhz) {
         break;
     }
     
-    self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column] = rgb_out;
+    u16_t* rgb_existing = &self.frame_buffer[frame_buffer_row * FRAME_BUFFER_WIDTH + frame_buffer_column];
+    if (rgb_out != *rgb_existing) {
+      *rgb_existing = rgb_out;
+
+      if (!self.is_dirty) {
+        self.dirty_row1 = self.dirty_row2 = frame_buffer_row;
+        self.dirty_col1 = self.dirty_col2 = frame_buffer_column;
+        self.is_dirty   = 1;
+      } else {
+        self.dirty_row1 = MIN(self.dirty_row1, frame_buffer_row);
+        self.dirty_row2 = MAX(self.dirty_row2, frame_buffer_row);
+        self.dirty_col1 = MIN(self.dirty_col1, frame_buffer_column);
+        self.dirty_col2 = MAX(self.dirty_col2, frame_buffer_column);
+      }
+    }
   }
 }
 
