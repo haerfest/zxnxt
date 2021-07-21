@@ -326,7 +326,6 @@ typedef struct self_t {
   int                        do_contend;
   u32_t                      tstates_x4;
   int                        is_timex_enabled;
-  int                        is_displaying_content;
   int                        is_enabled;
   u16_t                      transparency_rgb8;
   u8_t                       ula_next_mask_ink;
@@ -565,9 +564,6 @@ int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buf
     cpu_irq(E_CPU_IRQ_ULA, 0);
   }
 
-  /* Need to know this for floating bus support. */
-  self.is_displaying_content = beam_row < 192 && beam_column / 2 < 256;
-
   /* Nothing to draw when beam is outside visible area. */
   if (beam_row >= self.display_spec->vblank_start && beam_row < self.display_spec->vblank_end) {
     /* In VBLANK. */
@@ -602,7 +598,7 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
     self.border_colour = self.border_colour_latched;
   }
 
-  if (self.is_displaying_content) {
+  if (row >= 32 && row < 32 + 192 && column >= 32 * 2 && column < (32 + 256) * 2) {
     row    -= 32;
     column -= 32 * 2;
 
@@ -838,18 +834,6 @@ static void ula_contend_48k(void) {
 }
 
 
-static void ula_contend_128k(void) {
-  if (self.is_displaying_content) {
-    const u32_t delay[8] = {
-      6, 5, 4, 3, 2, 1, 0, 0
-    };
-    const u32_t t_states = self.tstates_x4 / 4;
-
-    clock_run(delay[((t_states + 1) % 228) % 8]);
-  }
-}
-
-
 typedef void (*contend_handler)(void);
 
 
@@ -857,7 +841,7 @@ void ula_contend(void) {
   const contend_handler handlers[E_MACHINE_TYPE_LAST - E_MACHINE_TYPE_FIRST + 1] = {
     NULL,
     ula_contend_48k,
-    ula_contend_128k,
+    NULL,
     NULL,
     NULL
   };
