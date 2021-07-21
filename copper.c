@@ -154,37 +154,38 @@ void copper_control_write(u8_t value) {
 }
 
 
-void copper_tick(u32_t beam_row, u32_t beam_column) {
+void copper_tick(u32_t beam_row, u32_t beam_column, int ticks_28mhz) {
+  int    tick;
+  u16_t instruction;
+
   if (!self.is_running) {
     return;
   }
 
-  const u16_t instruction = (self.instruction[self.cpc].msb << 8) | self.instruction[self.cpc].lsb;
+  for (tick = 0; tick < ticks_28mhz; tick++) {
+    instruction = (self.instruction[self.cpc].msb << 8) | self.instruction[self.cpc].lsb;
 
-  if (instruction == 0x0000) {
-    /* NOOP: 1 cycle. */
-    self.cpc = (self.cpc + 1) & 0x3FF;
-    return;
-  }
-
-  if (instruction & 0x8000) {
-    /* WAIT: 1 cycle. */
-    const u32_t wait_row    = instruction & 0x01FF;
-    const u32_t wait_column = (instruction & 0x7E00) >> 6;
-    if (beam_row == wait_row && beam_column >= wait_column) {
+    if (instruction == 0x0000) {
+      /* NOOP: 1 cycle. */
       self.cpc = (self.cpc + 1) & 0x3FF;
+    } else if (instruction & 0x8000) {
+      /* WAIT: 1 cycle. */
+      const u32_t wait_row    = instruction & 0x01FF;
+      const u32_t wait_column = (instruction & 0x7E00) >> 6;
+      if (beam_row == wait_row && beam_column >= wait_column) {
+        self.cpc = (self.cpc + 1) & 0x3FF;
+      }
+    } else {      
+      /* MOVE: 2 cycles. */
+      if (self.do_move_wait_one_cycle) {
+        const u8_t reg   = (instruction & 0x7F00) >> 8;
+        const u8_t value = instruction & 0x00FF;
+        nextreg_write_internal(reg, value);
+        self.cpc = (self.cpc + 1) & 0x3FF;
+      }
+      self.do_move_wait_one_cycle = !self.do_move_wait_one_cycle;
     }
-    return;
   }
-  
-  /* MOVE: 2 cycles. */
-  if (self.do_move_wait_one_cycle) {
-    const u8_t reg   = (instruction & 0x7F00) >> 8;
-    const u8_t value = instruction & 0x00FF;
-    nextreg_write_internal(reg, value);
-    self.cpc = (self.cpc + 1) & 0x3FF;
-  }
-  self.do_move_wait_one_cycle = !self.do_move_wait_one_cycle;
 }
 
 

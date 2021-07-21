@@ -37,7 +37,6 @@ typedef struct self_t {
   u32_t                dirty_row2;
   u32_t                dirty_col1;
   u32_t                dirty_col2;
-  int                  is_dirty;
 
   /* Resettable. */
   slu_layer_priority_t layer_priority;
@@ -92,7 +91,7 @@ void slu_reset(reset_t reset) {
 
 
 static void slu_blit(void) {
-  if (!self.is_dirty) {
+  if (self.dirty_row1 > self.dirty_row2) {
     return;
   }
 
@@ -127,7 +126,9 @@ static void slu_blit(void) {
 
   SDL_RenderPresent(self.renderer);
 
-  self.is_dirty = 0;
+  /* Impossible reversed configuration indicates nothing is dirty. */
+  self.dirty_row1 = self.dirty_col1 = FRAME_BUFFER_HEIGHT;
+  self.dirty_row2 = self.dirty_col2 = 0;
 }
 
 
@@ -171,8 +172,11 @@ static void slu_beam_advance(void) {
  * > signal.
  */
 static void slu_irq(void) {
-  self.line_irq_active = (self.line_irq_enabled && ((self.beam_row == self.display_rows - 1 && self.line_irq_row == 0) || self.beam_row == self.line_irq_row - 1) && self.beam_column >= 256 * 2);
-  cpu_irq(E_CPU_IRQ_LINE, self.line_irq_active);
+  const int line_irq_active = (self.line_irq_enabled && ((self.beam_row == self.display_rows - 1 && self.line_irq_row == 0) || self.beam_row == self.line_irq_row - 1) && self.beam_column >= 256 * 2);
+  if (line_irq_active != self.line_irq_active) {
+    self.line_irq_active = line_irq_active;
+    cpu_irq(E_CPU_IRQ_LINE, line_irq_active);
+  }
 }
 
 
@@ -282,8 +286,7 @@ void slu_run(u32_t ticks_14mhz) {
     slu_irq();
 
     /* Copper runs at 28 MHz. */
-    copper_tick(self.beam_row, self.beam_column);
-    copper_tick(self.beam_row, self.beam_column);
+    copper_tick(self.beam_row, self.beam_column, 2);
 
     if (!ula_beam_to_frame_buffer(self.beam_row, self.beam_column, &frame_buffer_row, &frame_buffer_column)) {
       /* Beam is outside frame buffer. */
@@ -462,16 +465,10 @@ void slu_run(u32_t ticks_14mhz) {
     if (rgb_out != *rgb_existing) {
       *rgb_existing = rgb_out;
 
-      if (!self.is_dirty) {
-        self.dirty_row1 = self.dirty_row2 = frame_buffer_row;
-        self.dirty_col1 = self.dirty_col2 = frame_buffer_column;
-        self.is_dirty   = 1;
-      } else {
-        self.dirty_row1 = MIN(self.dirty_row1, frame_buffer_row);
-        self.dirty_row2 = MAX(self.dirty_row2, frame_buffer_row);
-        self.dirty_col1 = MIN(self.dirty_col1, frame_buffer_column);
-        self.dirty_col2 = MAX(self.dirty_col2, frame_buffer_column);
-      }
+      self.dirty_row1 = MIN(self.dirty_row1, frame_buffer_row);
+      self.dirty_row2 = MAX(self.dirty_row2, frame_buffer_row);
+      self.dirty_col1 = MIN(self.dirty_col1, frame_buffer_column);
+      self.dirty_col2 = MAX(self.dirty_col2, frame_buffer_column);
     }
   }
 }

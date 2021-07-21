@@ -12,7 +12,7 @@ void copper_data_8bit_write(u8_t value);
 void copper_data_16bit_write(u8_t value);
 void copper_address_write(u8_t value);
 void copper_control_write(u8_t value);
-void copper_tick(u32_t beam_row, u32_t beam_column);
+void copper_tick(u32_t beam_row, u32_t beam_column, int tick_28mhz);
 void copper_irq(void);
 
 
