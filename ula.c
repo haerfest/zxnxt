@@ -1073,7 +1073,33 @@ static u8_t ula_floating_bus_48k_read(void) {
 
 
 static u8_t ula_floating_bus_128k_read(void) {
-  return 0xFF;  /* TODO */
+  const u32_t tstates = self.tstates_x4 / 4 - 14364;
+  const u32_t row     =  tstates / 228;
+  const u32_t col     = (tstates % 228) * 2;
+
+  if (col >= 256) {
+    /* Right border/horizontal flyback/left border. */
+    return 0xFF;
+  }
+
+  switch (tstates % 8) {
+    case 0:  /* 14364 + 8N */
+      return ula_mode_x_display_byte_get(row, col);
+    
+    case 1:  /* 14365 + 8N */
+      return ula_mode_x_attribute_byte_get(row, col);
+
+    case 2:  /* 14366 + 8N */
+      return ula_mode_x_display_byte_get(row, col + 8);
+    
+    case 3: /* 14367 + 8N */
+      return ula_mode_x_attribute_byte_get(row, col + 8);
+
+    default:
+      break;
+  }
+
+  return 0xFF;
 }
 
 
@@ -1097,9 +1123,14 @@ u8_t ula_floating_bus_read(void) {
     case E_MACHINE_TYPE_ZX_48K:
       return ula_floating_bus_48k_read();
 
-    default:
+    case E_MACHINE_TYPE_ZX_128K_PLUS2:
       return ula_floating_bus_128k_read();
+
+    default:
+      break;
   }
+
+  return 0xFF;
 }
 
 
