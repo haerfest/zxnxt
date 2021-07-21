@@ -21,7 +21,7 @@ static const u32_t clock_28mhz[E_TIMING_LAST - E_TIMING_FIRST + 1] = {
 };
 
 
-typedef struct {
+typedef struct self_t {
   timing_t    clock_timing;
   cpu_speed_t cpu_speed;
   u64_t       ticks_28mhz;      /* At max dot clock overflows in 20k years. */

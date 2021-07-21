@@ -12,7 +12,7 @@
 #include "ula.h"
 
 
-typedef enum {
+typedef enum blend_mode_t {
   E_BLEND_MODE_ULA = 0,
   E_BLEND_MODE_NONE,
   E_BLEND_MODE_ULA_TILEMAP_MIX,
@@ -20,7 +20,7 @@ typedef enum {
 } blend_mode_t;
 
 
-typedef struct {
+typedef struct self_t {
   SDL_Renderer*        renderer;
   SDL_Texture*         texture;
   u16_t*               frame_buffer;

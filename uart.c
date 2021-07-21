@@ -9,13 +9,13 @@
 /**
  * TODO Support UARTs redirected to joysticks?
  */
-typedef enum {
+typedef enum device_t {
   E_DEVICE_ESP = 0,
   E_DEVICE_PI
 } device_t;
 
 
-typedef struct {
+typedef struct uart_t {
   u32_t prescalar;
   int   bits_per_frame;
   int   use_parity_check;
@@ -24,7 +24,7 @@ typedef struct {
 } uart_t;
 
 
-typedef struct {
+typedef struct uarts_t {
   uart_t   uart[2];
   device_t selected;
 } uarts_t;

@@ -6,14 +6,14 @@
 #include "palette.h"
 
 
-typedef enum {
+typedef enum resolution_t {
   E_RESOLUTION_256X192 = 0,
   E_RESOLUTION_320X256,
   E_RESOLUTION_640X256
 } resolution_t;
 
 
-typedef enum {
+typedef enum mapping_t {
   E_MAPPING_FIRST_16K = 0,
   E_MAPPING_SECOND_16K,
   E_MAPPING_THIRD_16K,
@@ -21,7 +21,7 @@ typedef enum {
 } mapping_t;
 
 
-typedef struct {
+typedef struct self_t {
   u8_t*        ram;
   u8_t         access;
   u8_t         control;

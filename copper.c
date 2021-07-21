@@ -27,13 +27,13 @@
 
 
 /* Instructions are stored in big-endian format. */
-typedef struct {
+typedef struct instruction_t {
   u8_t msb;
   u8_t lsb;
 } instruction_t;
 
 
-typedef struct {
+typedef struct copper_t {
   u16_t         cpc;      /** 0 - 1023 */
   u16_t         address;  /** 0 - 2047 */
   instruction_t instruction[1024];

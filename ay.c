@@ -14,7 +14,7 @@
 #define N_CHANNELS      3
 
 
-typedef enum {
+typedef enum ay_register_t {
   E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_FINE = 0,
   E_AY_REGISTER_CHANNEL_A_TONE_PERIOD_COARSE,
   E_AY_REGISTER_CHANNEL_B_TONE_PERIOD_FINE,
@@ -63,7 +63,7 @@ typedef struct {
 } channel_latched_t;
 
 
-typedef struct {
+typedef struct ay_channel_t {
   channel_latched_t latched;
   u16_t             tone_counter;
   u16_t             tone_period_half;
@@ -73,14 +73,14 @@ typedef struct {
 } ay_channel_t;
 
 
-typedef struct {
+typedef struct general_latched_t {
   u8_t  noise_period;
   u16_t envelope_period;
   u8_t  envelope_shape;
 } general_latched_t;
 
 
-typedef struct {
+typedef struct ay_t {
   audio_source_t    source;
   u8_t              registers[N_REGISTERS];
   ay_register_t     selected_register;
@@ -102,7 +102,7 @@ typedef struct {
 } ay_t;
 
 
-typedef struct {
+typedef struct self_t {
   int  is_turbosound_enabled;
   u8_t selected_ay;
   ay_t ays[3];

@@ -4,7 +4,7 @@
 #include "log.h"
 
 
-typedef struct {
+typedef struct entity_t {
   SDL_GameController* controller;
   joystick_type_t     type;
   int                 is_pressed_up;
@@ -21,7 +21,7 @@ typedef struct {
 } entity_t;
 
 
-typedef struct {
+typedef struct self_t {
   entity_t entity[2];
 } self_t;
 

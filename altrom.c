@@ -7,7 +7,7 @@
 #define NOT_LOCKED  0
 
 
-typedef struct {
+typedef struct self_t {
   u8_t*          rom0_128k;
   u8_t*          rom1_48k;
   u8_t*          ptr;

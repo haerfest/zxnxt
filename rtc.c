@@ -12,7 +12,7 @@
 #define BCD(x)  (((x) / 10) << 4 | ((x) % 10))
 
 
-typedef struct {
+typedef struct rtc_t {
   u8_t index;
 } rtc_t;
 

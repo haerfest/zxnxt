@@ -13,7 +13,7 @@
  */
 
 
-typedef struct {
+typedef struct self_t {
   u8_t* sram;
   int   is_visible;
   int   is_enabled;

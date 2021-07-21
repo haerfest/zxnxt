@@ -24,7 +24,7 @@
 #define TOKEN_NO_DATA     0xFF
 
 
-typedef enum {
+typedef enum cmd_t {
   E_CMD_GO_IDLE_STATE       = 0,
   E_CMD_SEND_OP_COND        = 1,
   E_CMD_SEND_IF_COND        = 8,
@@ -40,19 +40,19 @@ typedef enum {
   E_CMD_READ_OCR            = 58
 } cmd_t;
 
-typedef enum {
+typedef enum response_t {
   E_RESPONSE_R1,
   E_RESPONSE_R1B_R1,
   E_RESPONSE_R1B_BUSY
 } response_t;
 
-typedef enum {
+typedef enum error_t {
   E_ERROR_NONE            = 0x00,
   E_ERROR_ILLEGAL_COMMAND = 0x04,
   E_ERROR_PARAMETER_ERROR = 0x40
 } error_t;
 
-typedef enum {
+typedef enum state_t {
   E_STATE_IDLE = 0,
   E_STATE_READY,
   E_STATE_IDENTIFICATION,
@@ -65,7 +65,7 @@ typedef enum {
   E_STATE_INACTIVE
 } state_t;
   
-typedef struct {
+typedef struct sdcard_t {
   state_t    state;
   u8_t       command_buffer[6];
   int        command_length;

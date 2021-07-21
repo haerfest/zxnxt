@@ -15,7 +15,7 @@
 #define BANK_NUMBER(value)     ((value) & 0x0F)
 
 
-typedef struct {
+typedef struct divmmc_t {
   u8_t* sram;
   u8_t* rom;
   u8_t* ram;

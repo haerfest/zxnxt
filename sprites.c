@@ -8,7 +8,7 @@
 #define N_SPRITES  128
 
 
-typedef struct {
+typedef struct sprite_t {
   u8_t number;
 
   /* Set. */
@@ -71,7 +71,7 @@ const sprite_t initial_anchor = {
  *       128 x 4-bit sprites of 128 bytes each.
  */
 
-typedef struct {
+typedef struct sprites_t {
   u8_t*     patterns;
   sprite_t* sprites;
   u16_t*    frame_buffer;

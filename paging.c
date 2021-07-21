@@ -6,7 +6,7 @@
 #include "ula.h"
 
 
-typedef struct {
+typedef struct self_t {
   int  is_spectrum_128k_paging_locked;
   u8_t bank_slot_4;
   int  is_special;

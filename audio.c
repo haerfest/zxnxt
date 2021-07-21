@@ -8,7 +8,7 @@
 #define SQRT_N_SOURCES  4  /* More or less, provides headroom. */
 
 
-typedef struct {
+typedef struct self_t {
   SDL_AudioDeviceID device;
   audio_channel_t   channels[N_SOURCES];
   s8_t              last_sample[N_SOURCES];

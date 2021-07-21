@@ -35,13 +35,13 @@
 #define CORE_VERSION_SUB_MINOR  9
 
 
-typedef struct {
+typedef struct clip_t {
   u8_t index;
   u8_t values[4];  /* x1, x2, y1, y2. */
 } clip_t;
 
 
-typedef struct {
+typedef struct nextreg_t {
   u8_t                     registers[256];
   u8_t                     selected_register;
   int                      is_hard_reset;

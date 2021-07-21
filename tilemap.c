@@ -12,7 +12,7 @@
  */
 
 
-typedef struct {
+typedef struct tilemap_t {
   u8_t*     bank5;
   u8_t      default_attribute;
   u16_t     definitions_base_address;

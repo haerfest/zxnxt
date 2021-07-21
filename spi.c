@@ -3,7 +3,7 @@
 #include "sdcard.h"
 
 
-typedef enum {
+typedef enum spi_device_t {
   E_SPI_DEVICE_NONE = 0,
   E_SPI_DEVICE_SDCARD_0,
   E_SPI_DEVICE_SDCARD_1,
@@ -23,7 +23,7 @@ static const char* spi_device_names[] = {
 };
 
 
-typedef struct {
+typedef struct spi_t {
   spi_device_t device;
 } spi_t;
 

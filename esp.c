@@ -28,7 +28,7 @@ static void idle_tx(void);
 static void send_tx(void);
 
 
-typedef struct {
+typedef struct esp_t {
   buffer_t     tx;
   buffer_t     rx;
   u8_t*        rx_temp;

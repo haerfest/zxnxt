@@ -9,7 +9,7 @@ typedef u8_t (*reader_t)(void);
 typedef void (*writer_t)(u8_t);
 
 
-const struct {
+const struct slave_t {
   u8_t     address;
   reader_t read;
   writer_t write;
@@ -18,7 +18,7 @@ const struct {
 };
 
 
-typedef enum {
+typedef enum state_t {
   E_STATE_IDLE = 0,
   E_STATE_ADDRESS,
   E_STATE_DIRECTION,
@@ -28,7 +28,7 @@ typedef enum {
 } state_t;
 
 
-typedef struct {
+typedef struct i2c_t {
   state_t  state;
   u8_t     scl;
   u8_t     sda;

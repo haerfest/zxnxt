@@ -11,7 +11,7 @@
 #define NOT_LOCKED  0
 
 
-typedef struct {
+typedef struct self_t {
   u8_t*          sram;
   rom_t          selected;
   rom_t          locked;

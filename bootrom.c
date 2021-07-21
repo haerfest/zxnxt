@@ -12,7 +12,7 @@
 #define BOOT_ROM_SIZE  (8 * 1024)
 
 
-typedef struct {
+typedef struct bootrom_t {
   u8_t* rom;
   u8_t* sram;
   int   is_active;

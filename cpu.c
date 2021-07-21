@@ -139,7 +139,7 @@ static const u8_t parity[256] = {
 
 /* Simple way to combine two 8-bit registers into a 16-bit one.
  * TODO: Deal with endianness of host CPU. */
-typedef union {
+typedef union reg16_t {
   struct {
     u8_t l;  /* Low.  */
     u8_t h;  /* High. */
@@ -157,7 +157,7 @@ typedef union {
 #define CPU_REQUEST_NMI         (CPU_REQUEST_NMI_MF | CPU_REQUEST_NMI_DIVMMC)
 
 
-typedef struct {
+typedef struct cpu_t {
   /* Combined 8-bit and 16-bit registers. */
   reg16_t af;
   reg16_t hl;

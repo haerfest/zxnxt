@@ -16,7 +16,7 @@
 #define N_GROUPS  7
 
 
-typedef enum {
+typedef enum dma_cmd_t {
   E_DMA_CMD_RESET                        = 0xC3,
   E_DMA_CMD_RESET_PORT_A_TIMING          = 0xC7,
   E_DMA_CMD_RESET_PORT_B_TIMING          = 0xCB,
@@ -36,7 +36,7 @@ typedef enum {
 } dma_cmd_t;
 
 
-typedef enum {
+typedef enum mode_t {
   E_MODE_BYTE = 0,
   E_MODE_CONTINUOUS,
   E_MODE_BURST,
@@ -47,7 +47,7 @@ typedef enum {
 typedef void (*dma_decode_handler_t)(u8_t value, int is_first_write);
 
 
-typedef struct {
+typedef struct dma_t {
   u8_t*  sram;
   u8_t   group;
   u8_t   group_value[N_GROUPS];

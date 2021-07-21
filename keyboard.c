@@ -9,7 +9,7 @@
 
 
 /* All the physical keys on a ZX Spectrum 48K. */
-typedef enum {
+typedef enum keyboard_key_t {
   E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4, E_KEY_5, E_KEY_6, E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0,
   E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R, E_KEY_T, E_KEY_Y, E_KEY_U, E_KEY_I, E_KEY_O,            E_KEY_P,
   E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F, E_KEY_G, E_KEY_H, E_KEY_J, E_KEY_K, E_KEY_L,            E_KEY_ENTER,
@@ -28,7 +28,7 @@ const static SDL_Scancode scancodes[N_KEYS] = {
 };
 
 
-typedef struct {
+typedef struct self_t {
   const u8_t* state;
   int         pressed[N_KEYS];
   u8_t        half_row_FE;

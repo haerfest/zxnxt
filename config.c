@@ -3,7 +3,7 @@
 #include "memory.h"
 
 
-typedef struct {
+typedef struct config_t {
   u8_t* sram;
   u8_t  rom_ram_bank;
   u32_t rom_ram_bank_base;

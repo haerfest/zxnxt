@@ -6,7 +6,7 @@
 #define N_PALETTES  (E_PALETTE_TILEMAP_SECOND - E_PALETTE_ULA_FIRST + 1)
 
 
-typedef struct {
+typedef struct self_t {
   palette_entry_t palette[N_PALETTES][256];
 } self_t;
 

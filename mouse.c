@@ -3,7 +3,7 @@
 #include "mouse.h"
 
 
-typedef struct {
+typedef struct mouse_t {
   int   is_captured;
   u8_t  x;
   u8_t  y;

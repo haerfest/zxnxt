@@ -42,7 +42,7 @@
 
 
 /* Tasks we want to schedule after the CPU has finished an instruction. */
-typedef enum {
+typedef enum main_task_t {
   E_MAIN_TASK_NONE,
   E_MAIN_TASK_RESET_HARD,
   E_MAIN_TASK_RESET_SOFT,
@@ -50,7 +50,7 @@ typedef enum {
 } main_task_t;
 
   
-typedef struct {
+typedef struct self_t {
   SDL_Window*         window;
   SDL_Renderer*       renderer;
   SDL_Texture*        texture;

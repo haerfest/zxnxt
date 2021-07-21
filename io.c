@@ -19,7 +19,7 @@
 #include "ula.h"
 
 
-typedef enum {
+typedef enum io_func_t {
   E_IO_FUNC_FIRST = 0,
   E_IO_FUNC_TIMEX = E_IO_FUNC_FIRST,
   E_IO_FUNC_PAGING_128K,
@@ -53,7 +53,7 @@ typedef enum {
 } io_func_t;
 
 
-typedef struct {
+typedef struct io_t {
   int  is_enabled[E_IO_FUNC_LAST - E_IO_FUNC_FIRST + 1];
   u8_t mf_port_enable;
   u8_t mf_port_disable;

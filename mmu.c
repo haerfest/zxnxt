@@ -9,7 +9,7 @@
 #define N_SLOTS    8
 
 
-typedef struct  {
+typedef struct mmu_t {
   u8_t* ram;
   u8_t  pages[N_SLOTS];
 } mmu_t;

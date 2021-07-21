@@ -28,7 +28,7 @@ typedef u8_t (*reader_t)(u16_t address);
 typedef void (*writer_t)(u16_t address, u8_t value);
 
 
-typedef struct {
+typedef struct memory_t {
   u8_t*    sram;
   reader_t readers[ADDRESS_SPACE_SIZE / ADDRESS_PAGE_SIZE];
   writer_t writers[ADDRESS_SPACE_SIZE / ADDRESS_PAGE_SIZE];

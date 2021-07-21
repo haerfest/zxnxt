@@ -4,7 +4,7 @@
 #include "log.h"
 
 
-typedef struct {
+typedef struct dac_t {
   int is_enabled;
 } dac_t;
 
