@@ -13,7 +13,7 @@
 #include "ula.h"
 
 
-typedef enum {
+typedef enum ula_display_mode_t {
   E_ULA_DISPLAY_MODE_FIRST = 0,
   E_ULA_DISPLAY_MODE_SCREEN_0 = E_ULA_DISPLAY_MODE_FIRST,
   E_ULA_DISPLAY_MODE_SCREEN_1,
@@ -41,7 +41,7 @@ typedef enum {
  * tables below have been adjusted for this, such that (0, 0) is the first
  * pixel of the generated display, i.e. borders included.
  */
-typedef struct {
+typedef struct ula_display_spec_t {
   unsigned int rows;                   /** Number of rows.                  */
   unsigned int columns;                /** Number of columns.               */
   unsigned int hblank_start;           /** Column where HBLANK starts.      */
@@ -299,7 +299,7 @@ const ula_display_spec_t ula_display_spec_vga[N_DISPLAY_TIMINGS][N_REFRESH_FREQU
 };
 
 
-typedef struct {
+typedef struct self_t {
   u8_t*                      sram;
   const ula_display_spec_t*  display_spec;
   int                        did_display_spec_change;
@@ -309,7 +309,6 @@ typedef struct {
   ula_display_mode_t         display_mode;
   ula_display_mode_t         display_mode_requested;
   u8_t*                      attribute_ram;
-  u8_t                       floating_bus;
   u8_t                       border_colour_latched;
   u8_t                       border_colour;
   u8_t                       speaker_state;
@@ -378,36 +377,26 @@ static const palette_entry_t* ula_display_mode_hi_res(u32_t row, u32_t column) {
 }
 
 
+static const u8_t ula_mode_x_display_byte_get(u32_t row, u32_t column) {
+  const u16_t display_offset = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | ((column / 8) & 0x1F);
+
+  return self.display_ram[display_offset];
+}
+
+
+static const u8_t ula_mode_x_attribute_byte_get(u32_t row, u32_t column) {
+  const u16_t attribute_offset = (row / 8) * 32 + column / 8;
+  
+  return self.attribute_ram[attribute_offset];
+}
+
+
 static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column) {
   const u32_t halved_column    = column / 2;
-  const u16_t attribute_offset = (row / 8) * 32 + halved_column / 8;
-  const u8_t  attribute_byte   = self.attribute_ram[attribute_offset];
-  const u16_t display_offset   = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | ((halved_column / 8) & 0x1F);
-  const u8_t  display_byte     = self.display_ram[display_offset];
   const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
+  const u8_t  display_byte     = ula_mode_x_display_byte_get(row, halved_column);
+  const u8_t  attribute_byte   = ula_mode_x_attribute_byte_get(row, halved_column);
   const int   is_foreground    = display_byte & mask;
-  const u32_t tstates          = self.tstates_x4 / 4;
-
-  /* 14338 = read display byte 1
-   * 14339 = read attribute 1
-   * 14340 = read display byte 2
-   * 14341 = read attribute 2
-   */
-  if (tstates < 64 * 224 + 2 || tstates >= (64 + 192) * 224 ) {
-    /* No display data read yet, or entire picture drawn. */
-    self.floating_bus = 0xFF;
-  } else if ((tstates - (64 * 224 + 2)) % 224 >= 128) {
-    /* Right border + horizontal flyback + left border. */
-    self.floating_bus = 0xFF;
-  } else {
-    switch ((tstates - (64 * 224 + 2)) % 8) {
-      case 0:  self.floating_bus = display_byte;   break;
-      case 1:  self.floating_bus = attribute_byte; break;
-      case 2:  self.floating_bus = display_byte;   break;
-      case 3:  self.floating_bus = attribute_byte; break;
-      default: self.floating_bus = 0xFF;           break;
-    }
-  }
 
   if (self.is_ula_next_mode) {
     if (is_foreground) {
@@ -627,8 +616,6 @@ void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_
     *rgb = ula_display_handlers[self.display_mode](row, column);
     return;
   }
-
-  self.floating_bus = 0xFF;
 
   *is_border  = 1;
   *is_clipped = 0;
@@ -1050,13 +1037,69 @@ void ula_offset_y_write(u8_t value) {
 }
 
 
+static u8_t ula_floating_bus_48k_read(void) {
+  if (self.tstates_x4 / 4 < 14338) {
+    return 0xFF;
+  }
+
+  const u32_t tstates = self.tstates_x4 / 4 - 14338;
+  const u32_t row     =  tstates / 224;
+  const u32_t col     = (tstates % 224) * 2;
+
+  if (col >= 256) {
+    /* Right border/horizontal flyback/left border. */
+    return 0xFF;
+  }
+
+  switch (tstates % 8) {
+    case 0:  /* 14338 + 8N */
+      return ula_mode_x_display_byte_get(row, col);
+    
+    case 1:  /* 14339 + 8N */
+      return ula_mode_x_attribute_byte_get(row, col);
+
+    case 2:  /* 14340 + 8N */
+      return ula_mode_x_display_byte_get(row, col + 8);
+    
+    case 3: /* 14341 + 8N */
+      return ula_mode_x_attribute_byte_get(row, col + 8);
+
+    default:
+      break;
+  }
+
+  return 0xFF;
+}
+
+
+static u8_t ula_floating_bus_128k_read(void) {
+  return 0xFF;  /* TODO */
+}
+
+
 /**
  * Implement floating bus behaviour. This fixes Arkanoid freezing at the
  * start of the first level and prevents flickering and slowdown in
  * Short Circuit.
  */
 u8_t ula_floating_bus_read(void) {
-  return self.floating_bus;
+  if (self.tstates_x4 < (self.display_spec->rows - self.display_spec->vsync_row) * self.display_spec->columns) {
+    /* Period from IRQ up to and including top border. */
+    return 0xFF;
+  }
+
+  if (self.tstates_x4 >= (self.display_spec->rows - self.display_spec->vsync_row + 192) * self.display_spec->columns) {
+    /* Period starting with lower border. */
+    return 0xFF;
+  }
+
+  switch (self.display_timing) {
+    case E_MACHINE_TYPE_ZX_48K:
+      return ula_floating_bus_48k_read();
+
+    default:
+      return ula_floating_bus_128k_read();
+  }
 }
 
 
