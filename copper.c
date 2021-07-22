@@ -154,7 +154,8 @@ void copper_control_write(u8_t value) {
 }
 
 
-void copper_tick(u32_t beam_row, u32_t beam_column, int ticks_28mhz) {
+inline
+static void copper_tick(u32_t beam_row, u32_t beam_column, int ticks_28mhz) {
   int    tick;
   u16_t instruction;
 

@@ -606,7 +606,8 @@ static void draw_sprites(void) {
 }
 
 
-void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb) {
+inline
+static void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb) {
   size_t offset;
 
   if (!sprites.is_enabled) {

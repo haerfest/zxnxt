@@ -125,7 +125,8 @@ static u8_t tilemap_attribute_get(u32_t row, u32_t column) {
 }
 
 
-void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enabled, int* is_pixel_below, int* is_pixel_textmode, const palette_entry_t** rgb) {
+inline
+static void tilemap_tick(u32_t row, u32_t column, int* is_enabled, int* is_pixel_enabled, int* is_pixel_below, int* is_pixel_textmode, const palette_entry_t** rgb) {
   if (!tilemap.is_enabled) {
     *is_enabled = 0;
     return;

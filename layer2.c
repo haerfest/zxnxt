@@ -132,7 +132,8 @@ void layer2_shadow_bank_write(u8_t bank) {
 }
 
 
-void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t** rgb, int* is_priority) {
+inline
+static void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_entry_t** rgb, int* is_priority) {
   u8_t palette_index ;
 
   if (!layer2.is_visible) {

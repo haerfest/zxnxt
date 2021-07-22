@@ -547,7 +547,8 @@ void ula_did_complete_frame(void) {
  * (0, 0) is the first pixel of the border, such that we can align the other
  * layers which use the 320x256 or 640x256 resolutions.
  */
-int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
+inline
+static int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buffer_row, u32_t* frame_buffer_column) {
   /**
    * tstates are expressed in the stock 3.5 MHz clock, but this function is
    * called at a 14 MHz rate, hence the "times four".
@@ -587,7 +588,8 @@ int ula_beam_to_frame_buffer(u32_t beam_row, u32_t beam_column, u32_t* frame_buf
  * Returns the ULA pixel colour for the frame buffer position, if any, and
  * whether it is transparent or not.
  */
-void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_clipped, const palette_entry_t** rgb) {
+inline
+static void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, int* is_clipped, const palette_entry_t** rgb) {
   *is_enabled = ula.is_enabled;
   if (!ula.is_enabled) {
     return;

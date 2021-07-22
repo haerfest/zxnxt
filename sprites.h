@@ -8,7 +8,6 @@
 int  sprites_init(void);
 void sprites_finit(void);
 void sprites_reset(reset_t reset);
-void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb);
 int  sprites_priority_get(void);
 void sprites_priority_set(int is_zero_on_top);
 int  sprites_enable_get(void);
