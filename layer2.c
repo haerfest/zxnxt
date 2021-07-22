@@ -204,7 +204,7 @@ static void layer2_tick(u32_t row, u32_t column, int* is_enabled, const palette_
   }
 
   *is_enabled  = 1;
-  *rgb         = palette_read(layer2.palette, (layer2.palette_offset << 4) + palette_index);
+  *rgb         = palette_read_inline(layer2.palette, (layer2.palette_offset << 4) + palette_index);
   *is_priority = (*rgb)->is_layer2_priority;
 }
 

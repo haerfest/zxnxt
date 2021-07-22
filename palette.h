@@ -35,6 +35,6 @@ void palette_finit(void);
 const palette_entry_t* palette_read(palette_t palette, u8_t index);
 void                   palette_write_rgb8(palette_t palette, u8_t index, u8_t  rgb);
 void                   palette_write_rgb9(palette_t palette, u8_t index, u8_t rgb);
-u16_t                  palette_rgb8_rgb16(u8_t rgb8);
+
 
 #endif  /* __PALETTE_H */

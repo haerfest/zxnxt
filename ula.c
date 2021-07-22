@@ -356,10 +356,10 @@ static const palette_entry_t* ula_display_mode_lo_res(u32_t row, u32_t column) {
   column /= 2;
   row    /= 2;
 
-  return palette_read(ula.palette,
-                      (row < 48)
-                      ? ula.display_ram[row * 128 + column]
-                      : ula.display_ram_alt[(row - 48) * 128 + column]);
+  return palette_read_inline(ula.palette,
+                             (row < 48)
+                             ? ula.display_ram[row * 128 + column]
+                             : ula.display_ram_alt[(row - 48) * 128 + column]);
 }
 
 
@@ -369,7 +369,7 @@ static const palette_entry_t* ula_display_mode_hi_res(u32_t row, u32_t column) {
   const u8_t* display_ram      = ((column / 8) & 0x01) ? ula.display_ram_alt : ula.display_ram;
   const u8_t  display_byte     = display_ram[display_offset];
 
-  return palette_read(ula.palette,
+  return palette_read_inline(ula.palette,
                       (display_byte & mask)
                       ? 0  + 8 + ula.hi_res_ink_colour
                       : 16 + 8 + (~ula.hi_res_ink_colour & 0x07));
@@ -399,19 +399,19 @@ static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column)
 
   if (ula.is_ula_next_mode) {
     if (is_foreground) {
-      return palette_read(ula.palette, attribute_byte & ula.ula_next_mask_ink);
+      return palette_read_inline(ula.palette, attribute_byte & ula.ula_next_mask_ink);
     }
     
     if (ula.ula_next_rshift_paper == 0) {
       return slu_transparent_get();
     }
 
-    return palette_read(ula.palette, 128 + ((attribute_byte & ~ula.ula_next_mask_ink) >> ula.ula_next_rshift_paper));
+    return palette_read_inline(ula.palette, 128 + ((attribute_byte & ~ula.ula_next_mask_ink) >> ula.ula_next_rshift_paper));
   }
 
   const u8_t             bright = (attribute_byte & 0x40) >> 3;
-  const palette_entry_t* ink    = palette_read(ula.palette, 0  + bright + (attribute_byte & 0x07));
-  const palette_entry_t* paper  = palette_read(ula.palette, 16 + bright + ((attribute_byte >> 3) & 0x07));;
+  const palette_entry_t* ink    = palette_read_inline(ula.palette, 0  + bright + (attribute_byte & 0x07));
+  const palette_entry_t* paper  = palette_read_inline(ula.palette, 16 + bright + ((attribute_byte >> 3) & 0x07));;
   const u8_t             blink  = attribute_byte & 0x80;
 
   return is_foreground
@@ -429,19 +429,19 @@ static const palette_entry_t* ula_display_mode_hi_colour(u32_t row, u32_t column
 
   if (ula.is_ula_next_mode) {
     if (is_foreground) {
-      return palette_read(ula.palette, attribute_byte & ula.ula_next_mask_ink);
+      return palette_read_inline(ula.palette, attribute_byte & ula.ula_next_mask_ink);
     }
     
     if (ula.ula_next_rshift_paper == 0) {
       return slu_transparent_get();
     }
 
-    return palette_read(ula.palette, 128 + ((attribute_byte & ~ula.ula_next_mask_ink) >> ula.ula_next_rshift_paper));
+    return palette_read_inline(ula.palette, 128 + ((attribute_byte & ~ula.ula_next_mask_ink) >> ula.ula_next_rshift_paper));
   }
 
   const u8_t             bright = (attribute_byte & 0x40) >> 3;
-  const palette_entry_t* ink    = palette_read(ula.palette, 0  + bright + (attribute_byte & 0x07));
-  const palette_entry_t* paper  = palette_read(ula.palette, 16 + bright + ((attribute_byte >> 3) & 0x07));;
+  const palette_entry_t* ink    = palette_read_inline(ula.palette, 0  + bright + (attribute_byte & 0x07));
+  const palette_entry_t* paper  = palette_read_inline(ula.palette, 16 + bright + ((attribute_byte >> 3) & 0x07));;
   const u8_t             blink  = attribute_byte & 0x80;
 
   return is_foreground
@@ -622,10 +622,10 @@ static void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, i
     if (ula.ula_next_rshift_paper == 0) {
       *rgb = slu_transparent_get();
     } else {
-      *rgb = palette_read(ula.palette, 128 + ula.border_colour);
+      *rgb = palette_read_inline(ula.palette, 128 + ula.border_colour);
     }
   } else {
-    *rgb = palette_read(ula.palette, 16 + ula.border_colour);
+    *rgb = palette_read_inline(ula.palette, 16 + ula.border_colour);
   }
 }
 

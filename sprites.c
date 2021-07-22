@@ -457,7 +457,7 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
     for (col = 0; col < 16; col++) {
       index = pattern[row * 16 + col];
       if (index != sprites.transparency_index) {
-        entry = palette_read(sprites.palette, (p << 4) + index);
+        entry = palette_read_inline(sprites.palette, (p << 4) + index);
         draw_pixel(entry->rgb16, x + col * xf, y + row * yf, xf, yf);
       }
     }
