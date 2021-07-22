@@ -105,6 +105,7 @@ void tilemap_transparency_index_write(u8_t value) {
 }
 
 
+inline
 static u16_t tilemap_map_offset_get(u32_t row, u32_t column) {
   const u8_t  map_row    = row    / 8;
   const u8_t  map_column = column / (tilemap.use_80x32 ? 8 : 16);
@@ -113,6 +114,7 @@ static u16_t tilemap_map_offset_get(u32_t row, u32_t column) {
 }
 
 
+inline
 static u8_t tilemap_attribute_get(u32_t row, u32_t column) {
   u16_t map_offset;
 
@@ -174,28 +176,6 @@ void tilemap_offset_x_lsb_write(u8_t value) {
 
 void tilemap_offset_y_write(u8_t value) {
   tilemap.offset_y = value;
-}
-
-
-int tilemap_priority_over_ula_get(u32_t row, u32_t column) {
-  if (!tilemap.is_enabled) {
-    /* Tilemap not active, so certainly not on top of ULA. */
-    return 0;
-  }
-  
-  if (tilemap.tilemap_over_ula) {
-    return 1;
-  }
-
-  if (tilemap.use_512_tiles) {
-    return 0;
-  }
-
-  if ((tilemap_attribute_get(row, column) & 0x01) == 0) {
-    return 1;
-  }
-
-  return 0;
 }
 
 
