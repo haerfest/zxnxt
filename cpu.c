@@ -11,6 +11,7 @@
 #include "nextreg.h"
 
 
+#include "clock.c"
 #include "dma.c"
 
 
@@ -97,7 +98,7 @@
 
 
 /* A shortcut to advance the system clock by a number of CPU ticks. */
-#define T    clock_run
+#define T    clock_run_inline
 
 
 #define SZ53(value)   self.sz53[value]

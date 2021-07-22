@@ -21,26 +21,26 @@ static const u32_t clock_28mhz[E_TIMING_LAST - E_TIMING_FIRST + 1] = {
 };
 
 
-typedef struct self_t {
+typedef struct clck_t {
   timing_t    clock_timing;
   cpu_speed_t cpu_speed;
   u64_t       ticks_28mhz;      /* At max dot clock overflows in 20k years. */
-  u64_t       sync_14mhz;       /* Last 28 MHz tick where we synced the 14 MHz ULA clock. */
-  u64_t       sync_2mhz;        /* Last 28 MHz tick where we synced the 1.75 MHz AY-3-8912 clock. */
+  u64_t       sync_14mhz;       /* Last 28 MHz tick where we synced the 14 MHz ULA clck. */
+  u64_t       sync_2mhz;        /* Last 28 MHz tick where we synced the 1.75 MHz AY-3-8912 clck. */
   u64_t       sync_host_next;   /* Next moment at which to sync with reality. */
-} self_t;
+} clck_t;
 
 
-static self_t self;
+static clck_t clck;
 
 
 int clock_init(void) {
-  self.clock_timing   = E_TIMING_HDMI;
-  self.cpu_speed      = E_CPU_SPEED_3MHZ;
-  self.ticks_28mhz    = 0;
-  self.sync_14mhz     = self.ticks_28mhz;
-  self.sync_2mhz      = self.ticks_28mhz;
-  self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get(clock_28mhz[self.clock_timing]);
+  clck.clock_timing   = E_TIMING_HDMI;
+  clck.cpu_speed      = E_CPU_SPEED_3MHZ;
+  clck.ticks_28mhz    = 0;
+  clck.sync_14mhz     = clck.ticks_28mhz;
+  clck.sync_2mhz      = clck.ticks_28mhz;
+  clck.sync_host_next = clck.ticks_28mhz + main_next_host_sync_get(clock_28mhz[clck.clock_timing]);
 
   return 0;
 }
@@ -51,47 +51,57 @@ void clock_finit(void) {
 
 
 u64_t clock_ticks(void) {
-  return self.ticks_28mhz;
+  return clck.ticks_28mhz;
 }
 
 
 cpu_speed_t clock_cpu_speed_get(void) {
-  return self.cpu_speed;
+  return clck.cpu_speed;
 }
 
 
 void clock_cpu_speed_set(cpu_speed_t speed) {
-  self.cpu_speed = speed;
+  clck.cpu_speed = speed;
 
-  main_show_cpu_speed(self.cpu_speed);
+  main_show_cpu_speed(clck.cpu_speed);
 }
 
 
-void clock_run_28mhz_ticks(u64_t ticks) {
+inline
+static void clock_run_28mhz_ticks(u64_t ticks) {
   u32_t ticks_14mhz;
   u32_t ticks_2mhz;
 
-  /* Update system clock. */
-  self.ticks_28mhz += ticks;
+  /* Update system clck. */
+  clck.ticks_28mhz += ticks;
 
   /* Update 14 MHz clock for SLU. */
-  ticks_14mhz = (self.ticks_28mhz - self.sync_14mhz) / 2;
+  ticks_14mhz = (clck.ticks_28mhz - clck.sync_14mhz) / 2;
   if (ticks_14mhz > 0) {
     slu_run(ticks_14mhz);
-    self.sync_14mhz += ticks_14mhz * 2;
+    clck.sync_14mhz += ticks_14mhz * 2;
   }
 
   /* Update 2 MHz clock for AY. */
-  ticks_2mhz = (self.ticks_28mhz - self.sync_2mhz) / 16;
+  ticks_2mhz = (clck.ticks_28mhz - clck.sync_2mhz) / 16;
   if (ticks_2mhz > 0) {
     ay_run(ticks_2mhz);
-    self.sync_2mhz += ticks_2mhz * 16;
+    clck.sync_2mhz += ticks_2mhz * 16;
   }
 
-  if (self.ticks_28mhz >= self.sync_host_next) {
+  if (clck.ticks_28mhz >= clck.sync_host_next) {
     main_sync();
-    self.sync_host_next = self.ticks_28mhz + main_next_host_sync_get(clock_28mhz[self.clock_timing]);
+    clck.sync_host_next = clck.ticks_28mhz + main_next_host_sync_get(clock_28mhz[clck.clock_timing]);
   }
+}
+
+
+inline
+static void clock_run_inline(u32_t cpu_ticks) {
+  const unsigned int clock_divider[E_CPU_SPEED_LAST - E_CPU_SPEED_FIRST + 1] = {
+    8, 4, 2, 1
+  };
+  clock_run_28mhz_ticks(cpu_ticks * clock_divider[clck.cpu_speed]);
 }
 
 
@@ -99,30 +109,30 @@ void clock_run(u32_t cpu_ticks) {
   const unsigned int clock_divider[E_CPU_SPEED_LAST - E_CPU_SPEED_FIRST + 1] = {
     8, 4, 2, 1
   };
-  clock_run_28mhz_ticks(cpu_ticks * clock_divider[self.cpu_speed]);
+  clock_run_28mhz_ticks(cpu_ticks * clock_divider[clck.cpu_speed]);
 }
 
 
 u32_t clock_28mhz_get(void) {
-  return clock_28mhz[self.clock_timing];
+  return clock_28mhz[clck.clock_timing];
 }
 
 
 timing_t clock_timing_get(void) {
-  return self.clock_timing;
+  return clck.clock_timing;
 }
 
 
 u8_t clock_timing_read(void) {
-  return (u8_t) self.clock_timing;
+  return (u8_t) clck.clock_timing;
 }
 
 
 void clock_timing_write(u8_t value) {
-  self.clock_timing = value & 0x07;
+  clck.clock_timing = value & 0x07;
 
-  audio_clock_28mhz_set(clock_28mhz[self.clock_timing]);
-  ula_hdmi_enable(self.clock_timing == E_TIMING_HDMI);
+  audio_clock_28mhz_set(clock_28mhz[clck.clock_timing]);
+  ula_hdmi_enable(clck.clock_timing == E_TIMING_HDMI);
 
-  main_show_timing(self.clock_timing);
+  main_show_timing(clck.clock_timing);
 }
