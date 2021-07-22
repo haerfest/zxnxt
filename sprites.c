@@ -98,27 +98,27 @@ typedef struct sprites_t {
 } sprites_t;
 
 
-static sprites_t self;
+static sprites_t sprites;
 
 
 int sprites_init(void) {
   u8_t number;
 
-  memset(&self, 0, sizeof(self));
+  memset(&sprites, 0, sizeof(sprites));
 
-  self.patterns       = (u8_t*)     calloc(16, 1024);
-  self.sprites        = (sprite_t*) calloc(N_SPRITES, sizeof(sprite_t));
-  self.frame_buffer   = (u16_t*)    malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2) * 2);
-  self.is_transparent = (u8_t*)     malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2));
+  sprites.patterns       = (u8_t*)     calloc(16, 1024);
+  sprites.sprites        = (sprite_t*) calloc(N_SPRITES, sizeof(sprite_t));
+  sprites.frame_buffer   = (u16_t*)    malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2) * 2);
+  sprites.is_transparent = (u8_t*)     malloc(FRAME_BUFFER_HEIGHT * (FRAME_BUFFER_WIDTH / 2));
 
-  if (self.patterns == NULL || self.sprites == NULL || self.frame_buffer == NULL || self.is_transparent == NULL) {
+  if (sprites.patterns == NULL || sprites.sprites == NULL || sprites.frame_buffer == NULL || sprites.is_transparent == NULL) {
     log_err("sprites: out of memory\n");
     sprites_finit();
     return -1;
   }
 
   for (number = 0; number < N_SPRITES; number++) {
-    self.sprites[number].number = number;
+    sprites.sprites[number].number = number;
   }
 
   sprites_reset(E_RESET_HARD);
@@ -128,21 +128,21 @@ int sprites_init(void) {
 
 
 void sprites_finit(void) {
-  if (self.is_transparent != NULL) {
-    free(self.is_transparent);
-    self.is_transparent = NULL;
+  if (sprites.is_transparent != NULL) {
+    free(sprites.is_transparent);
+    sprites.is_transparent = NULL;
   }
-  if (self.frame_buffer != NULL) {
-    free(self.frame_buffer);
-    self.frame_buffer = NULL;
+  if (sprites.frame_buffer != NULL) {
+    free(sprites.frame_buffer);
+    sprites.frame_buffer = NULL;
   }
-  if (self.sprites != NULL) {
-    free(self.sprites);
-    self.sprites = NULL;
+  if (sprites.sprites != NULL) {
+    free(sprites.sprites);
+    sprites.sprites = NULL;
   }
-  if (self.patterns != NULL) {
-    free(self.patterns);
-    self.patterns = NULL;
+  if (sprites.patterns != NULL) {
+    free(sprites.patterns);
+    sprites.patterns = NULL;
   }
 }
 
@@ -155,35 +155,35 @@ static void sprites_update_effective_clipping_area(void) {
    * > the X coords are internally doubled and the clip window origin is
    * > moved to the sprite origin inside the border.
    */
-  self.clip_x1_eff = self.clip_x1;
-  self.clip_x2_eff = self.clip_x2;
-  self.clip_y1_eff = self.clip_y1;
-  self.clip_y2_eff = self.clip_y2;
+  sprites.clip_x1_eff = sprites.clip_x1;
+  sprites.clip_x2_eff = sprites.clip_x2;
+  sprites.clip_y1_eff = sprites.clip_y1;
+  sprites.clip_y2_eff = sprites.clip_y2;
 
-  if (self.is_enabled_over_border && self.is_enabled_clipping_over_border) {
-    self.clip_x1_eff *= 2;
-    self.clip_x2_eff *= 2;
+  if (sprites.is_enabled_over_border && sprites.is_enabled_clipping_over_border) {
+    sprites.clip_x1_eff *= 2;
+    sprites.clip_x2_eff *= 2;
   } else {
-    self.clip_x1_eff += 32;
-    self.clip_x2_eff += 32;
-    self.clip_y1_eff += 32;
-    self.clip_y2_eff += 32;
+    sprites.clip_x1_eff += 32;
+    sprites.clip_x2_eff += 32;
+    sprites.clip_y1_eff += 32;
+    sprites.clip_y2_eff += 32;
   }
 }
 
 
 void sprites_reset(reset_t reset) {
-  self.is_enabled                      = 0;
-  self.is_enabled_over_border          = 0;
-  self.is_enabled_clipping_over_border = 0;
-  self.is_zero_on_top                  = 0;
-  self.clip_x1                         = 0;
-  self.clip_x2                         = 255;
-  self.clip_y1                         = 0;
-  self.clip_y2                         = 191;
-  self.transparency_index              = 0xE3;
-  self.palette                         = E_PALETTE_SPRITES_FIRST;
-  self.is_dirty                        = 1;
+  sprites.is_enabled                      = 0;
+  sprites.is_enabled_over_border          = 0;
+  sprites.is_enabled_clipping_over_border = 0;
+  sprites.is_zero_on_top                  = 0;
+  sprites.clip_x1                         = 0;
+  sprites.clip_x2                         = 255;
+  sprites.clip_y1                         = 0;
+  sprites.clip_y2                         = 191;
+  sprites.transparency_index              = 0xE3;
+  sprites.palette                         = E_PALETTE_SPRITES_FIRST;
+  sprites.is_dirty                        = 1;
 }
 
 
@@ -247,7 +247,7 @@ static void mirror_y(pattern_t pattern) {
 
 static void fetch_pattern(int n, int h, pattern_t pattern) {
   if (h) {
-    const u8_t* src = &self.patterns[n * 128];
+    const u8_t* src = &sprites.patterns[n * 128];
     u8_t*       dst = pattern;
     int         i;
 
@@ -256,7 +256,7 @@ static void fetch_pattern(int n, int h, pattern_t pattern) {
       *dst++ = (*src++) & 0x0F;
     }
   } else {
-    memcpy(pattern, &self.patterns[(n & 0xFE) * 128], 256);
+    memcpy(pattern, &sprites.patterns[(n & 0xFE) * 128], 256);
   }
 }
 
@@ -269,22 +269,22 @@ static int is_pixel_visible(int x, int y) {
 
   if (x < 32 || x >= 320 - 32 || y < 32 || y >= 256 - 32) {
     /* Over border. */
-    if (!self.is_enabled_over_border) {
+    if (!sprites.is_enabled_over_border) {
       /* Not enabled over border. */
       return 0;
     }
-    if (!self.is_enabled_clipping_over_border) {
+    if (!sprites.is_enabled_clipping_over_border) {
       /* Not clipped over border, only in 256x192 interior. */
       return 1;
     }
   }
 
-  if (x < self.clip_x1_eff || x > self.clip_x2_eff || y < self.clip_y1_eff || y > self.clip_y2_eff) {
+  if (x < sprites.clip_x1_eff || x > sprites.clip_x2_eff || y < sprites.clip_y1_eff || y > sprites.clip_y2_eff) {
     /* Clipped. */
     return 0;
   }
 
-  if (self.is_zero_on_top && !self.is_transparent[y * 320 + x]) {
+  if (sprites.is_zero_on_top && !sprites.is_transparent[y * 320 + x]) {
     /* Earlier higher priority sprite plotted here. */
     return 0;
   }
@@ -308,8 +308,8 @@ static void draw_pixel(u16_t rgb, int x, int y, int xf, int yf) {
       xs = x + col;
       if (is_pixel_visible(xs, ys)) {
         offset = ys * 320 + xs;
-        self.frame_buffer[  offset] = rgb;
-        self.is_transparent[offset] = 0;
+        sprites.frame_buffer[  offset] = rgb;
+        sprites.is_transparent[offset] = 0;
       }
     }
   }
@@ -431,8 +431,8 @@ static void draw_hex1(u8_t number, u16_t rgb, int x, int y) {
       if (*ptr++ == 'x') {
         if (is_pixel_visible(xs, ys)) {
           offset = ys * 320 + xs;
-          self.frame_buffer[  offset] = rgb;
-          self.is_transparent[offset] = 0;
+          sprites.frame_buffer[  offset] = rgb;
+          sprites.is_transparent[offset] = 0;
         }
       }
     }
@@ -456,8 +456,8 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
   for (row = 0; row < 16; row++) {
     for (col = 0; col < 16; col++) {
       index = pattern[row * 16 + col];
-      if (index != self.transparency_index) {
-        entry = palette_read(self.palette, (p << 4) + index);
+      if (index != sprites.transparency_index) {
+        entry = palette_read(sprites.palette, (p << 4) + index);
         draw_pixel(entry->rgb16, x + col * xf, y + row * yf, xf, yf);
       }
     }
@@ -466,8 +466,8 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
 #if 0
   if (is_pixel_visible(x, y)) {
     const u32_t offset = y * 320 + x;
-    self.frame_buffer[  offset] = dbg_rgb;
-    self.is_transparent[offset] = 0;
+    sprites.frame_buffer[  offset] = dbg_rgb;
+    sprites.is_transparent[offset] = 0;
 
     draw_hex2(sprite_number,  dbg_rgb, x + 2, y + 2);
     draw_hex2(pattern_number, dbg_rgb, x + 2, y + 8);
@@ -594,11 +594,11 @@ static void draw_sprites(void) {
   size_t          i;
 
   /* Assume no sprites visible. */
-  memset(self.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
+  memset(sprites.is_transparent, 1, FRAME_BUFFER_HEIGHT * FRAME_BUFFER_WIDTH / 2);
 
   /* Draw the sprites in order. */
   for (i = 0; i < N_SPRITES; i++) {
-    sprite = &self.sprites[i];
+    sprite = &sprites.sprites[i];
     if (draw_sprite(sprite, anchor)) {
       anchor = sprite;
     }
@@ -609,56 +609,56 @@ static void draw_sprites(void) {
 void sprites_tick(u32_t row, u32_t column, int* is_enabled, u16_t* rgb) {
   size_t offset;
 
-  if (!self.is_enabled) {
+  if (!sprites.is_enabled) {
     *is_enabled = 0;
     return;
   }
 
-  if (self.is_dirty && row == self.clip_y1_eff && column == self.clip_x1_eff) {
+  if (sprites.is_dirty && row == sprites.clip_y1_eff && column == sprites.clip_x1_eff) {
     draw_sprites();
-    self.is_dirty = 0;
+    sprites.is_dirty = 0;
   }
 
   offset      = row * FRAME_BUFFER_WIDTH / 2 + column / 2;
-  *rgb        = self.frame_buffer[offset];
-  *is_enabled = !self.is_transparent[offset];
+  *rgb        = sprites.frame_buffer[offset];
+  *is_enabled = !sprites.is_transparent[offset];
 }
 
 
 int sprites_priority_get(void) {
-  return self.is_zero_on_top;
+  return sprites.is_zero_on_top;
 }
 
 
 void sprites_priority_set(int is_zero_on_top) {
-  if (is_zero_on_top != self.is_zero_on_top) {
-    self.is_zero_on_top = is_zero_on_top;
-    self.is_dirty       = 1;
+  if (is_zero_on_top != sprites.is_zero_on_top) {
+    sprites.is_zero_on_top = is_zero_on_top;
+    sprites.is_dirty       = 1;
   }
 }
 
 
 int sprites_enable_get(void) {
-  return self.is_enabled;
+  return sprites.is_enabled;
 }
 
 
 void sprites_enable_set(int enable) {
-  if (enable != self.is_enabled) {
-    self.is_enabled = enable;
+  if (enable != sprites.is_enabled) {
+    sprites.is_enabled = enable;
   }
 }
 
 
 int sprites_enable_over_border_get(void) {
-  return self.is_enabled_over_border;
+  return sprites.is_enabled_over_border;
 }
 
 
 void sprites_enable_over_border_set(int enable) {
-  if (enable != self.is_enabled_over_border) {
-    self.is_enabled_over_border = enable;
-    self.is_dirty               = 1;
+  if (enable != sprites.is_enabled_over_border) {
+    sprites.is_enabled_over_border = enable;
+    sprites.is_dirty               = 1;
 
     sprites_update_effective_clipping_area();
   }
@@ -666,14 +666,14 @@ void sprites_enable_over_border_set(int enable) {
 
 
 int sprites_enable_clipping_over_border_get(void) {
-  return self.is_enabled_clipping_over_border;
+  return sprites.is_enabled_clipping_over_border;
 }
 
 
 void sprites_enable_clipping_over_border_set(int enable) {
-  if (enable != self.is_enabled_clipping_over_border) {
-    self.is_enabled_clipping_over_border = enable;
-    self.is_dirty                        = 1;
+  if (enable != sprites.is_enabled_clipping_over_border) {
+    sprites.is_enabled_clipping_over_border = enable;
+    sprites.is_dirty                        = 1;
 
     sprites_update_effective_clipping_area();
   }
@@ -681,12 +681,12 @@ void sprites_enable_clipping_over_border_set(int enable) {
 
 
 void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
-  if (x1 != self.clip_x1 || x2 != self.clip_x2 || y1 != self.clip_y1 || y2 != self.clip_y2) {
-    self.clip_x1  = x1;
-    self.clip_x2  = x2;
-    self.clip_y1  = y1;
-    self.clip_y2  = y2;
-    self.is_dirty = 1;
+  if (x1 != sprites.clip_x1 || x2 != sprites.clip_x2 || y1 != sprites.clip_y1 || y2 != sprites.clip_y2) {
+    sprites.clip_x1  = x1;
+    sprites.clip_x2  = x2;
+    sprites.clip_y1  = y1;
+    sprites.clip_y2  = y2;
+    sprites.is_dirty = 1;
 
     sprites_update_effective_clipping_area();
   }
@@ -694,14 +694,14 @@ void sprites_clip_set(u8_t x1, u8_t x2, u8_t y1, u8_t y2) {
 
 
 void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
-  sprite_t* sprite = &self.sprites[slot & 0x7F];
+  sprite_t* sprite = &sprites.sprites[slot & 0x7F];
 
   if (attribute_index > 4) {
     return;
   }
 
   sprite->attr[attribute_index] = value;
-  self.is_dirty                 = 1;
+  sprites.is_dirty                 = 1;
 
   switch (attribute_index) {
     case 0:
@@ -761,52 +761,52 @@ void sprites_attribute_set(u8_t slot, u8_t attribute_index, u8_t value) {
 
 
 void sprites_transparency_index_write(u8_t value) {
-  if (value != self.transparency_index) {
-    self.transparency_index = value;
-    self.is_dirty           = 1;
+  if (value != sprites.transparency_index) {
+    sprites.transparency_index = value;
+    sprites.is_dirty           = 1;
   }
 }
 
 
 u8_t sprites_slot_get(void) {
-  return self.sprite_index;
+  return sprites.sprite_index;
 }
 
 
 void sprites_slot_set(u8_t slot) {
-  self.sprite_index    = slot & 0x7F;
-  self.attribute_index = 0;
-  self.pattern_index   = ((slot & 0x3F) << 1) | ((slot & 0x80) >> 7);
-  self.pattern_address = self.pattern_index * 128;
+  sprites.sprite_index    = slot & 0x7F;
+  sprites.attribute_index = 0;
+  sprites.pattern_index   = ((slot & 0x3F) << 1) | ((slot & 0x80) >> 7);
+  sprites.pattern_address = sprites.pattern_index * 128;
 }
 
 
 void sprites_next_attribute_set(u8_t value) {
-  const sprite_t* sprite = &self.sprites[self.sprite_index];
+  const sprite_t* sprite = &sprites.sprites[sprites.sprite_index];
 
-  sprites_attribute_set(self.sprite_index, self.attribute_index, value);
+  sprites_attribute_set(sprites.sprite_index, sprites.attribute_index, value);
 
-  self.attribute_index++;
-  if (self.attribute_index == 5 || (self.attribute_index == 4 && !sprite->e)) {
-    self.attribute_index = 0;
-    self.sprite_index    = (self.sprite_index + 1) & 0x7F;
+  sprites.attribute_index++;
+  if (sprites.attribute_index == 5 || (sprites.attribute_index == 4 && !sprite->e)) {
+    sprites.attribute_index = 0;
+    sprites.sprite_index    = (sprites.sprite_index + 1) & 0x7F;
   }
 }
 
 
 void sprites_next_pattern_set(u8_t value) {
-  if (self.patterns[self.pattern_address] != value) {
-    self.patterns[self.pattern_address] = value;
-    self.is_dirty                       = 1;
+  if (sprites.patterns[sprites.pattern_address] != value) {
+    sprites.patterns[sprites.pattern_address] = value;
+    sprites.is_dirty                       = 1;
   }
-  self.pattern_address = (self.pattern_address + 1) & 0x3FFF;
+  sprites.pattern_address = (sprites.pattern_address + 1) & 0x3FFF;
 }
 
 
 void sprites_palette_set(int use_second) {
   const palette_t palette = use_second ? E_PALETTE_SPRITES_SECOND : E_PALETTE_SPRITES_FIRST;
-  if (self.palette != palette) {
-    self.palette  = palette;
-    self.is_dirty = 1;
+  if (sprites.palette != palette) {
+    sprites.palette  = palette;
+    sprites.is_dirty = 1;
   }
 }

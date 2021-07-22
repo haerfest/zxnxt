@@ -44,11 +44,11 @@ typedef struct copper_t {
 } copper_t;
 
 
-static copper_t self;
+static copper_t copper;
 
 
 int copper_init(void) {
-  memset(&self, 0, sizeof(self));
+  memset(&copper, 0, sizeof(copper));
   copper_reset(E_RESET_HARD);
   return 0;
 }
@@ -59,32 +59,32 @@ void copper_finit(void) {
 
 
 void copper_reset(reset_t reset) {
-  self.address    = 0;
-  self.is_running = 0;
+  copper.address    = 0;
+  copper.is_running = 0;
 }
 
 
 void copper_data_8bit_write(u8_t value) {
-  ((u8_t*) self.instruction)[self.address] = value;
-  self.address = (self.address + 1) & 0x7FF;
+  ((u8_t*) copper.instruction)[copper.address] = value;
+  copper.address = (copper.address + 1) & 0x7FF;
 }
 
 
 void copper_data_16bit_write(u8_t value)  {
-  if (self.address & 1) {
-    const u16_t even = self.address - 1;
-    self.instruction[even].msb = self.cached;
-    self.instruction[even].lsb = value;
+  if (copper.address & 1) {
+    const u16_t even = copper.address - 1;
+    copper.instruction[even].msb = copper.cached;
+    copper.instruction[even].lsb = value;
   } else {
-    self.cached = value;
+    copper.cached = value;
   }
 
-  self.address = (self.address + 1) & 0x7FF;
+  copper.address = (copper.address + 1) & 0x7FF;
 }
 
 
 void copper_address_write(u8_t value)  {
-  self.address = (self.address & 0x0700) | value;
+  copper.address = (copper.address & 0x0700) | value;
 }
 
 
@@ -94,7 +94,7 @@ static void copper_dump_program(void) {
   int i;
 
   for (i = 0; i < 1024; i++) {
-    const u16_t instr = (self.instruction[i].msb << 8) | self.instruction[i].lsb;
+    const u16_t instr = (copper.instruction[i].msb << 8) | copper.instruction[i].lsb;
 
     log_wrn("copper: %4d: $%04X ", i, instr);
 
@@ -119,35 +119,35 @@ static void copper_dump_program(void) {
 
 
 void copper_control_write(u8_t value) {
-  self.address = ((value & 0x07) << 8) | (self.address & 0x00FF);
+  copper.address = ((value & 0x07) << 8) | (copper.address & 0x00FF);
 
   switch (value >> 6) {
     case 0:
-      self.is_running = 0;
+      copper.is_running = 0;
       break;
 
     case 1:
-      self.cpc                    = 0;
-      self.do_move_wait_one_cycle = 0;
-      self.do_reset_pc_on_irq     = 0;
-      self.is_running             = 1;
+      copper.cpc                    = 0;
+      copper.do_move_wait_one_cycle = 0;
+      copper.do_reset_pc_on_irq     = 0;
+      copper.is_running             = 1;
       break;
 
     case 2:
-      self.do_reset_pc_on_irq = 0;
-      self.is_running         = 1;
+      copper.do_reset_pc_on_irq = 0;
+      copper.is_running         = 1;
       break;
 
     case 3:
-      self.cpc                    = 0;
-      self.do_move_wait_one_cycle = 0;
-      self.do_reset_pc_on_irq     = 1;
-      self.is_running             = 1;
+      copper.cpc                    = 0;
+      copper.do_move_wait_one_cycle = 0;
+      copper.do_reset_pc_on_irq     = 1;
+      copper.is_running             = 1;
       break;
   }
 
 #ifdef DUMP_PROGRAM
-  if (self.is_running) {
+  if (copper.is_running) {
     copper_dump_program();
   }
 #endif
@@ -158,40 +158,40 @@ void copper_tick(u32_t beam_row, u32_t beam_column, int ticks_28mhz) {
   int    tick;
   u16_t instruction;
 
-  if (!self.is_running) {
+  if (!copper.is_running) {
     return;
   }
 
   for (tick = 0; tick < ticks_28mhz; tick++) {
-    instruction = (self.instruction[self.cpc].msb << 8) | self.instruction[self.cpc].lsb;
+    instruction = (copper.instruction[copper.cpc].msb << 8) | copper.instruction[copper.cpc].lsb;
 
     if (instruction == 0x0000) {
       /* NOOP: 1 cycle. */
-      self.cpc = (self.cpc + 1) & 0x3FF;
+      copper.cpc = (copper.cpc + 1) & 0x3FF;
     } else if (instruction & 0x8000) {
       /* WAIT: 1 cycle. */
       const u32_t wait_row    = instruction & 0x01FF;
       const u32_t wait_column = (instruction & 0x7E00) >> 6;
       if (beam_row == wait_row && beam_column >= wait_column) {
-        self.cpc = (self.cpc + 1) & 0x3FF;
+        copper.cpc = (copper.cpc + 1) & 0x3FF;
       }
     } else {      
       /* MOVE: 2 cycles. */
-      if (self.do_move_wait_one_cycle) {
+      if (copper.do_move_wait_one_cycle) {
         const u8_t reg   = (instruction & 0x7F00) >> 8;
         const u8_t value = instruction & 0x00FF;
         nextreg_write_internal(reg, value);
-        self.cpc = (self.cpc + 1) & 0x3FF;
+        copper.cpc = (copper.cpc + 1) & 0x3FF;
       }
-      self.do_move_wait_one_cycle = !self.do_move_wait_one_cycle;
+      copper.do_move_wait_one_cycle = !copper.do_move_wait_one_cycle;
     }
   }
 }
 
 
 void copper_irq(void) {
-  if (self.do_reset_pc_on_irq) {
-    self.cpc                    = 0;
-    self.do_move_wait_one_cycle = 0;
+  if (copper.do_reset_pc_on_irq) {
+    copper.cpc                    = 0;
+    copper.do_move_wait_one_cycle = 0;
   }
 }

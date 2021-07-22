@@ -1,19 +1,21 @@
 #include <SDL2/SDL.h>
 #include <string.h>
-#include "copper.h"
 #include "cpu.h"
 #include "defs.h"
-#include "layer2.h"
 #include "log.h"
 #include "palette.h"
 #include "slu.h"
-#include "sprites.h"
-#include "tilemap.h"
-#include "ula.h"
 
 
 #define MIN(a,b)  ((a) < (b) ? (a) : (b))
 #define MAX(a,b)  ((a) > (b) ? (a) : (b))
+
+
+#include "copper.c"
+#include "layer2.c"
+#include "sprites.c"
+#include "tilemap.c"
+#include "ula.c"
 
 
 typedef enum blend_mode_t {
@@ -24,7 +26,7 @@ typedef enum blend_mode_t {
 } blend_mode_t;
 
 
-typedef struct self_t {
+typedef struct slu_t {
   SDL_Renderer*        renderer;
   SDL_Texture*         texture;
   u16_t*               frame_buffer;
@@ -47,10 +49,10 @@ typedef struct self_t {
   blend_mode_t         blend_mode;
   palette_entry_t      transparent;
   u16_t                fallback_rgba;
-} self_t;
+} slu_t;
 
 
-static self_t self;
+static slu_t self;
 
 
 int slu_init(SDL_Renderer* renderer, SDL_Texture* texture) {
