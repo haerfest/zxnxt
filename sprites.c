@@ -190,6 +190,7 @@ void sprites_reset(reset_t reset) {
 typedef u8_t pattern_t[256];
 
 
+inline
 static void rotate(pattern_t pattern) {
   pattern_t rotated;
   int       row;
@@ -205,6 +206,7 @@ static void rotate(pattern_t pattern) {
 }
 
 
+inline
 static void mirror_x(pattern_t pattern) {
   int   row;
   int   col;
@@ -225,6 +227,7 @@ static void mirror_x(pattern_t pattern) {
 }
 
 
+inline
 static void mirror_y(pattern_t pattern) {
   int   row;
   int   col;
@@ -245,6 +248,7 @@ static void mirror_y(pattern_t pattern) {
 }
 
 
+inline
 static void fetch_pattern(int n, int h, pattern_t pattern) {
   if (h) {
     const u8_t* src = &sprites.patterns[n * 128];
@@ -261,6 +265,7 @@ static void fetch_pattern(int n, int h, pattern_t pattern) {
 }
 
 
+inline
 static int is_pixel_visible(int x, int y) {
   if (x < 0 || x >= 320 || y < 0 || y >= 256) {
     /* Outside 320x256 area. */
@@ -293,6 +298,7 @@ static int is_pixel_visible(int x, int y) {
 }
 
 
+inline
 static void draw_pixel(u16_t rgb, int x, int y, int xf, int yf) {
   const int dr = (yf < 0) ? -1 : +1;
   const int dc = (xf < 0) ? -1 : +1;
@@ -447,6 +453,7 @@ static void draw_hex2(u8_t number, u16_t rgb, int x, int y) {
 #endif
 
 
+inline
 static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, int yf, u8_t sprite_number, u8_t pattern_number, u16_t dbg_rgb) {
   const palette_entry_t* entry;
   int                    row;
@@ -476,6 +483,7 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
 }
 
 
+inline
 static void draw_anchor(sprite_t* sprite) {
   pattern_t pattern;
 
@@ -521,6 +529,7 @@ static void draw_composite(sprite_t* sprite, const sprite_t* anchor) {
 }
 
 
+inline
 static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
   pattern_t pattern;
   int       x;
@@ -568,6 +577,7 @@ static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
 }
 
 
+inline
 static int draw_sprite(sprite_t* sprite, const sprite_t* anchor) {
   if (!sprite->e || (sprite->attr[4] & 0xC0) != 0x40) {
     draw_anchor(sprite);
@@ -588,6 +598,7 @@ static int draw_sprite(sprite_t* sprite, const sprite_t* anchor) {
 }
 
 
+inline
 static void draw_sprites(void) {
   const sprite_t* anchor = &initial_anchor;
   sprite_t*       sprite;
