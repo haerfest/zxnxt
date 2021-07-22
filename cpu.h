@@ -19,7 +19,7 @@ typedef enum {
 
 int   cpu_init(void);
 void  cpu_finit(void);
-void  cpu_step(void);
+void  cpu_run(int* do_stop);
 void  cpu_reset(void);
 void  cpu_irq(cpu_irq_t irq, int active);
 void  cpu_nmi(cpu_nmi_t nmi);

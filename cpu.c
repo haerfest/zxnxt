@@ -3,19 +3,15 @@
 #include "clock.h"
 #include "cpu.h"
 #include "defs.h"
-#include "divmmc.h"  /* For debugging. */
+#include "dma.h"
 #include "io.h"
 #include "log.h"
 #include "memory.h"
 #include "mf.h"
 #include "nextreg.h"
 
-#ifdef TRACE
-#include "bootrom.h"
-#include "divmmc.h"
-#include "mmu.h"
-#include "rom.h"
-#endif
+
+#include "dma.c"
 
 
 /* Convenient flag shortcuts. */
@@ -296,6 +292,7 @@ void cpu_nmi(cpu_nmi_t nmi) {
  *
  * IRQs are level-triggered, so don't clear on handling.
  */
+inline
 static void cpu_irq_pending(void) {
   /* We just executed an EI, need one instruction delay to allow
    * RETN to complete first. */ 
@@ -352,6 +349,7 @@ static void cpu_irq_pending(void) {
 }
 
 
+inline
 static void cpu_nmi_pending(void) {
   /* Save the IFF1 state. */
   IFF2 = IFF1;
@@ -378,48 +376,8 @@ static void cpu_nmi_pending(void) {
 }
 
 
-#ifdef TRACE
-
-static void cpu_sprintf_rom(char* buffer) {
-  if (bootrom_is_active()) {
-    *buffer = 'B';
-  } else if (divmmc_is_active()) {
-    *buffer = 'D';
-  } else {
-    *buffer = '0' + rom_selected();
-  }
-}
-
-
-static void cpu_sprintf_flags(char* buffer) {
-  buffer[0] = (F & SF_MASK) ? 'S' : '-';
-  buffer[1] = (F & ZF_MASK) ? 'Z' : '-';
-  buffer[2] = (F & HF_MASK) ? 'H' : '-';
-  buffer[3] = (F & VF_MASK) ? 'V' : '-';
-  buffer[4] = (F & NF_MASK) ? 'N' : '-';
-  buffer[5] = (F & CF_MASK) ? 'C' : '-';
-  buffer[6] = 0;
-}
-
-
-static void cpu_trace(void) {
-  char rom;
-  char flags[6 + 1];
-  
-  cpu_sprintf_rom(&rom);
-  cpu_sprintf_flags(flags);
-  log_dbg("%04X R%c %s AF=%04X'%04X BC=%04X'%04X DE=%04X'%04X HL=%04X'%04X IX=%04X IY=%04X SP=%04X DV=%02X MM=%02X %02X %02X %02X %02X %02X %02X %02X\n", PC, rom, flags, AF, AF_, BC, BC_, DE, DE_, HL, HL_, IX, IY, SP, divmmc_control_read(0x00E3), mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3), mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7));
-}
-
-#else   /* TRACE */
-
-#define cpu_trace()
-
-#endif  /* TRACE */
-
-
-void cpu_step(void) {
-  cpu_trace();
+inline
+static void cpu_step(void) {
   cpu_execute_next_opcode();
 
   if (self.requests) {
@@ -435,6 +393,14 @@ void cpu_step(void) {
   /* After EI the next RETN must complete before servicing IRQ. */
   if (self.irq_delay) {
     self.irq_delay = 0;
+  }
+}
+
+
+void cpu_run(int* do_stop) {
+  while (*do_stop == 0) {
+    dma_run();
+    cpu_step();
   }
 }
 

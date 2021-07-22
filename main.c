@@ -579,11 +579,7 @@ static void main_eventloop(void) {
   audio_resume();
 
   while (self.task != E_MAIN_TASK_QUIT) {
-
-    while (self.task == E_MAIN_TASK_NONE) {
-      dma_run();
-      cpu_step();
-    }
+    cpu_run((int *) &self.task);
 
     if (self.task == E_MAIN_TASK_RESET_HARD || self.task == E_MAIN_TASK_RESET_SOFT) {
       main_reset(self.task == E_MAIN_TASK_RESET_HARD);

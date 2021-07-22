@@ -36,60 +36,60 @@ typedef enum dma_cmd_t {
 } dma_cmd_t;
 
 
-typedef enum mode_t {
+typedef enum dma_mode_t {
   E_MODE_BYTE = 0,
   E_MODE_CONTINUOUS,
   E_MODE_BURST,
   E_MODE_DO_NOT_PROGRAM
-} mode_t;
+} dma_mode_t;
 
 
 typedef void (*dma_decode_handler_t)(u8_t value, int is_first_write);
 
 
 typedef struct dma_t {
-  u8_t*  sram;
-  u8_t   group;
-  u8_t   group_value[N_GROUPS];
-  u16_t  a_starting_address;
-  u16_t  b_starting_address;
-  u8_t   a_variable_timing;
-  u8_t   b_variable_timing;
-  u16_t  block_length;
-  u8_t   interrupt_control;
-  u8_t   pulse_control;
-  u8_t   interrupt_vector;
-  u8_t   read_mask;
-  u8_t   mask_byte;
-  u8_t   match_byte;
-  u8_t   zxn_prescalar;
-  int    is_enabled;
-  u16_t  n_bytes_transferred;
-  u16_t  n_blocks_transferred;
-  mode_t mode;
-  int    do_restart;
-  u64_t  next_transfer_ticks;
-  u8_t   read_bit;
+  u8_t*      sram;
+  u8_t       group;
+  u8_t       group_value[N_GROUPS];
+  u16_t      a_starting_address;
+  u16_t      b_starting_address;
+  u8_t       a_variable_timing;
+  u8_t       b_variable_timing;
+  u16_t      block_length;
+  u8_t       interrupt_control;
+  u8_t       pulse_control;
+  u8_t       interrupt_vector;
+  u8_t       read_mask;
+  u8_t       mask_byte;
+  u8_t       match_byte;
+  u8_t       zxn_prescalar;
+  int        is_enabled;
+  u16_t      n_bytes_transferred;
+  u16_t      n_blocks_transferred;
+  dma_mode_t mode;
+  int        do_restart;
+  u64_t      next_transfer_ticks;
+  u8_t       read_bit;
 
-  int   is_a_to_b;
-  u16_t src_address;
-  u16_t dst_address;
-  int   is_src_io;
-  int   is_dst_io;
-  int   src_address_delta;
-  int   dst_address_delta;
-  u8_t  src_cycle_length;
-  u8_t  dst_cycle_length;
+  int        is_a_to_b;
+  u16_t      src_address;
+  u16_t      dst_address;
+  int        is_src_io;
+  int        is_dst_io;
+  int        src_address_delta;
+  int        dst_address_delta;
+  u8_t       src_cycle_length;
+  u8_t       dst_cycle_length;
 } dma_t;
 
 
-static dma_t self;
+static dma_t dma;
 
 
 int dma_init(u8_t* sram) {
-  memset(&self, 0, sizeof(self));
+  memset(&dma, 0, sizeof(dma));
 
-  self.sram = sram;
+  dma.sram = sram;
 
   dma_reset(E_RESET_HARD);
 
@@ -102,17 +102,17 @@ void dma_finit(void) {
 
 
 void dma_reset(reset_t reset) {
-  self.group               = NO_GROUP;
-  self.read_mask           = 0x7F;
-  self.is_enabled          = 0;
-  self.zxn_prescalar       = 0;
-  self.do_restart          = 0;
-  self.next_transfer_ticks = 0;
+  dma.group               = NO_GROUP;
+  dma.read_mask           = 0x7F;
+  dma.is_enabled          = 0;
+  dma.zxn_prescalar       = 0;
+  dma.do_restart          = 0;
+  dma.next_transfer_ticks = 0;
 }
 
 
 static int dma_get_address_delta(int group) {
-  switch ((self.group_value[group] & 0x30) >> 4) {
+  switch ((dma.group_value[group] & 0x30) >> 4) {
     case 0:
       return -1;
 
@@ -130,10 +130,10 @@ static int dma_get_address_delta(int group) {
 static void read_bit_reset(void) {
   int i;
 
-  self.read_bit = 1;
+  dma.read_bit = 1;
 
-  for (i = 0; ((self.read_mask & self.read_bit) == 0) && (i < 8); i++) {
-    self.read_bit = (self.read_bit << 1) | (self.read_bit >> 7);
+  for (i = 0; ((dma.read_mask & dma.read_bit) == 0) && (i < 8); i++) {
+    dma.read_bit = (dma.read_bit << 1) | (dma.read_bit >> 7);
   }
 }
 
@@ -142,43 +142,44 @@ static void read_bit_advance(void) {
   int i;
 
   for (i = 0; i < 8; i++) {
-    self.read_bit = (self.read_bit << 1) | (self.read_bit >> 7);
+    dma.read_bit = (dma.read_bit << 1) | (dma.read_bit >> 7);
 
-    if (self.read_mask & self.read_bit) {
+    if (dma.read_mask & dma.read_bit) {
       break;
     }
   }
 }
 
 
+inline
 static void block_reload(void) {
-  const int   is_a_io         = self.group_value[1] & 0x08;
-  const int   is_b_io         = self.group_value[2] & 0x08;
+  const int   is_a_io         = dma.group_value[1] & 0x08;
+  const int   is_b_io         = dma.group_value[2] & 0x08;
   const int   a_address_delta = dma_get_address_delta(1);
   const int   b_address_delta = dma_get_address_delta(2);
-  const u8_t  a_cycle_length  = self.a_variable_timing & 0x03;
-  const u8_t  b_cycle_length  = self.b_variable_timing & 0x03;
+  const u8_t  a_cycle_length  = dma.a_variable_timing & 0x03;
+  const u8_t  b_cycle_length  = dma.b_variable_timing & 0x03;
 
-  if (self.is_a_to_b) {
+  if (dma.is_a_to_b) {
     /* A -> B */
-    self.src_address       = self.a_starting_address;
-    self.dst_address       = self.b_starting_address;
-    self.is_src_io         = is_a_io;
-    self.is_dst_io         = is_b_io;
-    self.src_address_delta = a_address_delta;
-    self.dst_address_delta = b_address_delta;
-    self.src_cycle_length  = a_cycle_length;
-    self.dst_cycle_length  = b_cycle_length;
+    dma.src_address       = dma.a_starting_address;
+    dma.dst_address       = dma.b_starting_address;
+    dma.is_src_io         = is_a_io;
+    dma.is_dst_io         = is_b_io;
+    dma.src_address_delta = a_address_delta;
+    dma.dst_address_delta = b_address_delta;
+    dma.src_cycle_length  = a_cycle_length;
+    dma.dst_cycle_length  = b_cycle_length;
   } else {
     /* B -> A */
-    self.src_address       = self.b_starting_address;
-    self.dst_address       = self.a_starting_address;
-    self.is_src_io         = is_b_io;
-    self.is_dst_io         = is_a_io;
-    self.src_address_delta = b_address_delta;
-    self.dst_address_delta = a_address_delta;
-    self.src_cycle_length  = b_cycle_length;
-    self.dst_cycle_length  = a_cycle_length;
+    dma.src_address       = dma.b_starting_address;
+    dma.dst_address       = dma.a_starting_address;
+    dma.is_src_io         = is_b_io;
+    dma.is_dst_io         = is_a_io;
+    dma.src_address_delta = b_address_delta;
+    dma.dst_address_delta = a_address_delta;
+    dma.src_cycle_length  = b_cycle_length;
+    dma.dst_cycle_length  = a_cycle_length;
   }
 }
 
@@ -187,8 +188,8 @@ static void dma_load(void) {
   block_reload();
   read_bit_reset();
 
-  self.n_bytes_transferred  = 0;
-  self.n_blocks_transferred = 0;
+  dma.n_bytes_transferred  = 0;
+  dma.n_blocks_transferred = 0;
 
 #if 0
   {
@@ -196,17 +197,17 @@ static void dma_load(void) {
     const char* mode_str[] = {"BYTE", "CONT", "BRST", "N/A"};
 
     log_wrn("dma: LOAD %s %s>%s %04X%s>%04X%s %s len=%04X pre=%02X rstrt=%c\n",
-            self.is_a_to_b ? "A>B" : "B>A",
-            self.is_src_io ? "IO" : "M",
-            self.is_dst_io ? "IO" : "M",
-            self.src_address,
-            delta_str[1 + self.src_address_delta],
-            self.dst_address,
-            delta_str[1 + self.dst_address_delta],
-            mode_str[self.mode],
-            self.block_length,
-            self.zxn_prescalar,
-            self.do_restart ? 'Y' : 'N');
+            dma.is_a_to_b ? "A>B" : "B>A",
+            dma.is_src_io ? "IO" : "M",
+            dma.is_dst_io ? "IO" : "M",
+            dma.src_address,
+            delta_str[1 + dma.src_address_delta],
+            dma.dst_address,
+            delta_str[1 + dma.dst_address_delta],
+            mode_str[dma.mode],
+            dma.block_length,
+            dma.zxn_prescalar,
+            dma.do_restart ? 'Y' : 'N');
   }
 #endif
 }
@@ -253,116 +254,116 @@ static u8_t dma_decode_group(u8_t value) {
 
 static void dma_group_0_write(u8_t value, int is_first_write) {
   if (is_first_write) {
-    self.is_a_to_b = self.group_value[0] & 0x04;
+    dma.is_a_to_b = dma.group_value[0] & 0x04;
   } else {
-    if (self.group_value[0] & 0x08) {
-      self.a_starting_address &= 0xFF00;
-      self.a_starting_address |= value;
-      self.group_value[0]     &= ~0x08;
-    } else if (self.group_value[0] & 0x10) {
-      self.a_starting_address &= 0x00FF;
-      self.a_starting_address |= value << 8;
-      self.group_value[0]     &= ~0x10;
-    } else if (self.group_value[0] & 0x20) {
-      self.block_length &= 0xFF00;
-      self.block_length |= value;
-      self.group_value[0] &= ~0x20;
-    } else if (self.group_value[0] & 0x40) {
-      self.block_length   &= 0x00FF;
-      self.block_length   |= value << 8;
-      self.group_value[0] &= ~0x40;
+    if (dma.group_value[0] & 0x08) {
+      dma.a_starting_address &= 0xFF00;
+      dma.a_starting_address |= value;
+      dma.group_value[0]     &= ~0x08;
+    } else if (dma.group_value[0] & 0x10) {
+      dma.a_starting_address &= 0x00FF;
+      dma.a_starting_address |= value << 8;
+      dma.group_value[0]     &= ~0x10;
+    } else if (dma.group_value[0] & 0x20) {
+      dma.block_length &= 0xFF00;
+      dma.block_length |= value;
+      dma.group_value[0] &= ~0x20;
+    } else if (dma.group_value[0] & 0x40) {
+      dma.block_length   &= 0x00FF;
+      dma.block_length   |= value << 8;
+      dma.group_value[0] &= ~0x40;
     }
   }
 
-  if ((self.group_value[0] & 0x78) == 0x00) {
-    self.group = NO_GROUP;
+  if ((dma.group_value[0] & 0x78) == 0x00) {
+    dma.group = NO_GROUP;
   }
 }
 
 
 static void dma_group_1_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
-    if (self.group_value[1] & 0x40) {
-      self.a_variable_timing = value;
-      self.group_value[1]   &= ~0x40;
+    if (dma.group_value[1] & 0x40) {
+      dma.a_variable_timing = value;
+      dma.group_value[1]   &= ~0x40;
     }
   }
 
-  if ((self.group_value[1] & 0x40) == 0x00) {
-    self.group = NO_GROUP;
+  if ((dma.group_value[1] & 0x40) == 0x00) {
+    dma.group = NO_GROUP;
   }
 }
 
 
 static void dma_group_2_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
-    if (self.group_value[2] & 0x40) {
-      self.b_variable_timing = value;
-      self.group_value[2]   &= ~0x40;
-    } else if (self.b_variable_timing & 0x20) {
-      self.zxn_prescalar      = value;
-      self.b_variable_timing &= ~0x20;
+    if (dma.group_value[2] & 0x40) {
+      dma.b_variable_timing = value;
+      dma.group_value[2]   &= ~0x40;
+    } else if (dma.b_variable_timing & 0x20) {
+      dma.zxn_prescalar      = value;
+      dma.b_variable_timing &= ~0x20;
     }
   }
 
-  if (((self.group_value[2]    & 0x40) == 0x00) &&
-      ((self.b_variable_timing & 0x20) == 0x00)) {
-    self.group = NO_GROUP;
+  if (((dma.group_value[2]    & 0x40) == 0x00) &&
+      ((dma.b_variable_timing & 0x20) == 0x00)) {
+    dma.group = NO_GROUP;
   }
 }
 
 
 static void dma_group_3_write(u8_t value, int is_first_write) {
   if (!is_first_write) {
-    if (self.group_value[3] & 0x08) {
-      self.mask_byte       = value;
-      self.group_value[3] &= ~0x08;
-    } else if (self.group_value[3] & 0x10) {
-      self.match_byte      = value;
-      self.group_value[3] &= ~0x10;
+    if (dma.group_value[3] & 0x08) {
+      dma.mask_byte       = value;
+      dma.group_value[3] &= ~0x08;
+    } else if (dma.group_value[3] & 0x10) {
+      dma.match_byte      = value;
+      dma.group_value[3] &= ~0x10;
     }
   }
 
-  if ((self.group_value[3] & 0x18) == 0x00) {
-    self.group = NO_GROUP;
+  if ((dma.group_value[3] & 0x18) == 0x00) {
+    dma.group = NO_GROUP;
   }
 }
 
 
 static void dma_group_4_write(u8_t value, int is_first_write) {
   if (is_first_write) {
-    self.mode = (value & 0x60) >> 5;
+    dma.mode = (value & 0x60) >> 5;
   } else {
-    if (self.group_value[4] & 0x04) {
-      self.b_starting_address &= 0xFF00;
-      self.b_starting_address |= value;
-      self.group_value[4]     &= ~0x04;
-    } else if (self.group_value[4] & 0x08) {
-      self.b_starting_address &= 0x00FF;
-      self.b_starting_address |= value << 8;
-      self.group_value[4]     &= ~0x08;
-    } else if (self.group_value[4] & 0x10) {
-      self.interrupt_control = value;
-      self.group_value[4]   &= ~0x10;
-    } else if (self.interrupt_control & 0x08) {
-      self.pulse_control      = value;
-      self.interrupt_control &= ~0x08;
-    } else if (self.interrupt_control & 0x10) {
-      self.interrupt_vector   = value;
-      self.interrupt_control &= ~0x10;
+    if (dma.group_value[4] & 0x04) {
+      dma.b_starting_address &= 0xFF00;
+      dma.b_starting_address |= value;
+      dma.group_value[4]     &= ~0x04;
+    } else if (dma.group_value[4] & 0x08) {
+      dma.b_starting_address &= 0x00FF;
+      dma.b_starting_address |= value << 8;
+      dma.group_value[4]     &= ~0x08;
+    } else if (dma.group_value[4] & 0x10) {
+      dma.interrupt_control = value;
+      dma.group_value[4]   &= ~0x10;
+    } else if (dma.interrupt_control & 0x08) {
+      dma.pulse_control      = value;
+      dma.interrupt_control &= ~0x08;
+    } else if (dma.interrupt_control & 0x10) {
+      dma.interrupt_vector   = value;
+      dma.interrupt_control &= ~0x10;
     }
   }
 
-  if (((self.group_value[4]    & 0x1C) == 0x00) &&
-      ((self.interrupt_control & 0x18) == 0x00)) {
-    self.group = NO_GROUP;
+  if (((dma.group_value[4]    & 0x1C) == 0x00) &&
+      ((dma.interrupt_control & 0x18) == 0x00)) {
+    dma.group = NO_GROUP;
   }
 }
 
 
 static void dma_group_5_write(u8_t value, int is_first_write) {
-  self.do_restart = value & 0x20;
-  self.group      = NO_GROUP;
+  dma.do_restart = value & 0x20;
+  dma.group      = NO_GROUP;
 }
 
 
@@ -370,7 +371,7 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
   if (is_first_write) {
     switch (value) {
       case E_DMA_CMD_RESET:
-        self.is_enabled = 0;
+        dma.is_enabled = 0;
         break;
 
       case E_DMA_CMD_RESET_PORT_A_TIMING:
@@ -390,11 +391,11 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
         break;
 
       case E_DMA_CMD_ENABLE_DMA:
-        self.is_enabled = 1;
+        dma.is_enabled = 1;
         break;
 
       case E_DMA_CMD_DISABLE_DMA:
-        self.is_enabled = 0;
+        dma.is_enabled = 0;
         break;
 
       case E_DMA_CMD_LOAD:
@@ -410,11 +411,11 @@ static void dma_group_6_write(u8_t value, int is_first_write) {
     }
 
     if (value != E_DMA_CMD_READ_MASK_FOLLOWS) {
-      self.group = NO_GROUP;
+      dma.group = NO_GROUP;
     }
   } else {
-    self.read_mask = value & 0x7F;
-    self.group     = NO_GROUP;
+    dma.read_mask = value & 0x7F;
+    dma.group     = NO_GROUP;
   }
 }
 
@@ -435,56 +436,56 @@ void dma_write(u16_t address, u8_t value) {
     dma_group_6_write,
   };
   
-  if (self.group == NO_GROUP) {
-    self.group = dma_decode_group(value);
-    if (self.group != NO_GROUP) {
-      self.group_value[self.group] = value;
-      handlers[self.group](value, 1);
+  if (dma.group == NO_GROUP) {
+    dma.group = dma_decode_group(value);
+    if (dma.group != NO_GROUP) {
+      dma.group_value[dma.group] = value;
+      handlers[dma.group](value, 1);
     }
     return;
   }
 
-  handlers[self.group](value, 0);
+  handlers[dma.group](value, 0);
 }
 
 
 u8_t dma_read(u16_t address) {
   u8_t value;
 
-  switch (self.read_bit) {
+  switch (dma.read_bit) {
     case 0x01:
       /* Status byte. */
-      value = 0x1A | ((self.n_blocks_transferred > 0) << 5) | (self.n_bytes_transferred > 0);
+      value = 0x1A | ((dma.n_blocks_transferred > 0) << 5) | (dma.n_bytes_transferred > 0);
       break;
 
     case 0x02:
       /* Byte counter high? */
-      value = self.n_bytes_transferred >> 8;
+      value = dma.n_bytes_transferred >> 8;
       break;
 
     case 0x04:
       /* Byte counter low? */
-      value = self.n_bytes_transferred & 0x00FF;
+      value = dma.n_bytes_transferred & 0x00FF;
       break;
 
     case 0x08:
       /* Port A address low. */
-      value = (self.is_a_to_b ? self.src_address : self.dst_address) & 0x00FF;
+      value = (dma.is_a_to_b ? dma.src_address : dma.dst_address) & 0x00FF;
       break;
 
     case 0x10:
       /* Port A address high. */
-      value = (self.is_a_to_b ? self.src_address : self.dst_address) >> 8;
+      value = (dma.is_a_to_b ? dma.src_address : dma.dst_address) >> 8;
       break;
 
     case 0x20:
       /* Port B address low. */
-      value = (self.is_a_to_b ? self.dst_address : self.src_address) & 0x00FF;
+      value = (dma.is_a_to_b ? dma.dst_address : dma.src_address) & 0x00FF;
       break;
 
     case 0x40:
       /* Port B address high. */
-      value = (self.is_a_to_b ? self.dst_address : self.src_address) >> 8;
+      value = (dma.is_a_to_b ? dma.dst_address : dma.src_address) >> 8;
       break;
 
     default:
@@ -498,55 +499,57 @@ u8_t dma_read(u16_t address) {
 }
 
 
+inline
 static void transfer_one_byte(void) {
   const u64_t start_ticks = clock_ticks();
-  const u8_t  byte        = self.is_src_io ? io_read(self.src_address) : memory_read(self.src_address);
+  const u8_t  byte        = dma.is_src_io ? io_read(dma.src_address) : memory_read(dma.src_address);
   
-  self.src_address += self.src_address_delta;
-  clock_run(self.src_cycle_length);
+  dma.src_address += dma.src_address_delta;
+  clock_run(dma.src_cycle_length);
 
-  if (self.is_dst_io) {
-    io_write(self.dst_address, byte);
+  if (dma.is_dst_io) {
+    io_write(dma.dst_address, byte);
   } else {
-    memory_write(self.dst_address, byte);
+    memory_write(dma.dst_address, byte);
   }
-  self.dst_address += self.dst_address_delta;
-  clock_run(self.dst_cycle_length);
+  dma.dst_address += dma.dst_address_delta;
+  clock_run(dma.dst_cycle_length);
 
-  self.n_bytes_transferred++;
+  dma.n_bytes_transferred++;
 
-  if (self.zxn_prescalar != 0) {
+  if (dma.zxn_prescalar != 0) {
     /**
      * Each byte should be written at a rate of 875 kHz / prescalar,
      * assuming a 28 Mhz clock (875 kHz = 28 MHz / 32).
      */
-    self.next_transfer_ticks = start_ticks + self.zxn_prescalar * 32;
+    dma.next_transfer_ticks = start_ticks + dma.zxn_prescalar * 32;
   }
 }
 
 
-void dma_run(void) {
+inline
+static void dma_run(void) {
   u64_t now;
 
-  if (!self.is_enabled) {
+  if (!dma.is_enabled) {
     return;
   }
 
-  switch (self.mode) {
+  switch (dma.mode) {
     case E_MODE_BURST:
-      if (self.zxn_prescalar != 0 && clock_ticks() < self.next_transfer_ticks) {
+      if (dma.zxn_prescalar != 0 && clock_ticks() < dma.next_transfer_ticks) {
         return;
       }
       transfer_one_byte();
       break;
 
     case E_MODE_CONTINUOUS:
-      while (self.n_bytes_transferred < self.block_length) {
+      while (dma.n_bytes_transferred < dma.block_length) {
         transfer_one_byte();
-        if (self.zxn_prescalar != 0) {
+        if (dma.zxn_prescalar != 0) {
           now = clock_ticks();
-          if (self.next_transfer_ticks > now) {
-            clock_run_28mhz_ticks(self.next_transfer_ticks - now);
+          if (dma.next_transfer_ticks > now) {
+            clock_run_28mhz_ticks(dma.next_transfer_ticks - now);
           }
         }
       }
@@ -557,13 +560,13 @@ void dma_run(void) {
       return;
   }
 
-  if (self.n_bytes_transferred == self.block_length) {
-    if (self.do_restart) {
+  if (dma.n_bytes_transferred == dma.block_length) {
+    if (dma.do_restart) {
       block_reload();
-      self.n_blocks_transferred++;
-      self.n_bytes_transferred = 0;
+      dma.n_blocks_transferred++;
+      dma.n_bytes_transferred = 0;
     } else {
-      self.is_enabled = 0;
+      dma.is_enabled = 0;
     }
   }
 }

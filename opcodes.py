@@ -1619,6 +1619,7 @@ def generate(table: Table, prefix: List[Opcode]) -> Tuple[List[str], str]:
                 reader = 'const u8_t opcode = memory_read(PC++); T(4);'
 
             fn = f'''
+inline
 static void execute_{pfx_str}(void) {{
   {reader.strip()}
   switch (opcode) {{
@@ -1651,7 +1652,8 @@ def main() -> None:
             f.write(fn)
 
         f.write(f'''
-void cpu_execute_next_opcode(void) {{
+inline
+static void cpu_execute_next_opcode(void) {{
   R = (R & 0x80) | ((R + 1) & 0x7F);
 
   const u8_t opcode = memory_read(PC++); T(4);
