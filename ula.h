@@ -41,6 +41,7 @@ void              ula_60hz_set(int enable);
 int               ula_60hz_get(void);
 int               ula_irq_enable_get(void);
 void              ula_irq_enable_set(int enable);
+int               ula_lo_res_enable_get(void);
 void              ula_lo_res_enable_set(int enable);
 void              ula_lo_res_offset_x_write(u8_t value);
 void              ula_lo_res_offset_y_write(u8_t value);

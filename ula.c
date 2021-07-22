@@ -470,13 +470,13 @@ static void ula_display_reconfigure(void) {
   const ula_display_mode_t mode = \
     ula.is_lo_res_enabled_requested          ? E_ULA_DISPLAY_MODE_LO_RES :
     (ula.screen_bank == E_ULA_SCREEN_BANK_7) ? (ula.display_mode_requested & 1) :
-    /* else */                                  ula.display_mode_requested;
+    /* else */                                 ula.display_mode_requested;
 
   /* Remember the requested mode in case we honor it in bank 5. */
-  ula.display_mode = mode;
-  ula.is_60hz      = ula.is_60hz_requested;
-  ula.is_hdmi      = ula.is_hdmi_requested;
-  ula.display_spec = ula.is_hdmi
+  ula.display_mode      = mode;
+  ula.is_60hz           = ula.is_60hz_requested;
+  ula.is_hdmi           = ula.is_hdmi_requested;
+  ula.display_spec      = ula.is_hdmi
     ? &ula_display_spec_hdmi[ula.is_60hz & 1]
     : &ula_display_spec_vga[ula.display_timing][ula.is_60hz & 1];
 
@@ -992,6 +992,11 @@ int ula_irq_enable_get(void) {
 
 void ula_irq_enable_set(int enable) {
   ula.disable_ula_irq = !enable;
+}
+
+
+int ula_lo_res_enable_get(void) {
+  return ula.is_lo_res_enabled_requested;
 }
 
 

@@ -466,7 +466,9 @@ static void nextreg_palette_value_9bits_write(u8_t value) {
 
 
 static u8_t nextreg_sprite_layers_system_read(void) {
-  return (slu_layer_priority_get() << 2)                      |
+  return \
+    (ula_lo_res_enable_get()                   ? 0x80 : 0x00) |
+    (slu_layer_priority_get() << 2)                           |
     (sprites_priority_get()                    ? 0x40 : 0x00) |
     (sprites_enable_clipping_over_border_get() ? 0x20 : 0x00) |
     (sprites_enable_over_border_get()          ? 0x02 : 0x00) |
