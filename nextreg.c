@@ -845,6 +845,12 @@ u8_t nextreg_read_internal(u8_t reg) {
     case E_NEXTREG_REGISTER_VIDEO_TIMING:
       return clock_timing_read();
 
+    case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
+      return layer2_active_bank_read();
+
+    case E_NEXTREG_REGISTER_LAYER2_SHADOW_RAM_BANK:
+      return layer2_shadow_bank_read();
+
     case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
       return nextreg_sprite_layers_system_read();
 

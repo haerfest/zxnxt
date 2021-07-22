@@ -118,10 +118,20 @@ void layer2_control_write(u8_t value) {
 }
 
 
+u8_t layer2_active_bank_read(void) {
+  return layer2.active_bank;
+}
+
+
 void layer2_active_bank_write(u8_t bank) {
   if (bank != layer2.active_bank) {
     layer2.active_bank = bank;
   }
+}
+
+
+u8_t layer2_shadow_bank_read(void) {
+  return layer2.shadow_bank;
 }
 
 
