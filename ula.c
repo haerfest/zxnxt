@@ -457,17 +457,6 @@ static const palette_entry_t* ula_display_mode_hi_colour(u32_t row, u32_t column
 }
 
 
-typedef const palette_entry_t* (*ula_display_mode_handler_t)(u32_t beam_row, u32_t beam_column);
-
-const ula_display_mode_handler_t ula_display_handlers[N_DISPLAY_MODES] = {  
-  ula_display_mode_screen_x,   /* E_ULA_DISPLAY_MODE_SCREEN_0 */
-  ula_display_mode_screen_x,   /* E_ULA_DISPLAY_MODE_SCREEN_1 */
-  ula_display_mode_hi_colour,  /* E_ULA_DISPLAY_MODE_HI_COLOUR */
-  ula_display_mode_hi_res,     /* E_ULA_DISPLAY_MODE_HI_RES */
-  ula_display_mode_lo_res      /* E_ULA_DISPLAY_MODE_LO_RES */
-};
-
-
 static void ula_display_reconfigure(void) {
   /**
    * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/raw/master/cores/zxnext/ports.txt
