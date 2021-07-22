@@ -33,7 +33,7 @@ void              ula_contend(void);
 void              ula_contend_bank(u8_t bank);
 void              ula_enable_set(int enable);
 void              ula_did_complete_frame(void);
-void              ula_transparency_colour_write(u8_t rgb);
+void              ula_transparent_set(const palette_entry_t* transparent);
 void              ula_attribute_byte_format_write(u8_t value);
 u8_t              ula_attribute_byte_format_read(void);
 void              ula_next_mode_enable(int do_enable);

@@ -327,7 +327,7 @@ typedef struct ula_t {
   u32_t                      tstates_x4;
   int                        is_timex_enabled;
   int                        is_enabled;
-  u16_t                      transparency_rgb8;
+  const palette_entry_t*     transparent;
   u8_t                       ula_next_mask_ink;
   u8_t                       ula_next_rshift_paper;
   int                        is_ula_next_mode;
@@ -349,6 +349,7 @@ static ula_t ula;
 #define N_DISPLAY_MODES   (E_ULA_DISPLAY_MODE_LAST - E_ULA_DISPLAY_MODE_FIRST + 1)
 
 
+inline
 static const palette_entry_t* ula_display_mode_lo_res(u32_t row, u32_t column) {
   column = (ula.lo_res_offset_x + column) % 256;
   row    = (ula.lo_res_offset_y + row   ) % 192;
@@ -363,6 +364,7 @@ static const palette_entry_t* ula_display_mode_lo_res(u32_t row, u32_t column) {
 }
 
 
+inline
 static const palette_entry_t* ula_display_mode_hi_res(u32_t row, u32_t column) {
   const u8_t  mask             = 1 << (7 - (column & 0x07));
   const u16_t display_offset   = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | (((column >> 1) / 8) & 0x1F);;
@@ -376,6 +378,7 @@ static const palette_entry_t* ula_display_mode_hi_res(u32_t row, u32_t column) {
 }
 
 
+inline
 static const u8_t ula_mode_x_display_byte_get(u32_t row, u32_t column) {
   const u16_t display_offset = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | ((column / 8) & 0x1F);
 
@@ -383,6 +386,7 @@ static const u8_t ula_mode_x_display_byte_get(u32_t row, u32_t column) {
 }
 
 
+inline
 static const u8_t ula_mode_x_attribute_byte_get(u32_t row, u32_t column) {
   const u16_t attribute_offset = (row / 8) * 32 + column / 8;
   
@@ -390,6 +394,7 @@ static const u8_t ula_mode_x_attribute_byte_get(u32_t row, u32_t column) {
 }
 
 
+inline
 static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column) {
   const u32_t halved_column    = column / 2;
   const u8_t  mask             = 1 << (7 - (halved_column & 0x07));
@@ -403,7 +408,7 @@ static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column)
     }
     
     if (ula.ula_next_rshift_paper == 0) {
-      return slu_transparent_get();
+      return ula.transparent;
     }
 
     return palette_read_inline(ula.palette, 128 + ((attribute_byte & ~ula.ula_next_mask_ink) >> ula.ula_next_rshift_paper));
@@ -419,6 +424,8 @@ static const palette_entry_t* ula_display_mode_screen_x(u32_t row, u32_t column)
     : ((blink && ula.blink_state) ? ink : paper);
 }
 
+
+inline
 static const palette_entry_t* ula_display_mode_hi_colour(u32_t row, u32_t column) {
   const u32_t halved_column    = column / 2;
   const u16_t attribute_offset = ((row & 0xC0) << 5) | ((row & 0x07) << 8) | ((row & 0x38) << 2) | ((halved_column / 8) & 0x1F);
@@ -433,7 +440,7 @@ static const palette_entry_t* ula_display_mode_hi_colour(u32_t row, u32_t column
     }
     
     if (ula.ula_next_rshift_paper == 0) {
-      return slu_transparent_get();
+      return ula.transparent;
     }
 
     return palette_read_inline(ula.palette, 128 + ((attribute_byte & ~ula.ula_next_mask_ink) >> ula.ula_next_rshift_paper));
@@ -611,7 +618,25 @@ static void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, i
     row     = (row    + ula.offset_y    ) % 192;
     column  = (column + ula.offset_x * 2) % (256 * 2);
  
-    *rgb = ula_display_handlers[ula.display_mode](row, column);
+    /* *rgb = ula_display_handlers[ula.display_mode](row, column); */
+    switch (ula.display_mode) {
+      case E_ULA_DISPLAY_MODE_HI_COLOUR:
+        *rgb = ula_display_mode_hi_colour(row, column);
+        break;
+      
+      case E_ULA_DISPLAY_MODE_HI_RES:
+        *rgb = ula_display_mode_hi_res(row, column);
+        break;
+      
+      case E_ULA_DISPLAY_MODE_LO_RES:
+        *rgb = ula_display_mode_lo_res(row, column);
+        break;
+
+      default:
+        *rgb = ula_display_mode_screen_x(row, column);
+        break;
+    }
+
     return;
   }
 
@@ -620,7 +645,7 @@ static void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, i
 
   if (ula.is_ula_next_mode) {
     if (ula.ula_next_rshift_paper == 0) {
-      *rgb = slu_transparent_get();
+      *rgb = ula.transparent;
     } else {
       *rgb = palette_read_inline(ula.palette, 128 + ula.border_colour);
     }
@@ -906,8 +931,8 @@ void ula_enable_set(int enable) {
 }
 
 
-void ula_transparency_colour_write(u8_t rgb) {
-  ula.transparency_rgb8 = rgb;
+void ula_transparent_set(const palette_entry_t* transparent) {
+  ula.transparent = transparent;
 }
 
 

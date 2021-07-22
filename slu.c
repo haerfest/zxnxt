@@ -536,6 +536,8 @@ void slu_transparent_set(u8_t rgb8) {
   self.transparent.rgb9               = PALETTE_RGB8_TO_RGB9(rgb8);
   self.transparent.rgb16              = PALETTE_RGB9_TO_RGB16(self.transparent.rgb9);
   self.transparent.is_layer2_priority = 0;
+
+  ula_transparent_set(&self.transparent);
 }
 
 
