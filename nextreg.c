@@ -30,9 +30,9 @@
 
 #define MACHINE_ID              8  /* Emulator. */
 
-#define CORE_VERSION_MAJOR      3
-#define CORE_VERSION_MINOR      1
-#define CORE_VERSION_SUB_MINOR  9
+#define CORE_VERSION_MAJOR       3
+#define CORE_VERSION_MINOR       1
+#define CORE_VERSION_SUB_MINOR  10
 
 
 typedef struct clip_t {
