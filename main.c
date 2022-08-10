@@ -9,6 +9,7 @@
 #include "copper.h"
 #include "cpu.h"
 #include "dac.h"
+#include "debug.h"
 #include "dma.h"
 #include "defs.h"
 #include "divmmc.h"
@@ -46,6 +47,7 @@ typedef enum main_task_t {
   E_MAIN_TASK_NONE,
   E_MAIN_TASK_RESET_HARD,
   E_MAIN_TASK_RESET_SOFT,
+  E_MAIN_TASK_DEBUG,
   E_MAIN_TASK_QUIT
 } main_task_t;
 
@@ -327,6 +329,10 @@ static int main_init(void) {
     goto exit_copper;
   }
 
+  if (debug_init() != 0) {
+    goto exit_cpu;
+  }
+
   memory_refresh_accessors(0, 8);
 
   self.is_60hz = ula_60hz_get();
@@ -336,6 +342,8 @@ static int main_init(void) {
 
   return 0;
 
+exit_cpu:
+  cpu_finit();
 exit_copper:
   copper_finit();
 exit_slu:
@@ -494,51 +502,6 @@ static void main_nmi_multiface(void) {
 }
 
 
-static void main_dump_64k(void) {
-  const u16_t pc = cpu_pc_get();
-  FILE*       fp;
-  u32_t       address;
-  char        filename[18 + 1];
-
-  (void) snprintf(filename, sizeof(filename), "memory-PC=%04X.bin", pc);
-  fp = fopen(filename, "wb");
-  if (fp == NULL) {
-    log_err("main: could not open %s for writing\n", filename);
-    return;
-  }
-
-  for (address = 0x0000; address <= 0xFFFF; address++) {
-    fputc(memory_read(address), fp);
-  }
-
-  fclose(fp);
-  log_wrn("main: %s written\n", filename);
-}
-
-
-static void main_dump_all(void) {
-  const u16_t pc   = cpu_pc_get();
-  const u8_t* sram = memory_sram();
-  FILE*       fp;
-  u32_t       address;
-  char        filename[18 + 1];
-
-  (void) snprintf(filename, sizeof(filename), "memory-PC=%04X.bin", pc);
-  fp = fopen(filename, "wb");
-  if (fp == NULL) {
-    log_err("main: could not open %s for writing\n", filename);
-    return;
-  }
-
-  for (address = 0; address < MEMORY_SRAM_SIZE; address++) {
-    fputc(sram[address], fp);
-  }
-
-  fclose(fp);
-  log_wrn("main: %s written\n", filename);
-}
-
-
 static void main_handle_function_keys(void) {
   const int key_reset_hard = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_RESET_HARD);
   const int key_reset_soft = keyboard_is_special_key_pressed(E_KEYBOARD_SPECIAL_KEY_RESET_SOFT);
@@ -557,10 +520,8 @@ static void main_handle_function_keys(void) {
       if (key_drive)       main_nmi_divmmc();
       if (f11)             mouse_toggle();
       if (f12) {
-        if (self.keyboard_state[SDL_SCANCODE_LSHIFT]) {
-          main_dump_64k();
-        } else if (self.keyboard_state[SDL_SCANCODE_RSHIFT]) {
-          main_dump_all();
+        if (self.keyboard_state[SDL_SCANCODE_LSHIFT] || self.keyboard_state[SDL_SCANCODE_RSHIFT]) {
+          self.task = E_MAIN_TASK_DEBUG;
         } else {
           main_toggle_fullscreen();
         }
@@ -584,6 +545,8 @@ static void main_eventloop(void) {
     if (self.task == E_MAIN_TASK_RESET_HARD || self.task == E_MAIN_TASK_RESET_SOFT) {
       main_reset(self.task == E_MAIN_TASK_RESET_HARD);
       self.task = E_MAIN_TASK_NONE;
+    } else if (self.task == E_MAIN_TASK_DEBUG) {
+      self.task = debug_enter() ? E_MAIN_TASK_QUIT : E_MAIN_TASK_NONE;
     }
   }
 
@@ -592,6 +555,7 @@ static void main_eventloop(void) {
 
 
 static void main_finit(void) {
+  debug_finit();
   cpu_finit();
   copper_finit();
   slu_finit();
