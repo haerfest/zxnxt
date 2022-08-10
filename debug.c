@@ -206,11 +206,11 @@ static void debug_show_disassembly(void) {
       }
       if (strcmp(s, "e") == 0) {
         const s8_t offset = (s8_t) memory_read(self.address++);
-        fprintf(stderr, "%04X", self.address - 1 + offset);
+        fprintf(stderr, "$%04X", self.address - 1 + offset);
         continue;
       }
       if (strcmp(s, "d") == 0) {
-        fprintf(stderr, "%02X", memory_read(self.address++));
+        fprintf(stderr, "$%02X", memory_read(self.address++));
         continue;
       }
       if (strcmp(s, "n") == 0) {
@@ -220,15 +220,15 @@ static void debug_show_disassembly(void) {
       if (strcmp(s, "nn") == 0) {
         const u8_t lo = memory_read(self.address++);
         const u8_t hi = memory_read(self.address++);
-        fprintf(stderr, "%02X%02X", hi, lo);
+        fprintf(stderr, "$%02X%02X", hi, lo);
         continue;
       }
       if (strcmp(s, "value") == 0) {
-        fprintf(stderr, "%02X", memory_read(self.address++));
+        fprintf(stderr, "$%02X", memory_read(self.address++));
         continue;
       }
       if (strcmp(s, "reg") == 0) {
-        fprintf(stderr, "%02X", memory_read(self.address++));
+        fprintf(stderr, "$%02X", memory_read(self.address++));
         continue;
       }
       fprintf(stderr, "%s", s);
