@@ -6,13 +6,17 @@
 #include "memory.h"
 
 
+#include "disassemble.c"
+
+
 typedef enum debug_cmd_t {
   E_DEBUG_CMD_NONE = 0,
   E_DEBUG_CMD_HELP,
   E_DEBUG_CMD_CONTINUE,
   E_DEBUG_CMD_QUIT,
   E_DEBUG_CMD_SHOW_REGISTERS,
-  E_DEBUG_CMD_SHOW_MEMORY
+  E_DEBUG_CMD_SHOW_MEMORY,
+  E_DEBUG_CMD_SHOW_DISASSEMBLY
 } debug_cmd_t;
 
 
@@ -112,6 +116,17 @@ static int debug_parse(char* s) {
     return 0;
   }
 
+  if (strcmp("d", p) == 0) {
+    self.command = E_DEBUG_CMD_SHOW_DISASSEMBLY;
+
+    if (debug_next_word(q + 1, &p, &q)) {
+      return 0;
+    }
+
+    self.address = strtol(p, NULL, 16);
+    return 0;
+  }
+
   return -1;
 }
 
@@ -167,12 +182,70 @@ static void debug_show_memory(void) {
 }
 
 
+static void debug_show_disassembly(void) {
+  int  i;
+  u8_t opcode;
+
+  for (i = 0; i < 16; i++) {
+    fprintf(stderr, "%04X  ", self.address);
+
+    table_entry_t* t = table;
+    for (;;) {
+      opcode = memory_read(self.address++);
+      if (!t[opcode].is_table) {
+        break;
+      }
+
+      t = t[opcode].payload.table;
+    }
+
+    for (int i = 0; i < 4; i++) {
+      const char* s = t[opcode].payload.instr[i];
+      if (s == NULL) {
+        break;
+      }
+      if (strcmp(s, "e") == 0) {
+        const s8_t offset = (s8_t) memory_read(self.address++);
+        fprintf(stderr, "%04X", self.address - 1 + offset);
+        continue;
+      }
+      if (strcmp(s, "d") == 0) {
+        fprintf(stderr, "%02X", memory_read(self.address++));
+        continue;
+      }
+      if (strcmp(s, "n") == 0) {
+        fprintf(stderr, "%02X", memory_read(self.address++));
+        continue;
+      }
+      if (strcmp(s, "nn") == 0) {
+        const u8_t lo = memory_read(self.address++);
+        const u8_t hi = memory_read(self.address++);
+        fprintf(stderr, "%02X%02X", hi, lo);
+        continue;
+      }
+      if (strcmp(s, "value") == 0) {
+        fprintf(stderr, "%02X", memory_read(self.address++));
+        continue;
+      }
+      if (strcmp(s, "reg") == 0) {
+        fprintf(stderr, "%02X", memory_read(self.address++));
+        continue;
+      }
+      fprintf(stderr, "%s", s);
+    }
+
+    fprintf(stderr, "\n");
+  }
+}
+
+
 static const struct {
   debug_cmd_t command;
   void (*handler)(void);
 } debug_commands[] = {
-  { E_DEBUG_CMD_SHOW_REGISTERS, debug_show_registers },
-  { E_DEBUG_CMD_SHOW_MEMORY,    debug_show_memory    }
+  { E_DEBUG_CMD_SHOW_REGISTERS,   debug_show_registers   },
+  { E_DEBUG_CMD_SHOW_MEMORY,      debug_show_memory      },
+  { E_DEBUG_CMD_SHOW_DISASSEMBLY, debug_show_disassembly }
 };
 
 

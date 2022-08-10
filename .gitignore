@@ -1,5 +1,9 @@
 zxnxt
+disassemble.c
 opcodes.c
 *.mmc
 *.bin
 *.o
+.*
+__pycache__
+*.code-workspace
