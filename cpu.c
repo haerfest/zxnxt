@@ -101,8 +101,8 @@
 #define T    clock_run_inline
 
 
-#define SZ53(value)   self.sz53[value]
-#define SZ53P(value)  self.sz53p[value]
+#define SZ53(value)   sz53[value]
+#define SZ53P(value)  sz53p[value]
 
 
 /**
@@ -134,17 +134,6 @@ static const u8_t parity[256] = {
 };
 
 
-/* Simple way to combine two 8-bit registers into a 16-bit one.
- * TODO: Deal with endianness of host CPU. */
-typedef union reg16_t {
-  struct {
-    u8_t l;  /* Low.  */
-    u8_t h;  /* High. */
-  } b;       /* Byte. */
-  u16_t w;   /* Word. */
-} reg16_t;
-
-
 #define CPU_REQUEST_RESET       0x01
 #define CPU_REQUEST_IRQ_ULA     0x02
 #define CPU_REQUEST_IRQ_LINE    0x04
@@ -154,53 +143,10 @@ typedef union reg16_t {
 #define CPU_REQUEST_NMI         (CPU_REQUEST_NMI_MF | CPU_REQUEST_NMI_DIVMMC)
 
 
-typedef struct cpu_t {
-  /* Combined 8-bit and 16-bit registers. */
-  reg16_t af;
-  reg16_t hl;
-  reg16_t bc;
-  reg16_t de;
-
-  /* Shadow registers. */
-  reg16_t af_;
-  reg16_t hl_;
-  reg16_t bc_;
-  reg16_t de_;
-
-  /* Hidden, internal register, aka MEMPTR. */
-  reg16_t wz;
-
-  /* Index registers, split for undocumented opcode support. */
-  reg16_t ix;
-  reg16_t iy;
-
-  /* Additional registers. */
-  reg16_t pc;
-  reg16_t sp;
-
-  /* Interrupt stuff. */
-  int iff1;
-  int iff2;
-
-  /* Interrupt table start and memory refresh registers. */
-  reg16_t ir;
-
-  /* Requests from outside. */
-  int requests;
-
-  /* IRQ. */
-  u8_t im;                      /* Interrupt mode.                                      */
-  int  irq_delay;               /* Number of instructions by which IRQ must be delayed. */
-
-  /* Eight-bit register to hold temporary values. */
-  u8_t tmp;
-
-  /* Look-up tables to set multiple flags at once and prevent needing to
-   * calculate things every time. */
-  u8_t sz53[256];
-  u8_t sz53p[256];
-
-} cpu_t;
+/* Look-up tables to set multiple flags at once and prevent needing to
+ * calculate things every time. */
+static u8_t sz53[256];
+static u8_t sz53p[256];
 
 
 /* Local-global cpu for fast reference. */
@@ -214,8 +160,8 @@ static void cpu_fill_tables(void) {
   int value;
   
   for (value = 0; value < 256; value++) {
-    self.sz53[value]   = (value & 0x80) | (value == 0) << ZF_SHIFT | (value & 0x20) | (value & 0x08);
-    self.sz53p[value]  = self.sz53[value] | (1 - parity[value]) << PF_SHIFT;
+    sz53[value]  = (value & 0x80) | (value == 0) << ZF_SHIFT | (value & 0x20) | (value & 0x08);
+    sz53p[value] = sz53[value] | (1 - parity[value]) << PF_SHIFT;
   }
 }
 
@@ -408,4 +354,9 @@ void cpu_run(int* do_stop) {
 
 u16_t cpu_pc_get(void) {
   return PC;
+}
+
+
+cpu_t* cpu_get(void) {
+  return &self;
 }
