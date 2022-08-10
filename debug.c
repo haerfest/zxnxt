@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "cpu.h"
 #include "debug.h"
+#include "memory.h"
 
 
 typedef enum debug_cmd_t {
@@ -9,12 +11,15 @@ typedef enum debug_cmd_t {
   E_DEBUG_CMD_HELP,
   E_DEBUG_CMD_CONTINUE,
   E_DEBUG_CMD_QUIT,
-  E_DEBUG_CMD_SHOW_REGISTERS
+  E_DEBUG_CMD_SHOW_REGISTERS,
+  E_DEBUG_CMD_SHOW_MEMORY
 } debug_cmd_t;
 
 
 typedef struct debug_t {
   debug_cmd_t command;
+  u16_t       address;
+  u16_t       length;
 } debug_t;
 
 
@@ -23,6 +28,7 @@ static debug_t self;
 
 int debug_init(void) {
   memset(&self, 0, sizeof(self));
+  self.length = 0x0100;
   return 0;
 }
 
@@ -90,6 +96,22 @@ static int debug_parse(char* s) {
     return 0;
   }
 
+  if (strcmp("m", p) == 0) {
+    self.command = E_DEBUG_CMD_SHOW_MEMORY;
+
+    if (debug_next_word(q + 1, &p, &q)) {
+      return 0;
+    }
+    self.address = strtol(p, NULL, 16);
+
+    if (debug_next_word(q + 1, &p, &q)) {
+      return 0;
+    }
+    self.length = strtol(p, NULL, 16);
+    
+    return 0;
+  }
+
   return -1;
 }
 
@@ -126,21 +148,49 @@ static void debug_show_registers(void) {
 }
 
 
-static void debug_execute(void) {
-  switch (self.command) {
-    case E_DEBUG_CMD_SHOW_REGISTERS:
-      debug_show_registers();
-      break;
+static void debug_show_memory(void) {
+  u16_t i, j;
+  u8_t  byte;
+  char  ascii[16 + 1];
 
-    default:
-      break;
+  ascii[sizeof(ascii) - 1] = '\0';
+
+  for (i = 0; i < self.length; i += 16) {
+    fprintf(stderr, "%04X  ", self.address);    
+    for (j = 0; j < 16; j++) {
+      byte = memory_read(self.address++);
+      fprintf(stderr, "%02X ", byte);
+      ascii[j] = (byte < ' ' || byte > '~') ? '.' : byte;
+    }
+    fprintf(stderr, " %s\n", ascii);
+  }
+}
+
+
+static const struct {
+  debug_cmd_t command;
+  void (*handler)(void);
+} debug_commands[] = {
+  { E_DEBUG_CMD_SHOW_REGISTERS, debug_show_registers },
+  { E_DEBUG_CMD_SHOW_MEMORY,    debug_show_memory    }
+};
+
+
+static void debug_execute(void) {
+  size_t i;
+
+  for (i = 0; i < sizeof(debug_commands) / sizeof(*debug_commands); i++) {
+    if (debug_commands[i].command == self.command) {
+      debug_commands[i].handler();
+      return;
+    }
   }
 }
 
 
 static void debug_prompt(void) {
-    fprintf(stderr, "> ");
-    fflush(stderr);
+  fprintf(stderr, "> ");
+  fflush(stderr);
 }
 
 
