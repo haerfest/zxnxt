@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -189,24 +190,38 @@ static void debug_show_disassembly(void) {
   for (i = 0; i < 16; i++) {
     fprintf(stderr, "%04X  ", self.address);
 
-    table_entry_t* t = table;
+    table_entry_t* t      = table;
+    size_t         length = 0;
+
+    /* Print any prefix + the opcode. */
     for (;;) {
       opcode = memory_read(self.address++);
-      if (!t[opcode].is_table) {
+      fprintf(stderr, "%02X ", opcode);
+      length++;
+
+      if (t[opcode].length > 0) {
         break;
       }
 
       t = t[opcode].payload.table;
     }
 
-    for (int i = 0; i < 4; i++) {
+    /* Print remaining bytes of instruction and padding. */
+    u16_t address = self.address;
+    for (size_t i = length; i < t[opcode].length; i++) {
+      fprintf(stderr, "%02X ", memory_read(address++));
+    }
+    for (size_t i = t[opcode].length; i < MAXARGS; i++) {
+      fprintf(stderr, "   ");
+    }
+
+    for (int i = 0; i < MAXARGS; i++) {
       const char* s = t[opcode].payload.instr[i];
       if (s == NULL) {
         break;
       }
       if (strcmp(s, "e") == 0) {
-        const s8_t offset = (s8_t) memory_read(self.address++);
-        fprintf(stderr, "$%04X", self.address - 1 + offset);
+        fprintf(stderr, "$%04X", self.address + (s8_t) memory_read(self.address++) - 1);
         continue;
       }
       if (strcmp(s, "d") == 0) {
@@ -214,7 +229,7 @@ static void debug_show_disassembly(void) {
         continue;
       }
       if (strcmp(s, "n") == 0) {
-        fprintf(stderr, "%02X", memory_read(self.address++));
+        fprintf(stderr, "$%02X", memory_read(self.address++));
         continue;
       }
       if (strcmp(s, "nn") == 0) {
@@ -231,6 +246,7 @@ static void debug_show_disassembly(void) {
         fprintf(stderr, "$%02X", memory_read(self.address++));
         continue;
       }
+
       fprintf(stderr, "%s", s);
     }
 

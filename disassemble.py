@@ -8,42 +8,64 @@ from tables    import *
 from typing    import *
 
 
-def split_on_lowercase(s: str) -> List[str]:
-  parts = []
+MAXARGS = 5
 
-  part = s[0]
-  for ch in s[1:]:
-    if part[0].islower() == ch.islower():
-      part += ch
-    else:
-      parts.append(part)
-      part = ch
+
+def format_instr(s: str) -> List[str]:
+  '''
+  Format an instruction by aligning the uppercase opcode and splitting the
+  arguments on changes in case, e.g. "LD B,nn" => ["LD   ", "B,", "nn"].
+  '''
+  split    = s.split()
+  mnemonic = split[0]
+  parts    = [f'{mnemonic:<5}']
+
+  args = ' '.join(split[1:])
+  if args:
+    part = args[0]
+    
+    for ch in args[1:]:
+      if part[0].islower() == ch.islower():
+        part += ch
+      else:
+        parts.append(part)
+        part = ch
+    
+    parts.append(part)
   
-  parts.append(part)
   return parts
 
 
-def disassemble(f: IO, t: Table, prefix: Optional[str] = '') -> None:
+def arg_length(s: str) -> int:
+  if s in ['e', 'd', 'n']:
+    return 1
+  if s in ['nn']:
+    return 2
+  return 0
+
+def disassemble(f: IO, t: Table, prefix: Optional[List[str]] = []) -> None:
     for opcode in range(256):
         if opcode in t and isinstance(t[opcode], dict):
-            disassemble(f, t[opcode], f'{prefix}{opcode:02X}')
+            disassemble(f, t[opcode], prefix + [f'{opcode:02X}'])
     
-    f.write(f'static table_entry_t table{prefix}[256] = {{\n')
+    prefix_str = ''.join(prefix)
+    f.write(f'static table_entry_t table{prefix_str}[256] = {{\n')
 
     for opcode in range(256):
         f.write(f'  /* 0x{opcode:02X} */ {{ ')
         if opcode in t:
             if isinstance(t[opcode], tuple):
-                instr, _ = t[opcode]
-                parts    = [f'"{s}"' for s in split_on_lowercase(instr)] + ['NULL'] * 4
-                joined   = ",".join(parts[:4])
-                f.write(f'0, {{ .instr = {{{joined}}} }}')
+                instr, _  = t[opcode]
+                parts     = format_instr(instr)
+                n         = len(prefix) + 1 + sum(arg_length(arg) for arg in parts[1:])
+                formatted = ','.join(([f'"{part}"' for part in parts] + ['NULL'] * MAXARGS)[:MAXARGS])
+                f.write(f'{n}, {{ .instr = {{{formatted}}} }}')
             elif isinstance(t[opcode], dict):
-                f.write(f'1, {{ .table = table{prefix}{opcode:02X} }}')
+                f.write(f'0, {{ .table = table{prefix_str}{opcode:02X} }}')
             else:
-                f.write('0, { .instr = {"?", NULL, NULL, NULL} }')
+                f.write('1, { .instr = {"?", NULL, NULL, NULL, NULL} }')
         else:
-            f.write('0, { .instr = {"?", NULL, NULL, NULL} }')
+            f.write('1, { .instr = {"?", NULL, NULL, NULL, NULL} }')
         f.write(' },\n')
     
     f.write('};\n\n')
@@ -52,10 +74,12 @@ def disassemble(f: IO, t: Table, prefix: Optional[str] = '') -> None:
 def main() -> None:
     with open('disassemble.c', 'w') as f:
         f.write(f'''
+#define MAXARGS {MAXARGS}
+
 typedef struct table_entry_t {{
-  int is_table;
+  size_t length;
   union {{
-    char*                 instr[4];
+    char*                 instr[MAXARGS];
     struct table_entry_t* table;
   }} payload;
 }} table_entry_t;
