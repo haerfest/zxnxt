@@ -36,9 +36,11 @@ u8_t divmmc_rom_read(u16_t address);
 void divmmc_rom_write(u16_t address, u8_t value);
 u8_t divmmc_control_read(u16_t address); 
 void divmmc_control_write(u16_t address, u8_t value);
-void divmmc_automap_enable(divmmc_addr_t address, int enable);
-void divmmc_automap_always(divmmc_addr_t address, int always);
-void divmmc_automap_instant(divmmc_addr_t address, int instant);
+int  divmmc_is_automap_enabled(void);
+void divmmc_automap_enable(int enable);
+void divmmc_automap_on_fetch_enable(divmmc_addr_t address, int enable);
+void divmmc_automap_on_fetch_always(divmmc_addr_t address, int always);
+void divmmc_automap_on_fetch_instant(divmmc_addr_t address, int instant);
 void divmmc_automap(u16_t address, int instant);
 
 

@@ -10,12 +10,10 @@
 /**
  * DivMMC seems to be a backwards-compatible evolution of DivIDE.
  * See: https://velesoft.speccy.cz/zx/divide/divide-memory.htm
+ *
+ * For specifics to the Next, see:
+ * https://gitlab.com/SpectrumNext/ZX_Spectrum_Next_FPGA/-/commit/0a9e835a42975600dedf6653e078022281c1dd46
  */
-
-
-#define CONMEM_ENABLED(value)  ((value) & 0x80)
-#define MAPRAM_ENABLED(value)  ((value) & 0x40)
-#define BANK_NUMBER(value)     ((value) & 0x0F)
 
 
 typedef struct divmmc_automap_t {
@@ -30,6 +28,8 @@ typedef struct divmmc_t {
   u8_t*            rom;
   u8_t*            ram;
   u8_t             value;
+  int              bank_number;
+  int              is_automap_enabled;
   int              is_active;
   divmmc_automap_t automap[E_DIVMMC_ADDR_LAST - E_DIVMMC_ADDR_FIRST + 1];
 } divmmc_t;
@@ -42,15 +42,17 @@ static void divmmc_refresh_ptr(void) {
   /* We subtract 0x2000 because RAM is paged in starting at 0x2000, so all
    * addresses are offset 0x2000. This saves us a subtraction on every
    * access. */
-  self.ram = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_RAM + BANK_NUMBER(self.value) * 8 * 1024 - 0x2000];
+  self.ram = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_RAM + self.bank_number * 8 * 1024 - 0x2000];
 }
 
 
 int divmmc_init(u8_t* sram) {
-  self.sram      = sram;
-  self.rom       = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
-  self.value     = 0x00;
-  self.is_active = 0;
+  self.sram               = sram;
+  self.rom                = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
+  self.value              = 0x00;
+  self.bank_number        = 0;
+  self.is_automap_enabled = 0;
+  self.is_active          = 0;
 
   divmmc_reset(E_RESET_HARD);
   divmmc_refresh_ptr();
@@ -75,6 +77,10 @@ void divmmc_reset(reset_t reset) {
   self.automap[E_DIVMMC_ADDR_04C6].enable = 1;
   self.automap[E_DIVMMC_ADDR_0562].enable = 1; 
   self.automap[E_DIVMMC_ADDR_3DXX].enable = 1;
+
+  if (reset == E_RESET_HARD) {
+    self.is_automap_enabled = 0;
+  }
 }
 
 
@@ -108,42 +114,62 @@ u8_t divmmc_control_read(u16_t address) {
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
-  log_wrn("divmmc: control write $%02X to $%04X\n", value, address);
-  self.value     = value;
-  self.is_active = CONMEM_ENABLED(self.value);
+  log_wrn("divmmc: control write $%02X\n", value);
+  
+  self.value       = value;
+  self.bank_number = value & 0x0F;
+  self.is_active   = value & 0x80;
 
-  divmmc_refresh_ptr();
-
-  if (MAPRAM_ENABLED(value)) {
+  if (value & 0x40) {
     log_wrn("divmmc: MAPRAM functionality not implemented\n");
   }
 
+  divmmc_refresh_ptr();
   memory_refresh_accessors(0, 2);
 }
 
 
-void divmmc_automap_enable(divmmc_addr_t address, int enable) {
-  if (self.automap[address].enable != enable) {
-    self.automap[address].enable = enable;
+int divmmc_is_automap_enabled(void) {
+  log_wrn("divmmc: returning automap being %s\n", self.is_automap_enabled ? "enabled" : "disabled");
+  return self.is_automap_enabled;
+}
+
+
+void divmmc_automap_enable(int enable) {
+  log_wrn("divmmc: automap set to %s\n", enable ? "enabled" : "disabled");
+
+  self.is_automap_enabled = enable;
+
+  if (!enable && self.is_active && !(self.value & 0x80)) {
+    self.is_active = 0;
+    memory_refresh_accessors(0, 2);
   }
 }
 
 
-void divmmc_automap_always(divmmc_addr_t address, int always) {
-  if (self.automap[address].always != always) {
-    self.automap[address].always = always;
-  }
+void divmmc_automap_on_fetch_enable(divmmc_addr_t address, int enable) {
+  log_wrn("divmmc: automap on fetch %d %s\n", address, enable ? "enable" : "disable");
+  self.automap[address].enable = enable;
 }
 
 
-void divmmc_automap_instant(divmmc_addr_t address, int instant) {
-  if (self.automap[address].instant != instant) {
-    self.automap[address].instant = instant;
-  }
+void divmmc_automap_on_fetch_always(divmmc_addr_t address, int always) {
+  log_wrn("divmmc: automap on fetch %d %s\n", address, always ? "always" : "rom3");
+  self.automap[address].always = always;
+}
+
+
+void divmmc_automap_on_fetch_instant(divmmc_addr_t address, int instant) {
+  log_wrn("divmmc: automap on fetch %d %s\n", address, instant ? "instant" : "delayed");
+  self.automap[address].instant = instant;
 }
 
 
 void divmmc_automap(u16_t address, int instant) {
+  if (!self.is_automap_enabled || self.is_active) {
+    return;
+  }
+
   divmmc_addr_t addr = E_DIVMMC_ADDR_3DXX;
 
   switch (address) {
@@ -193,6 +219,5 @@ void divmmc_automap(u16_t address, int instant) {
   self.is_active = 1;
   log_wrn("divmmc: automap triggered on $%04X (%s)\n", address, instant ? "instant" : "delayed");
 
-  divmmc_refresh_ptr();
   memory_refresh_accessors(0, 2);
 }
