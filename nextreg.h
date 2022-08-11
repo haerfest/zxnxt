@@ -102,6 +102,10 @@ typedef enum {
   E_NEXTREG_REGISTER_ALTERNATE_ROM                         = 0x8C,
   E_NEXTREG_REGISTER_SPECTRUM_MEMORY_MAPPING               = 0x8E,
   E_NEXTREG_REGISTER_MEMORY_MAPPING_MODE                   = 0x8F,
+  E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0                  = 0xB8,
+  E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_VALID            = 0xB9,
+  E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_TIMING           = 0xBA,
+  E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1                  = 0xBB,
   E_NEXTREG_REGISTER_INTERRUPT_CONTROL                     = 0xC0,
   E_NEXTREG_REGISTER_INT_EN_0                              = 0xC4
 } nextreg_register_t;

@@ -1,4 +1,6 @@
+#include <string.h>
 #include "defs.h"
+#include "divmmc.h"
 #include "log.h"
 #include "memory.h"
 #include "utils.h"
@@ -20,6 +22,7 @@ typedef struct divmmc_t {
   u8_t* rom;
   u8_t* ram;
   u8_t  value;
+  int   automap_enabled[E_DIVMMC_ADDR_LAST - E_DIVMMC_ADDR_FIRST + 1];
 } divmmc_t;
 
 
@@ -39,6 +42,7 @@ int divmmc_init(u8_t* sram) {
   self.rom   = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
   self.value = 0x00;
 
+  divmmc_reset(E_RESET_HARD);
   divmmc_refresh_ptr();
 
   return 0;
@@ -46,6 +50,19 @@ int divmmc_init(u8_t* sram) {
 
 
 void divmmc_finit(void) {
+}
+
+
+void divmmc_reset(reset_t reset) {
+  memset(self.automap_enabled, 0, sizeof(self.automap_enabled));
+
+  self.automap_enabled[E_DIVMMC_ADDR_0000] = 1;
+  self.automap_enabled[E_DIVMMC_ADDR_0008] = 1;
+  self.automap_enabled[E_DIVMMC_ADDR_0038] = 1;
+  self.automap_enabled[E_DIVMMC_ADDR_3DXX] = 1;
+  self.automap_enabled[E_DIVMMC_ADDR_0562] = 1;
+  self.automap_enabled[E_DIVMMC_ADDR_04C6] = 1;
+  self.automap_enabled[E_DIVMMC_ADDR_0066] = 1;  /* TODO: delayed */
 }
 
 
@@ -90,4 +107,12 @@ void divmmc_control_write(u16_t address, u8_t value) {
 
     memory_refresh_accessors(0, 2);
   }
+}
+
+
+void divmmc_automap_enable(divmmc_addr_t address, int enable) {
+  if (self.automap_enabled[address] != enable) {
+    self.automap_enabled[address] = enable;
+  }
+  log_wrn("divmmc: automap %d %s functionality not implemented\n", address, enable ? "enable" : "disable");
 }

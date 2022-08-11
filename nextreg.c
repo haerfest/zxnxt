@@ -8,6 +8,7 @@
 #include "cpu.h"
 #include "dac.h"
 #include "defs.h"
+#include "divmmc.h"
 #include "dma.h"
 #include "i2c.h"
 #include "io.h"
@@ -102,6 +103,7 @@ static void nextreg_reset(reset_t reset) {
   ay_reset(reset);
   copper_reset(reset);
   dac_reset(reset);
+  divmmc_reset(reset);
   dma_reset(reset);
   i2c_reset(reset);
   io_reset(reset);
@@ -798,6 +800,31 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXTREG_REGISTER_INT_EN_0:
       nextreg_int_en_0_write(value);
+      break;
+
+    case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0:
+      divmmc_automap_enable(E_DIVMMC_ADDR_0038, value & 0x80);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0030, value & 0x40);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0028, value & 0x20);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0020, value & 0x10);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0018, value & 0x08);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0010, value & 0x04);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0008, value & 0x02);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0000, value & 0x01);
+      break;
+
+    case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_VALID:
+    case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_TIMING:
+      break;
+
+    case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1:
+      divmmc_automap_enable(E_DIVMMC_ADDR_3DXX,        value & 0x80);
+      divmmc_automap_enable(E_DIVMMC_ADDR_1FF8_1FFF, ~(value & 0x40));
+      divmmc_automap_enable(E_DIVMMC_ADDR_056A,        value & 0x20);
+      divmmc_automap_enable(E_DIVMMC_ADDR_04D7,        value & 0x10);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0562,        value & 0x08);
+      divmmc_automap_enable(E_DIVMMC_ADDR_04C6,        value & 0x04);
+      divmmc_automap_enable(E_DIVMMC_ADDR_0066,        value & 0x03);  /* TODO: instant/delayed */
       break;
 
     default:
