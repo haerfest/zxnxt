@@ -168,7 +168,15 @@ void memory_refresh_accessors(int page, int n_pages) {
 
 u8_t memory_read(u16_t address) {
   const u8_t page = address / ADDRESS_PAGE_SIZE;
-  return self.readers[page](address);
+  u8_t       byte;
+
+  divmmc_automap(address, 1);
+
+  byte = self.readers[page](address);
+
+  divmmc_automap(address, 0);
+
+  return byte;
 }
 
 

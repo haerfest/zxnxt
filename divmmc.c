@@ -3,6 +3,7 @@
 #include "divmmc.h"
 #include "log.h"
 #include "memory.h"
+#include "rom.h"
 #include "utils.h"
 
 
@@ -29,6 +30,7 @@ typedef struct divmmc_t {
   u8_t*            rom;
   u8_t*            ram;
   u8_t             value;
+  int              is_active;
   divmmc_automap_t automap[E_DIVMMC_ADDR_LAST - E_DIVMMC_ADDR_FIRST + 1];
 } divmmc_t;
 
@@ -45,9 +47,10 @@ static void divmmc_refresh_ptr(void) {
 
 
 int divmmc_init(u8_t* sram) {
-  self.sram  = sram;
-  self.rom   = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
-  self.value = 0x00;
+  self.sram      = sram;
+  self.rom       = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
+  self.value     = 0x00;
+  self.is_active = 0;
 
   divmmc_reset(E_RESET_HARD);
   divmmc_refresh_ptr();
@@ -76,7 +79,7 @@ void divmmc_reset(reset_t reset) {
 
 
 int divmmc_is_active(void) {
-  return CONMEM_ENABLED(self.value);
+  return self.is_active;
 }
 
 
@@ -105,17 +108,17 @@ u8_t divmmc_control_read(u16_t address) {
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
-  if (value != self.value)  {
-    self.value = value;
+  log_wrn("divmmc: control write $%02X to $%04X\n", value, address);
+  self.value     = value;
+  self.is_active = CONMEM_ENABLED(self.value);
 
-    divmmc_refresh_ptr();
+  divmmc_refresh_ptr();
 
-    if (MAPRAM_ENABLED(value)) {
-      log_wrn("divmmc: MAPRAM functionality not implemented\n");
-    }
-
-    memory_refresh_accessors(0, 2);
+  if (MAPRAM_ENABLED(value)) {
+    log_wrn("divmmc: MAPRAM functionality not implemented\n");
   }
+
+  memory_refresh_accessors(0, 2);
 }
 
 
@@ -137,4 +140,59 @@ void divmmc_automap_instant(divmmc_addr_t address, int instant) {
   if (self.automap[address].instant != instant) {
     self.automap[address].instant = instant;
   }
+}
+
+
+void divmmc_automap(u16_t address, int instant) {
+  divmmc_addr_t addr = E_DIVMMC_ADDR_3DXX;
+
+  switch (address) {
+    case 0x0008: addr = E_DIVMMC_ADDR_0008; break;
+    case 0x0010: addr = E_DIVMMC_ADDR_0010; break;
+    case 0x0018: addr = E_DIVMMC_ADDR_0018; break;
+    case 0x0020: addr = E_DIVMMC_ADDR_0020; break;
+    case 0x0028: addr = E_DIVMMC_ADDR_0028; break;
+    case 0x0030: addr = E_DIVMMC_ADDR_0030; break;
+    case 0x0038: addr = E_DIVMMC_ADDR_0038; break;
+    case 0x0066: addr = E_DIVMMC_ADDR_0066; break;
+    case 0x04C6: addr = E_DIVMMC_ADDR_04C6; break;
+    case 0x04D7: addr = E_DIVMMC_ADDR_04D7; break;
+    case 0x0562: addr = E_DIVMMC_ADDR_0562; break;
+    case 0x056A: addr = E_DIVMMC_ADDR_056A; break;
+    
+    case 0x1FF8:
+    case 0x1FF9:
+    case 0x1FFA:
+    case 0x1FFB:
+    case 0x1FFC:
+    case 0x1FFD:
+    case 0x1FFE:
+    case 0x1FFF:
+      addr = E_DIVMMC_ADDR_1FF8_1FFF;
+      break;
+
+    default:
+      if ((address & 0xFF00) != 0x3D00) {
+        return;
+      }
+      break;
+  }
+
+  if (!self.automap[addr].enable) {
+    return;
+  }
+
+  if (self.automap[addr].instant != instant) {
+    return;
+  }
+
+  if (!self.automap[addr].always && rom_selected() != E_ROM_48K_BASIC) {
+    return;
+  }
+  
+  self.is_active = 1;
+  log_wrn("divmmc: automap triggered on $%04X (%s)\n", address, instant ? "instant" : "delayed");
+
+  divmmc_refresh_ptr();
+  memory_refresh_accessors(0, 2);
 }
