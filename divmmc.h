@@ -37,6 +37,10 @@ void divmmc_rom_write(u16_t address, u8_t value);
 u8_t divmmc_control_read(u16_t address); 
 void divmmc_control_write(u16_t address, u8_t value);
 void divmmc_automap_enable(divmmc_addr_t address, int enable);
+void divmmc_automap_always(divmmc_addr_t address, int always);
+void divmmc_automap_instant(divmmc_addr_t address, int instant);
+
+
 
 
 #endif  /* __DIVMMC_H */

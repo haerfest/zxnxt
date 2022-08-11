@@ -17,12 +17,19 @@
 #define BANK_NUMBER(value)     ((value) & 0x0F)
 
 
+typedef struct divmmc_automap_t {
+  int enable;
+  int always;
+  int instant;
+} divmmc_automap_t;
+
+
 typedef struct divmmc_t {
-  u8_t* sram;
-  u8_t* rom;
-  u8_t* ram;
-  u8_t  value;
-  int   automap_enabled[E_DIVMMC_ADDR_LAST - E_DIVMMC_ADDR_FIRST + 1];
+  u8_t*            sram;
+  u8_t*            rom;
+  u8_t*            ram;
+  u8_t             value;
+  divmmc_automap_t automap[E_DIVMMC_ADDR_LAST - E_DIVMMC_ADDR_FIRST + 1];
 } divmmc_t;
 
 
@@ -54,15 +61,17 @@ void divmmc_finit(void) {
 
 
 void divmmc_reset(reset_t reset) {
-  memset(self.automap_enabled, 0, sizeof(self.automap_enabled));
+  memset(self.automap, 0, sizeof(self.automap));
 
-  self.automap_enabled[E_DIVMMC_ADDR_0000] = 1;
-  self.automap_enabled[E_DIVMMC_ADDR_0008] = 1;
-  self.automap_enabled[E_DIVMMC_ADDR_0038] = 1;
-  self.automap_enabled[E_DIVMMC_ADDR_3DXX] = 1;
-  self.automap_enabled[E_DIVMMC_ADDR_0562] = 1;
-  self.automap_enabled[E_DIVMMC_ADDR_04C6] = 1;
-  self.automap_enabled[E_DIVMMC_ADDR_0066] = 1;  /* TODO: delayed */
+  self.automap[E_DIVMMC_ADDR_0000].enable = 1;
+  self.automap[E_DIVMMC_ADDR_0000].always = 1;
+
+  self.automap[E_DIVMMC_ADDR_0008].enable = 1;
+  self.automap[E_DIVMMC_ADDR_0038].enable = 1;
+  self.automap[E_DIVMMC_ADDR_0066].enable = 1;
+  self.automap[E_DIVMMC_ADDR_04C6].enable = 1;
+  self.automap[E_DIVMMC_ADDR_0562].enable = 1; 
+  self.automap[E_DIVMMC_ADDR_3DXX].enable = 1;
 }
 
 
@@ -111,8 +120,21 @@ void divmmc_control_write(u16_t address, u8_t value) {
 
 
 void divmmc_automap_enable(divmmc_addr_t address, int enable) {
-  if (self.automap_enabled[address] != enable) {
-    self.automap_enabled[address] = enable;
+  if (self.automap[address].enable != enable) {
+    self.automap[address].enable = enable;
   }
-  log_wrn("divmmc: automap %d %s functionality not implemented\n", address, enable ? "enable" : "disable");
+}
+
+
+void divmmc_automap_always(divmmc_addr_t address, int always) {
+  if (self.automap[address].always != always) {
+    self.automap[address].always = always;
+  }
+}
+
+
+void divmmc_automap_instant(divmmc_addr_t address, int instant) {
+  if (self.automap[address].instant != instant) {
+    self.automap[address].instant = instant;
+  }
 }
