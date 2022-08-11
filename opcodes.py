@@ -76,7 +76,7 @@ inline
 static void cpu_execute_next_opcode(void) {{
   R = (R & 0x80) | ((R + 1) & 0x7F);
 
-  const u8_t opcode = memory_read(PC++); T(4);
+  const u8_t opcode = memory_read_opcode(PC++); T(4);
   switch (opcode) {{
 {body.rstrip()}
       log_wrn("cpu: opcode %02X at PC=$%04X not implemented\\n", opcode, PC - 1);
