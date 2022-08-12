@@ -555,8 +555,6 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
 
 void nextreg_write_internal(u8_t reg, u8_t value) {
-  log_wrn("nextreg: write $%02X to $%04X\n", value, reg);
-
   switch (reg) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
       nextreg_config_mapping_write(value);

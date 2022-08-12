@@ -153,7 +153,7 @@ static int debug_parse(char* s) {
     return 0;
   }
 
-  if (strcmp("ba", p) == 0) {
+  if (strcmp("b", p) == 0) {
     self.command = E_DEBUG_CMD_BREAKPOINTS_ADD;
     self.nr_args = 0;
     while (self.nr_args < MAX_DEBUG_ARGS && debug_next_word(q + 1, &p, &q) == 0) {
@@ -211,9 +211,8 @@ static u16_t debug_disassemble(u16_t address) {
         break;
       }
       if (strcmp(s, "e") == 0) {
-        const s8_t offset = (s8_t) memory_read(address + 1);
-        fprintf(stderr, "$%04X", address + offset - 1);
-        address++;
+        const s8_t offset = (s8_t) memory_read(address++);
+        fprintf(stderr, "$%04X", address + offset);
         continue;
       }
       if (strcmp(s, "d") == 0) {
