@@ -35,6 +35,10 @@
 #define CORE_VERSION_MINOR       1
 #define CORE_VERSION_SUB_MINOR  10
 
+#define BOARD_ID_ISSUE_2      0x00
+#define BOARD_ID_ISSUE_3      0x01
+#define BOARD_ID_ISSUE_4      0x02
+
 
 typedef struct clip_t {
   u8_t index;
@@ -949,6 +953,9 @@ u8_t nextreg_read_internal(u8_t reg) {
 
     case E_NEXTREG_REGISTER_CORE_VERSION_SUB_MINOR:
       return CORE_VERSION_SUB_MINOR;
+
+    case E_NEXTREG_REGISTER_BOARD_ID:
+      return BOARD_ID_ISSUE_4;
 
     case E_NEXTREG_REGISTER_CORE_BOOT:
       return nextreg_core_boot_read();

@@ -161,16 +161,12 @@ void divmmc_automap_enable(int enable) {
   log_wrn("divmmc: automap set to %s\n", enable ? "enabled" : "disabled");
 
   self.is_automap_enabled = enable;
-
-  if (!enable && self.is_active && !(self.value & 0x80)) {
-    self.is_active = 0;
-    memory_refresh_accessors(0, 2);
-  }
 }
 
 
 static divmmc_addr_t map(u16_t address) {
   switch (address) {
+    case 0x0000: return E_DIVMMC_ADDR_0000; break;
     case 0x0008: return E_DIVMMC_ADDR_0008; break;
     case 0x0010: return E_DIVMMC_ADDR_0010; break;
     case 0x0018: return E_DIVMMC_ADDR_0018; break;

@@ -23,6 +23,7 @@ typedef enum {
   E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING                  = 0x09,
   E_NEXTREG_REGISTER_PERIPHERAL_5_SETTING                  = 0x0A,
   E_NEXTREG_REGISTER_CORE_VERSION_SUB_MINOR                = 0x0E,
+  E_NEXTREG_REGISTER_BOARD_ID                              = 0x0F,
   E_NEXTREG_REGISTER_CORE_BOOT                             = 0x10,
   E_NEXTREG_REGISTER_VIDEO_TIMING                          = 0x11,
   E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK                = 0x12,
