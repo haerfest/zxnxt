@@ -39,7 +39,7 @@ def format_instr(s: str) -> List[str]:
 def arg_length(s: str) -> int:
   if s in ['e', 'd', 'n']:
     return 1
-  if s in ['nn']:
+  if s in ['nn', 'mm']:
     return 2
   return 0
 

@@ -24,6 +24,7 @@ typedef enum debug_cmd_t {
   E_DEBUG_CMD_SHOW_DISASSEMBLY,
   E_DEBUG_CMD_SHOW_NEXT_REGISTERS,
   E_DEBUG_CMD_STEP,
+  E_DEBUG_CMD_OVER,
   E_DEBUG_CMD_BREAKPOINTS_LIST,
   E_DEBUG_CMD_BREAKPOINTS_ADD,
   E_DEBUG_CMD_BREAKPOINTS_DELETE
@@ -31,7 +32,7 @@ typedef enum debug_cmd_t {
 
 
 #define MAX_DEBUG_ARGS   10
-#define MAX_BREAKPOINTS  10
+#define MAX_BREAKPOINTS  11
 
 
 typedef struct breakpoint_t {
@@ -45,7 +46,7 @@ typedef struct debug_t {
   int          nr_args;
   u16_t        args[MAX_DEBUG_ARGS];
   int          has_breakpoints;
-  breakpoint_t breakpoints[MAX_BREAKPOINTS];
+  breakpoint_t breakpoints[MAX_BREAKPOINTS];  /* First one is for 'over' functionality. */
 } debug_t;
 
 
@@ -109,6 +110,11 @@ static int debug_parse(char* s) {
 
   if (strcmp("c", p) == 0) {
     self.command = E_DEBUG_CMD_CONTINUE;
+    self.nr_args = 0;
+    if (debug_next_word(q + 1, &p, &q) == 0) {
+      self.args[0] = strtol(p, NULL, 16);
+      self.nr_args = 1;
+    }
     return 0;
   }
 
@@ -129,6 +135,11 @@ static int debug_parse(char* s) {
 
   if (strcmp("s", p) == 0) {
     self.command = E_DEBUG_CMD_STEP;
+    return 0;
+  }
+
+  if (strcmp("o", p) == 0) {
+    self.command = E_DEBUG_CMD_OVER;
     return 0;
   }
 
@@ -229,6 +240,12 @@ static u16_t debug_disassemble(u16_t address) {
         fprintf(stderr, "$%02X%02X", hi, lo);
         continue;
       }
+      if (strcmp(s, "mm") == 0) {
+        const u8_t hi = memory_read(address++);
+        const u8_t lo = memory_read(address++);
+        fprintf(stderr, "$%02X%02X", hi, lo);
+        continue;
+      }
       if (strcmp(s, "value") == 0) {
         fprintf(stderr, "$%02X", memory_read(address++));
         continue;
@@ -247,7 +264,7 @@ static u16_t debug_disassemble(u16_t address) {
 }
 
 
-static void debug_show_registers(void) {
+static int debug_show_registers(void) {
   const cpu_t* cpu = cpu_get();
 
   fprintf(stderr, " PC   SP   AF   BC   DE   HL   IX   IY   AF'  BC'  DE'  HL' SZ?H?PNC IM  IR  IFF1 IFF2 __________ MMU ________ ROM MMC\n");
@@ -280,10 +297,12 @@ static void debug_show_registers(void) {
     mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7),
     rom_selected(),
     divmmc_is_active() ? 'Y' : 'N');
+
+    return 0;
 }
 
 
-static void debug_show_next_registers(void) {
+static int debug_show_next_registers(void) {
   fprintf(stderr, "   x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 xA xB xC xD xE xF\n");
   for (int i = 0; i < 256; i += 16) {
     fprintf(stderr, "%0Xx ", i >> 4);
@@ -293,17 +312,66 @@ static void debug_show_next_registers(void) {
     }
     fprintf(stderr, "\n");
   }
+
+  return 0;
 }
 
 
-static void debug_step(void) {
+static int debug_continue(void) {
+  if (self.nr_args > 0) {
+    self.breakpoints[0].address = self.args[0];
+    self.breakpoints[0].is_set  = 1;
+    self.has_breakpoints        = 1;
+  }
+
+  /* Continue running. */
+  return 1;
+}
+
+
+static int debug_step(void) {
   cpu_step();
   
   (void) debug_disassemble(cpu_get()->pc.w);
+
+  return 0;
 }
 
 
-static void debug_show_memory(void) {
+static int debug_instruction_length(u16_t address) {
+    table_entry_t* t      = table;
+    size_t         length = 0;
+    u8_t           opcode;
+
+    for (;;) {
+      opcode = memory_read(address++);
+      length++;
+
+      if (t[opcode].length > 0) {
+        break;
+      }
+
+      t = t[opcode].payload.table;
+    }
+
+    return length - 1 + t[opcode].length;
+}
+
+
+static int debug_over(void) {
+  const u16_t pc   = cpu_get()->pc.w;
+  const u16_t next = pc + debug_instruction_length(pc);
+  
+  self.breakpoints[0].address = next;
+  self.breakpoints[0].is_set  = 1;
+  self.has_breakpoints        = 1;
+
+  /* Continue running. */
+  return 1;
+}
+
+
+static int debug_show_memory(void) {
   u16_t i, j;
   u8_t  byte;
   char  ascii[16 + 1];
@@ -319,41 +387,58 @@ static void debug_show_memory(void) {
     }
     fprintf(stderr, " %s\n", ascii);
   }
+
+  return 0;
 }
 
 
-static void debug_show_disassembly(void) {
+static int debug_show_disassembly(void) {
   for (int i = 0; i < 16; i++) {
     self.args[0] = debug_disassemble(self.args[0]);
   }
+
+  return 0;
 }
 
 
-static void debug_breakpoints_list(void) {
+static int debug_breakpoints_list(void) {
   for (int i = 0; i < MAX_BREAKPOINTS; i++) {
     if (self.breakpoints[i].is_set) {
       fprintf(stderr, "$%04X\n", self.breakpoints[i].address);
     }
   }
+
+  return 0;
 }
 
 
-static void debug_breakpoints_add(void) {
+static int debug_breakpoints_add(void) {
   for (int i = 0; i < self.nr_args; i++) {
     const u16_t address = self.args[i];
-    for (int j = 0; j < MAX_BREAKPOINTS; j++) {
+    /* Add except for the 'over' breakpoint. */
+    for (int j = 1; j < MAX_BREAKPOINTS; j++) {
       if (!self.breakpoints[j].is_set || self.breakpoints[j].address == address) {
         self.breakpoints[j].address = address;
         self.breakpoints[j].is_set  = 1;
-        self.has_breakpoints      = 1;
+        self.has_breakpoints        = 1;
         break;
       }
     }
   }
+
+  return 0;
 }
 
 
-static void debug_breakpoints_delete(void) {
+static void debug_set_has_breakpoints(void) {
+  self.has_breakpoints = 0;
+  for (int j = 0; j < MAX_BREAKPOINTS; j++) {
+    self.has_breakpoints |= self.breakpoints[j].is_set;
+  }
+}
+
+
+static int debug_breakpoints_delete(void) {
   for (int i = 0; i < self.nr_args; i++) {
     const u16_t address = self.args[i];
     for (int j = 0; j < MAX_BREAKPOINTS; j++) {
@@ -364,10 +449,9 @@ static void debug_breakpoints_delete(void) {
     }
   }
 
-  self.has_breakpoints = 0;
-  for (int j = 0; j < MAX_BREAKPOINTS; j++) {
-    self.has_breakpoints |= self.breakpoints[j].is_set;
-  }
+  debug_set_has_breakpoints();
+
+  return 0;
 }
 
 
@@ -388,28 +472,31 @@ int debug_is_breakpoint(u16_t address) {
 
 static const struct {
   debug_cmd_t command;
-  void (*handler)(void);
+  int (*handler)(void);
 } debug_commands[] = {
   { E_DEBUG_CMD_SHOW_REGISTERS,      debug_show_registers      },
   { E_DEBUG_CMD_SHOW_MEMORY,         debug_show_memory         },
   { E_DEBUG_CMD_SHOW_DISASSEMBLY,    debug_show_disassembly    },
   { E_DEBUG_CMD_SHOW_NEXT_REGISTERS, debug_show_next_registers },
+  { E_DEBUG_CMD_CONTINUE,            debug_continue            },
   { E_DEBUG_CMD_STEP,                debug_step                },
+  { E_DEBUG_CMD_OVER,                debug_over                },
   { E_DEBUG_CMD_BREAKPOINTS_LIST,    debug_breakpoints_list    },
   { E_DEBUG_CMD_BREAKPOINTS_ADD,     debug_breakpoints_add     },
   { E_DEBUG_CMD_BREAKPOINTS_DELETE,  debug_breakpoints_delete  }
 };
 
 
-static void debug_execute(void) {
+static int debug_execute(void) {
   size_t i;
 
   for (i = 0; i < sizeof(debug_commands) / sizeof(*debug_commands); i++) {
     if (debug_commands[i].command == self.command) {
-      debug_commands[i].handler();
-      return;
+      return debug_commands[i].handler();
     }
   }
+
+  return 0;
 }
 
 
@@ -422,9 +509,14 @@ static void debug_prompt(void) {
 int debug_enter(void) {
   char input[80 + 1];
 
-  debug_show_registers();
   (void) debug_disassemble(cpu_get()->pc.w);
-  
+
+  /* When we completed 'over', clear its breakpoint. */
+  if (self.breakpoints[0].is_set && cpu_get()->pc.w == self.breakpoints[0].address) {
+    self.breakpoints[0].is_set = 0;
+    debug_set_has_breakpoints();
+  }
+
   self.command = E_DEBUG_CMD_NONE;
   
   for (;;) {
@@ -441,10 +533,8 @@ int debug_enter(void) {
     if (self.command == E_DEBUG_CMD_QUIT) {
       return -1;
     }
-    if (self.command == E_DEBUG_CMD_CONTINUE) {
+    if (debug_execute()) {
       return 0;
     }
-
-    debug_execute();
   }
 }
