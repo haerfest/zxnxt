@@ -277,8 +277,8 @@ static u16_t debug_disassemble(u16_t address) {
 static int debug_show_registers(void) {
   const cpu_t* cpu = cpu_get();
 
-  fprintf(stderr, " PC   SP   AF   BC   DE   HL   IX   IY   AF'  BC'  DE'  HL' SZ?H?PNC IM  IR  IFF1 IFF2 __________ MMU ________ ROM MMC\n");
-  fprintf(stderr, "%04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %c%c%c%c%c%c%c%c %02x %04X %04X %04X %02X %02X %02X %02X %02X %02X %02X %02X %2X   %c\n",
+  fprintf(stderr, " PC   SP   AF   BC   DE   HL   IX   IY   AF'  BC'  DE'  HL' SZ?H?PNC IM  IR  IFF1 IFF2 __________ MMU ________ ROM MMC BNK MAP\n");
+  fprintf(stderr, "%04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %c%c%c%c%c%c%c%c %02x %04X %04X %04X %02X %02X %02X %02X %02X %02X %02X %02X %2X   %c   %1X   %c\n",
     cpu->pc.w,
     cpu->sp.w,
     cpu->af.w,
@@ -306,7 +306,9 @@ static int debug_show_registers(void) {
     mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3),
     mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7),
     rom_selected(),
-    divmmc_is_active() ? 'Y' : 'N');
+    divmmc_is_active() ? 'Y' : 'N',
+    divmmc_bank(),
+    divmmc_is_mapram_enabled() ? 'Y' : 'N');
 
     return 0;
 }

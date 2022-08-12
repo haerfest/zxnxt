@@ -21,7 +21,9 @@ void divmmc_automap_on_fetch_enable(u16_t address, int enable);
 void divmmc_automap_on_fetch_always(u16_t address, int always);
 void divmmc_automap_on_fetch_instant(u16_t address, int instant);
 void divmmc_automap(u16_t address, int instant);
-void divmmc_mapram_reset(void);
+int  divmmc_is_mapram_enabled(void);
+void divmmc_mapram_disable(void);
+int  divmmc_bank(void);
 
 
 #endif  /* __DIVMMC_H */

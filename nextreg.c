@@ -310,7 +310,7 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
   ay_mono_enable_set(0, value & 0x20);
 
   if (value & 0x08) {
-    divmmc_mapram_reset();
+    divmmc_mapram_disable();
   }
 
   self.is_sprites_lockstepped = (value & 0x10) >> 4;
@@ -885,7 +885,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
 
     case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1:
       divmmc_automap_on_fetch_enable(0x3D00, value & 0x80);
-      divmmc_automap_on_fetch_enable(0x1FF8, (value & 0x40) ^ 0x40);
+      //divmmc_automap_on_fetch_enable(0x1FF8, (value & 0x40) ^ 0x40); ???
       divmmc_automap_on_fetch_enable(0x056A, value & 0x20);
       divmmc_automap_on_fetch_enable(0x04D7, value & 0x10);
       divmmc_automap_on_fetch_enable(0x0562, value & 0x08);

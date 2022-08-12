@@ -1,4 +1,5 @@
 #include <string.h>
+#include "cpu.h"
 #include "defs.h"
 #include "divmmc.h"
 #include "keyboard.h"
@@ -54,6 +55,7 @@ typedef struct divmmc_t {
   int              bank_number;
   int              is_active_via_conmem;
   int              is_active_via_automap;
+  int              is_mapram_enabled;
   int              is_automap_enabled;
   divmmc_automap_t automap[E_DIVMMC_ADDR_LAST - E_DIVMMC_ADDR_FIRST + 1];
 } divmmc_t;
@@ -62,21 +64,26 @@ typedef struct divmmc_t {
 static divmmc_t self;
 
 
-static void divmmc_refresh_ptr(void) {
+static void divmmc_refresh_ptrs(void) {
   /* We subtract 0x2000 because RAM is paged in starting at 0x2000, so all
    * addresses are offset 0x2000. This saves us a subtraction on every
    * access. */
   self.ram = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_RAM + self.bank_number * 8 * 1024 - 0x2000];
+
+  if (self.is_mapram_enabled) {
+    self.rom = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_RAM + 3 * 8 * 1024];
+  } else {
+    self.rom = &self.sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
+  }
 }
 
 
 int divmmc_init(u8_t* sram) {
   memset(&self, 0, sizeof(self));
   self.sram = sram;
-  self.rom  = &sram[MEMORY_RAM_OFFSET_DIVMMC_ROM];
 
   divmmc_reset(E_RESET_HARD);
-  divmmc_refresh_ptr();
+  divmmc_refresh_ptrs();
 
   return 0;
 }
@@ -100,7 +107,14 @@ void divmmc_reset(reset_t reset) {
   self.automap[E_DIVMMC_ADDR_3DXX     ].enable = 1;
 
   if (reset == E_RESET_HARD) {
-    self.is_automap_enabled = 0;
+    self.is_automap_enabled    = 0;
+    self.value                 = 0;
+    self.is_mapram_enabled     = 0;
+    self.is_active_via_conmem  = 0;
+    self.is_active_via_automap = 0;
+
+    divmmc_refresh_ptrs();
+    memory_refresh_accessors(0, 2);
   }
 }
 
@@ -135,17 +149,14 @@ u8_t divmmc_control_read(u16_t address) {
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
-  //log_wrn("divmmc: control write $%02X\n", value);
-  
-  self.value                = value;
+  //log_wrn("divmmc: control write $%02X (PC=$%04X)\n", value, cpu_pc_get());
+
+  self.value                = value | self.is_mapram_enabled;
+  self.is_mapram_enabled   |= value & 0x40;
   self.bank_number          = value & 0x0F;
   self.is_active_via_conmem = value & 0x80;
 
-  if (value & 0x40) {
-    log_wrn("divmmc: MAPRAM functionality not implemented\n");
-  }
-
-  divmmc_refresh_ptr();
+  divmmc_refresh_ptrs();
   memory_refresh_accessors(0, 2);
 }
 
@@ -284,10 +295,26 @@ void divmmc_automap(u16_t address, int instant) {
   self.is_active_via_automap = addr != E_DIVMMC_ADDR_1FF8_1FFF;
   log_wrn("divmmc: %s via automap on $%04X (%s)\n", self.is_active_via_automap ? "activated" : "deactivated", address, instant ? "instant" : "delayed");
 
+  if (self.is_active_via_automap) {
+    divmmc_refresh_ptrs();
+  }
   memory_refresh_accessors(0, 2);
 }
 
 
-void divmmc_mapram_reset(void) {
-  log_wrn("divmmc: MAPRAM bit reset not implemented\n");
+int divmmc_is_mapram_enabled(void) {
+  return self.is_mapram_enabled;
+}
+
+
+void divmmc_mapram_disable(void) {
+  log_wrn("divmmc: MAPRAM disabled\n");
+
+  self.is_mapram_enabled = 0;
+  divmmc_refresh_ptrs();
+}
+
+
+int divmmc_bank(void) {
+  return self.bank_number;
 }
