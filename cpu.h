@@ -84,8 +84,8 @@ typedef struct cpu_t {
 
 int              cpu_init(void);
 void             cpu_finit(void);
-void             cpu_run(int* do_stop);
-void             cpu_step(void);
+int              cpu_run(int* do_stop);
+int              cpu_step(void);
 void             cpu_reset(void);
 void             cpu_irq(cpu_irq_t irq, int active);
 void             cpu_nmi(cpu_nmi_t nmi, cpu_nmi_source_t source);

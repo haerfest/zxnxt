@@ -23,14 +23,29 @@ typedef enum debug_cmd_t {
   E_DEBUG_CMD_SHOW_MEMORY,
   E_DEBUG_CMD_SHOW_DISASSEMBLY,
   E_DEBUG_CMD_SHOW_NEXT_REGISTERS,
-  E_DEBUG_CMD_STEP
+  E_DEBUG_CMD_STEP,
+  E_DEBUG_CMD_BREAKPOINTS_LIST,
+  E_DEBUG_CMD_BREAKPOINTS_ADD,
+  E_DEBUG_CMD_BREAKPOINTS_DELETE
 } debug_cmd_t;
+
+
+#define MAX_DEBUG_ARGS   10
+#define MAX_BREAKPOINTS  10
+
+
+typedef struct breakpoint_t {
+  int   is_set;
+  u16_t address;
+} breakpoint_t;
 
 
 typedef struct debug_t {
   debug_cmd_t command;
-  u16_t       address;
-  u16_t       length;
+  int          nr_args;
+  u16_t        args[MAX_DEBUG_ARGS];
+  int          has_breakpoints;
+  breakpoint_t breakpoints[MAX_BREAKPOINTS];
 } debug_t;
 
 
@@ -39,7 +54,6 @@ static debug_t self;
 
 int debug_init(void) {
   memset(&self, 0, sizeof(self));
-  self.length = 0x0100;
   return 0;
 }
 
@@ -120,28 +134,40 @@ static int debug_parse(char* s) {
 
   if (strcmp("m", p) == 0) {
     self.command = E_DEBUG_CMD_SHOW_MEMORY;
-
-    if (debug_next_word(q + 1, &p, &q)) {
-      return 0;
+    if (debug_next_word(q + 1, &p, &q) == 0) {
+      self.args[0] = strtol(p, NULL, 16);
     }
-    self.address = strtol(p, NULL, 16);
-
-    if (debug_next_word(q + 1, &p, &q)) {
-      return 0;
-    }
-    self.length = strtol(p, NULL, 16);
-    
     return 0;
   }
 
   if (strcmp("d", p) == 0) {
     self.command = E_DEBUG_CMD_SHOW_DISASSEMBLY;
-
-    if (debug_next_word(q + 1, &p, &q)) {
-      return 0;
+    if (debug_next_word(q + 1, &p, &q) == 0) {
+      self.args[0] = strtol(p, NULL, 16);
     }
+    return 0;
+  }
 
-    self.address = strtol(p, NULL, 16);
+  if (strcmp("bl", p) == 0) {
+    self.command = E_DEBUG_CMD_BREAKPOINTS_LIST;
+    return 0;
+  }
+
+  if (strcmp("ba", p) == 0) {
+    self.command = E_DEBUG_CMD_BREAKPOINTS_ADD;
+    self.nr_args = 0;
+    while (self.nr_args < MAX_DEBUG_ARGS && debug_next_word(q + 1, &p, &q) == 0) {
+      self.args[self.nr_args++] = strtol(p, NULL, 16);
+    }
+    return 0;
+  }
+
+  if (strcmp("bd", p) == 0) {
+    self.command = E_DEBUG_CMD_BREAKPOINTS_DELETE;
+    self.nr_args = 0;
+    while (self.nr_args < MAX_DEBUG_ARGS && debug_next_word(q + 1, &p, &q) == 0) {
+      self.args[self.nr_args++] = strtol(p, NULL, 16);
+    }
     return 0;
   }
 
@@ -285,10 +311,10 @@ static void debug_show_memory(void) {
 
   ascii[sizeof(ascii) - 1] = '\0';
 
-  for (i = 0; i < self.length; i += 16) {
-    fprintf(stderr, "%04X  ", self.address);    
+  for (i = 0; i < 256; i += 16) {
+    fprintf(stderr, "%04X  ", self.args[0]);    
     for (j = 0; j < 16; j++) {
-      byte = memory_read(self.address++);
+      byte = memory_read(self.args[0]++);
       fprintf(stderr, "%02X ", byte);
       ascii[j] = (byte < ' ' || byte > '~') ? '.' : byte;
     }
@@ -299,8 +325,65 @@ static void debug_show_memory(void) {
 
 static void debug_show_disassembly(void) {
   for (int i = 0; i < 16; i++) {
-    self.address = debug_disassemble(self.address);
+    self.args[0] = debug_disassemble(self.args[0]);
   }
+}
+
+
+static void debug_breakpoints_list(void) {
+  for (int i = 0; i < MAX_BREAKPOINTS; i++) {
+    if (self.breakpoints[i].is_set) {
+      fprintf(stderr, "$%04X\n", self.breakpoints[i].address);
+    }
+  }
+}
+
+
+static void debug_breakpoints_add(void) {
+  for (int i = 0; i < self.nr_args; i++) {
+    const u16_t address = self.args[i];
+    for (int j = 0; j < MAX_BREAKPOINTS; j++) {
+      if (!self.breakpoints[j].is_set || self.breakpoints[j].address == address) {
+        self.breakpoints[j].address = address;
+        self.breakpoints[j].is_set  = 1;
+        self.has_breakpoints      = 1;
+        break;
+      }
+    }
+  }
+}
+
+
+static void debug_breakpoints_delete(void) {
+  for (int i = 0; i < self.nr_args; i++) {
+    const u16_t address = self.args[i];
+    for (int j = 0; j < MAX_BREAKPOINTS; j++) {
+      if (self.breakpoints[j].address == address) {
+        self.breakpoints[j].is_set = 0;
+        break;
+      }
+    }
+  }
+
+  self.has_breakpoints = 0;
+  for (int j = 0; j < MAX_BREAKPOINTS; j++) {
+    self.has_breakpoints |= self.breakpoints[j].is_set;
+  }
+}
+
+
+int debug_is_breakpoint(u16_t address) {
+  if (!self.has_breakpoints) {
+    return 0;
+  }
+
+  for (int j = 0; j < MAX_BREAKPOINTS; j++) {
+    if (self.breakpoints[j].is_set && self.breakpoints[j].address == address) {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 
@@ -312,7 +395,10 @@ static const struct {
   { E_DEBUG_CMD_SHOW_MEMORY,         debug_show_memory         },
   { E_DEBUG_CMD_SHOW_DISASSEMBLY,    debug_show_disassembly    },
   { E_DEBUG_CMD_SHOW_NEXT_REGISTERS, debug_show_next_registers },
-  { E_DEBUG_CMD_STEP,                debug_step                }
+  { E_DEBUG_CMD_STEP,                debug_step                },
+  { E_DEBUG_CMD_BREAKPOINTS_LIST,    debug_breakpoints_list    },
+  { E_DEBUG_CMD_BREAKPOINTS_ADD,     debug_breakpoints_add     },
+  { E_DEBUG_CMD_BREAKPOINTS_DELETE,  debug_breakpoints_delete  }
 };
 
 

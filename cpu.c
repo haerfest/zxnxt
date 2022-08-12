@@ -2,6 +2,7 @@
 #include <string.h>
 #include "clock.h"
 #include "cpu.h"
+#include "debug.h"
 #include "defs.h"
 #include "dma.h"
 #include "io.h"
@@ -349,7 +350,7 @@ static void cpu_nmi_pending(void) {
 }
 
 
-void cpu_step(void) {
+int cpu_step(void) {
   dma_run();
   cpu_execute_next_opcode();
 
@@ -367,13 +368,19 @@ void cpu_step(void) {
   if (self.irq_delay) {
     self.irq_delay = 0;
   }
+
+  return debug_is_breakpoint(self.pc.w);
 }
 
 
-void cpu_run(int* do_stop) {
+int cpu_run(int* do_stop) {
   while (*do_stop == 0) {
-    cpu_step();
+    if (cpu_step()) {
+      return 1;
+    }
   }
+
+  return 0;
 }
 
 
