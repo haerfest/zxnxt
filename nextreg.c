@@ -144,6 +144,40 @@ u8_t nextreg_select_read(u16_t address) {
 }
 
 
+static u8_t nextreg_reset_read(void) {
+  u8_t result = self.is_hard_reset ? 0x02 : 0x01;
+
+  switch (cpu_nmi_get()) {
+    case E_CPU_NMI_MF:
+      switch (cpu_nmi_source()) {
+        case E_CPU_NMI_SOURCE_TRAP:
+          result |= 0x10;
+          break;
+
+        case E_CPU_NMI_SOURCE_NEXTREG:
+          result |= 0x08;
+          break;
+        
+        default:
+        break;
+      }
+      break;
+    
+    case E_CPU_NMI_DIVMMC:
+      if (cpu_nmi_source() == E_CPU_NMI_SOURCE_NEXTREG) {
+        result |= 0x04;
+      }
+      break;
+    
+    default:
+      break;
+  }
+
+  log_wrn("nextreg: returning reset status $%02X\n", result);
+  return result;
+}
+
+
 static void nextreg_reset_write(u8_t value) {
   if (value & 0x03) {
     /* Hard or soft reset. */
@@ -154,12 +188,12 @@ static void nextreg_reset_write(u8_t value) {
   }
 
   if (value & 0x08) {
-    cpu_nmi(E_CPU_NMI_MF);
+    cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_NEXTREG);
     return;
   }
 
   if (value & 0x04) {
-    cpu_nmi(E_CPU_NMI_DIVMMC);
+    cpu_nmi(E_CPU_NMI_DIVMMC, E_CPU_NMI_SOURCE_NEXTREG);
     return;
   }
 }
@@ -883,6 +917,10 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       }
       break;
 
+    case E_NEXTREG_REGISTER_IO_TRAPS:
+      io_traps_enable(value & 0x01);
+      break;
+
     default:
       log_wrn("nextreg: unimplemented write of $%02X to register $%02X from PC=$%04X\n", value, reg, cpu_pc_get());
       break;
@@ -902,6 +940,9 @@ u8_t nextreg_read_internal(u8_t reg) {
   switch (reg) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
       return MACHINE_ID;
+
+    case E_NEXTREG_REGISTER_RESET:
+      return nextreg_reset_read();
 
     case E_NEXTREG_REGISTER_CORE_VERSION:
       return CORE_VERSION_MAJOR << 4 | CORE_VERSION_MINOR;

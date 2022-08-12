@@ -210,6 +210,9 @@ void cpu_finit(void) {
 
 void cpu_irq(cpu_irq_t irq, int active) {
   switch (irq) {
+    case E_CPU_IRQ_NONE:
+      break;
+
     case E_CPU_IRQ_ULA:
       self.requests = active ? (self.requests | CPU_REQUEST_IRQ_ULA) : (self.requests & ~CPU_REQUEST_IRQ_ULA);
       break;
@@ -221,16 +224,39 @@ void cpu_irq(cpu_irq_t irq, int active) {
 }
 
 
-void cpu_nmi(cpu_nmi_t nmi) {
+void cpu_nmi(cpu_nmi_t nmi, cpu_nmi_source_t source) {
   switch (nmi) {
+    case E_CPU_NMI_NONE:
+      break;
+
     case E_CPU_NMI_MF:
       self.requests |= CPU_REQUEST_NMI_MF;
+      self.nmi_source = source;
       break;
 
     case E_CPU_NMI_DIVMMC:
       self.requests |= CPU_REQUEST_NMI_DIVMMC;
+      self.nmi_source = source;
       break;
   }
+}
+
+
+cpu_nmi_t cpu_nmi_get(void) {
+  if (self.requests & CPU_REQUEST_NMI_MF) {
+    return E_CPU_NMI_MF;
+  }
+  
+  if (self.requests & CPU_REQUEST_NMI_DIVMMC) {
+    return E_CPU_NMI_DIVMMC;
+  }
+
+  return E_CPU_NMI_NONE;
+}
+
+
+cpu_nmi_source_t cpu_nmi_source(void) {
+  return self.nmi_source;
 }
 
 

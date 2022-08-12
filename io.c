@@ -1,5 +1,6 @@
 #include "ay.h"
 #include "clock.h"
+#include "cpu.h"
 #include "divmmc.h"
 #include "dma.h"
 #include "nextreg.h"
@@ -49,7 +50,8 @@ typedef enum io_func_t {
   E_IO_FUNC_DMA_Z80,
   E_IO_FUNC_PENTAGON_1024_MEMORY,
   E_IO_FUNC_Z80_CTC,
-  E_IO_FUNC_LAST = E_IO_FUNC_Z80_CTC
+  E_IO_FUNC_TRAPS,
+  E_IO_FUNC_LAST = E_IO_FUNC_TRAPS
 } io_func_t;
 
 
@@ -72,6 +74,9 @@ int io_init(void) {
 void io_reset(reset_t reset) {
   /* Enable all ports. */
   memset(self.is_enabled, 0xFF, sizeof(self.is_enabled));
+
+  /* Except these. */
+  self.is_enabled[E_IO_FUNC_TRAPS] = 0;
 
   self.mf_port_enable  = 0x3F;
   self.mf_port_disable = 0xBF;
@@ -134,6 +139,13 @@ static u8_t read_internal(u16_t address) {
 
     case 0x253B:
       return nextreg_data_read(address);
+
+    case 0x2FFD:
+    case 0x3FFD:
+      if (self.is_enabled[E_IO_FUNC_TRAPS]) {
+        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_TRAP);
+      }
+      break;
 
     case 0x7FFD:
       return self.is_enabled[E_IO_FUNC_PAGING_128K]
@@ -351,6 +363,13 @@ static void write_internal(u16_t address, u8_t value) {
     case 0x253B:
       nextreg_data_write(address, value);
       return;
+
+    case 0x2FFD:
+    case 0x3FFD:
+      if (self.is_enabled[E_IO_FUNC_TRAPS]) {
+        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_TRAP);
+      }
+      break;
 
     case 0x303B:
       if (self.is_enabled[E_IO_FUNC_SPRITES]) {
@@ -625,4 +644,9 @@ void io_decoding_write(u8_t index, u8_t value) {
     default:
       break;
   }
+}
+
+
+void io_traps_enable(int enable) {
+  self.is_enabled[E_IO_FUNC_TRAPS] = enable;
 }
