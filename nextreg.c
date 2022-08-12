@@ -273,6 +273,10 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
   ay_mono_enable_set(1, value & 0x40);
   ay_mono_enable_set(0, value & 0x20);
 
+  if (value & 0x08) {
+    divmmc_mapram_reset();
+  }
+
   self.is_sprites_lockstepped = (value & 0x10) >> 4;
 }
 
@@ -811,71 +815,71 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0:
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0038, value & 0x80);
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0030, value & 0x40);
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0028, value & 0x20);
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0020, value & 0x10);
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0018, value & 0x08);
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0010, value & 0x04);
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0008, value & 0x02);
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0000, value & 0x01);
+      divmmc_automap_on_fetch_enable(0x0038, value & 0x80);
+      divmmc_automap_on_fetch_enable(0x0030, value & 0x40);
+      divmmc_automap_on_fetch_enable(0x0028, value & 0x20);
+      divmmc_automap_on_fetch_enable(0x0020, value & 0x10);
+      divmmc_automap_on_fetch_enable(0x0018, value & 0x08);
+      divmmc_automap_on_fetch_enable(0x0010, value & 0x04);
+      divmmc_automap_on_fetch_enable(0x0008, value & 0x02);
+      divmmc_automap_on_fetch_enable(0x0000, value & 0x01);
       break;
 
     case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_VALID:
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0038, value & 0x80);
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0030, value & 0x40);
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0028, value & 0x20);
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0020, value & 0x10);
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0018, value & 0x08);
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0010, value & 0x04);
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0008, value & 0x02);
-      divmmc_automap_on_fetch_always(E_DIVMMC_ADDR_0000, value & 0x01);
+      divmmc_automap_on_fetch_always(0x0038, value & 0x80);
+      divmmc_automap_on_fetch_always(0x0030, value & 0x40);
+      divmmc_automap_on_fetch_always(0x0028, value & 0x20);
+      divmmc_automap_on_fetch_always(0x0020, value & 0x10);
+      divmmc_automap_on_fetch_always(0x0018, value & 0x08);
+      divmmc_automap_on_fetch_always(0x0010, value & 0x04);
+      divmmc_automap_on_fetch_always(0x0008, value & 0x02);
+      divmmc_automap_on_fetch_always(0x0000, value & 0x01);
       break;
 
     case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_TIMING:
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0038, value & 0x80);
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0030, value & 0x40);
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0028, value & 0x20);
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0020, value & 0x10);
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0018, value & 0x08);
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0010, value & 0x04);
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0008, value & 0x02);
-      divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0000, value & 0x01);
+      divmmc_automap_on_fetch_instant(0x0038, value & 0x80);
+      divmmc_automap_on_fetch_instant(0x0030, value & 0x40);
+      divmmc_automap_on_fetch_instant(0x0028, value & 0x20);
+      divmmc_automap_on_fetch_instant(0x0020, value & 0x10);
+      divmmc_automap_on_fetch_instant(0x0018, value & 0x08);
+      divmmc_automap_on_fetch_instant(0x0010, value & 0x04);
+      divmmc_automap_on_fetch_instant(0x0008, value & 0x02);
+      divmmc_automap_on_fetch_instant(0x0000, value & 0x01);
       break;
 
     case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1:
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_3DXX, value & 0x80);
+      divmmc_automap_on_fetch_enable(0x3D00, value & 0x80);
       if (value & 0x80) {
-        divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_3DXX, 1);
-        divmmc_automap_on_fetch_always( E_DIVMMC_ADDR_3DXX, 0);
+        divmmc_automap_on_fetch_instant(0x3D00, 1);
+        divmmc_automap_on_fetch_always( 0x3D00, 0);
       }
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_1FF8_1FFF, (value & 0x40) ^ 0x40);
+      divmmc_automap_on_fetch_enable(0x1FF8, (value & 0x40) ^ 0x40);
       if ((value & 0x40) ^ 0x40) {
-        divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_1FF8_1FFF, 0);
+        divmmc_automap_on_fetch_instant(0x1FF8, 0);
       }
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_056A, value & 0x20);
+      divmmc_automap_on_fetch_enable(0x056A, value & 0x20);
       if (value & 0x20) {
-        divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_056A, 0);
-        divmmc_automap_on_fetch_always( E_DIVMMC_ADDR_056A, 0);
+        divmmc_automap_on_fetch_instant(0x056A, 0);
+        divmmc_automap_on_fetch_always( 0x056A, 0);
       }
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_04D7, value & 0x10);
+      divmmc_automap_on_fetch_enable(0x04D7, value & 0x10);
       if (value & 0x10) {
-        divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_04D7, 0);
-        divmmc_automap_on_fetch_always( E_DIVMMC_ADDR_04D7, 0);
+        divmmc_automap_on_fetch_instant(0x04D7, 0);
+        divmmc_automap_on_fetch_always( 0x04D7, 0);
       }
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0562, value & 0x08);
+      divmmc_automap_on_fetch_enable(0x0562, value & 0x08);
       if (value & 0x08) {
-        divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0562, 0);
-        divmmc_automap_on_fetch_always( E_DIVMMC_ADDR_0562, 0);
+        divmmc_automap_on_fetch_instant(0x0562, 0);
+        divmmc_automap_on_fetch_always( 0x0562, 0);
       }
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_04C6, value & 0x04);
+      divmmc_automap_on_fetch_enable(0x04C6, value & 0x04);
       if (value & 0x04) {
-        divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_04C6, 0);
-        divmmc_automap_on_fetch_always( E_DIVMMC_ADDR_04C6, 0);
+        divmmc_automap_on_fetch_instant(0x04C6, 0);
+        divmmc_automap_on_fetch_always( 0x04C6, 0);
       }
-      divmmc_automap_on_fetch_enable(E_DIVMMC_ADDR_0066, value & 0x03);
+      divmmc_automap_on_fetch_enable(0x0066, value & 0x03);
       if (value & 0x03) {
-        divmmc_automap_on_fetch_instant(E_DIVMMC_ADDR_0066, value & 0x02);
+        divmmc_automap_on_fetch_instant(0x0066, value & 0x02);
       }
       break;
 

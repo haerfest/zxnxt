@@ -16,6 +16,28 @@
  */
 
 
+ typedef enum {
+  E_DIVMMC_ADDR_FIRST = 0,
+  E_DIVMMC_ADDR_0000 = E_DIVMMC_ADDR_FIRST,
+  E_DIVMMC_ADDR_0008,
+  E_DIVMMC_ADDR_0010,
+  E_DIVMMC_ADDR_0018,
+  E_DIVMMC_ADDR_0020,
+  E_DIVMMC_ADDR_0028,
+  E_DIVMMC_ADDR_0030,
+  E_DIVMMC_ADDR_0038,
+  E_DIVMMC_ADDR_0066,
+  E_DIVMMC_ADDR_04C6,
+  E_DIVMMC_ADDR_04D7,
+  E_DIVMMC_ADDR_0562,
+  E_DIVMMC_ADDR_056A,
+  E_DIVMMC_ADDR_1FF8_1FFF,
+  E_DIVMMC_ADDR_3DXX,
+  E_DIVMMC_ADDR_LAST = E_DIVMMC_ADDR_3DXX,
+  E_DIVMMC_ADDR_NONE
+} divmmc_addr_t;
+
+
 typedef struct divmmc_automap_t {
   int enable;
   int always;
@@ -147,44 +169,20 @@ void divmmc_automap_enable(int enable) {
 }
 
 
-void divmmc_automap_on_fetch_enable(divmmc_addr_t address, int enable) {
-  log_wrn("divmmc: automap on fetch %d %s\n", address, enable ? "enable" : "disable");
-  self.automap[address].enable = enable;
-}
-
-
-void divmmc_automap_on_fetch_always(divmmc_addr_t address, int always) {
-  log_wrn("divmmc: automap on fetch %d %s\n", address, always ? "always" : "rom3");
-  self.automap[address].always = always;
-}
-
-
-void divmmc_automap_on_fetch_instant(divmmc_addr_t address, int instant) {
-  log_wrn("divmmc: automap on fetch %d %s\n", address, instant ? "instant" : "delayed");
-  self.automap[address].instant = instant;
-}
-
-
-void divmmc_automap(u16_t address, int instant) {
-  if (!self.is_automap_enabled || self.is_active) {
-    return;
-  }
-
-  divmmc_addr_t addr = E_DIVMMC_ADDR_3DXX;
-
+static divmmc_addr_t map(u16_t address) {
   switch (address) {
-    case 0x0008: addr = E_DIVMMC_ADDR_0008; break;
-    case 0x0010: addr = E_DIVMMC_ADDR_0010; break;
-    case 0x0018: addr = E_DIVMMC_ADDR_0018; break;
-    case 0x0020: addr = E_DIVMMC_ADDR_0020; break;
-    case 0x0028: addr = E_DIVMMC_ADDR_0028; break;
-    case 0x0030: addr = E_DIVMMC_ADDR_0030; break;
-    case 0x0038: addr = E_DIVMMC_ADDR_0038; break;
-    case 0x0066: addr = E_DIVMMC_ADDR_0066; break;
-    case 0x04C6: addr = E_DIVMMC_ADDR_04C6; break;
-    case 0x04D7: addr = E_DIVMMC_ADDR_04D7; break;
-    case 0x0562: addr = E_DIVMMC_ADDR_0562; break;
-    case 0x056A: addr = E_DIVMMC_ADDR_056A; break;
+    case 0x0008: return E_DIVMMC_ADDR_0008; break;
+    case 0x0010: return E_DIVMMC_ADDR_0010; break;
+    case 0x0018: return E_DIVMMC_ADDR_0018; break;
+    case 0x0020: return E_DIVMMC_ADDR_0020; break;
+    case 0x0028: return E_DIVMMC_ADDR_0028; break;
+    case 0x0030: return E_DIVMMC_ADDR_0030; break;
+    case 0x0038: return E_DIVMMC_ADDR_0038; break;
+    case 0x0066: return E_DIVMMC_ADDR_0066; break;
+    case 0x04C6: return E_DIVMMC_ADDR_04C6; break;
+    case 0x04D7: return E_DIVMMC_ADDR_04D7; break;
+    case 0x0562: return E_DIVMMC_ADDR_0562; break;
+    case 0x056A: return E_DIVMMC_ADDR_056A; break;
     
     case 0x1FF8:
     case 0x1FF9:
@@ -194,24 +192,56 @@ void divmmc_automap(u16_t address, int instant) {
     case 0x1FFD:
     case 0x1FFE:
     case 0x1FFF:
-      addr = E_DIVMMC_ADDR_1FF8_1FFF;
-      break;
+      return E_DIVMMC_ADDR_1FF8_1FFF;
 
     default:
-      if ((address & 0xFF00) != 0x3D00) {
-        return;
-      }
-      break;
+      return (address >> 8 == 0x3D) ? E_DIVMMC_ADDR_3DXX : E_DIVMMC_ADDR_NONE;
+  }
+}
+
+
+void divmmc_automap_on_fetch_enable(u16_t address, int enable) {
+  log_wrn("divmmc: automap on fetch $%04X %s\n", address, enable ? "enable" : "disable");
+  const u16_t addr = map(address);
+  if (addr != E_DIVMMC_ADDR_NONE) {
+    self.automap[addr].enable = enable;
+  }
+}
+
+
+void divmmc_automap_on_fetch_always(u16_t address, int always) {
+  log_wrn("divmmc: automap on fetch $%04X %s\n", address, always ? "always" : "rom3");
+  const u16_t addr = map(address);
+  if (addr != E_DIVMMC_ADDR_NONE) {
+    self.automap[addr].always = always;
+  }
+}
+
+
+void divmmc_automap_on_fetch_instant(u16_t address, int instant) {
+  log_wrn("divmmc: automap on fetch $%04X %s\n", address, instant ? "instant" : "delayed");
+  const u16_t addr = map(address);
+  if (addr != E_DIVMMC_ADDR_NONE) {
+    self.automap[addr].instant = instant;
+  }
+}
+
+
+void divmmc_automap(u16_t address, int instant) {
+  if (!self.is_automap_enabled || self.is_active) {
+    return;
   }
 
+  const divmmc_addr_t addr = map(address);
+  if (addr == E_DIVMMC_ADDR_NONE) {
+    return;
+  }
   if (!self.automap[addr].enable) {
     return;
   }
-
   if (self.automap[addr].instant != instant) {
     return;
   }
-
   if (!self.automap[addr].always && rom_selected() != E_ROM_48K_BASIC) {
     return;
   }
@@ -220,4 +250,9 @@ void divmmc_automap(u16_t address, int instant) {
   log_wrn("divmmc: automap triggered on $%04X (%s)\n", address, instant ? "instant" : "delayed");
 
   memory_refresh_accessors(0, 2);
+}
+
+
+void divmmc_mapram_reset(void) {
+  log_wrn("divmmc: MAPRAM bit reset not implemented\n");
 }
