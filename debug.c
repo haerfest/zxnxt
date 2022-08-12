@@ -4,7 +4,11 @@
 #include <string.h>
 #include "cpu.h"
 #include "debug.h"
+#include "divmmc.h"
 #include "memory.h"
+#include "mmu.h"
+#include "nextreg.h"
+#include "rom.h"
 
 
 #include "disassemble.c"
@@ -17,7 +21,9 @@ typedef enum debug_cmd_t {
   E_DEBUG_CMD_QUIT,
   E_DEBUG_CMD_SHOW_REGISTERS,
   E_DEBUG_CMD_SHOW_MEMORY,
-  E_DEBUG_CMD_SHOW_DISASSEMBLY
+  E_DEBUG_CMD_SHOW_DISASSEMBLY,
+  E_DEBUG_CMD_SHOW_NEXT_REGISTERS,
+  E_DEBUG_CMD_STEP
 } debug_cmd_t;
 
 
@@ -73,11 +79,12 @@ static int debug_parse(char* s) {
   char *p;
   char *q;
 
-  self.command = E_DEBUG_CMD_NONE;
-
   if (debug_next_word(s, &p, &q)) {
-    return -1;
+    /* Repeat or continue last command. */
+    return 0;
   }
+
+  self.command = E_DEBUG_CMD_NONE;
 
   *q = '\0';
 
@@ -98,6 +105,16 @@ static int debug_parse(char* s) {
 
   if (strcmp("r", p) == 0) {
     self.command = E_DEBUG_CMD_SHOW_REGISTERS;
+    return 0;
+  }
+
+  if (strcmp("nr", p) == 0) {
+    self.command = E_DEBUG_CMD_SHOW_NEXT_REGISTERS;
+    return 0;
+  }
+
+  if (strcmp("s", p) == 0) {
+    self.command = E_DEBUG_CMD_STEP;
     return 0;
   }
 
@@ -132,11 +149,84 @@ static int debug_parse(char* s) {
 }
 
 
+static u16_t debug_disassemble(u16_t address) {
+    fprintf(stderr, "%04X  ", address);
+
+    table_entry_t* t      = table;
+    size_t         length = 0;
+    u8_t           opcode;
+
+    /* Print any prefix + the opcode. */
+    for (;;) {
+      opcode = memory_read(address++);
+      fprintf(stderr, "%02X ", opcode);
+      length++;
+
+      if (t[opcode].length > 0) {
+        break;
+      }
+
+      t = t[opcode].payload.table;
+    }
+
+    /* Print remaining bytes of instruction and padding. */
+    u16_t last_opcode_address = address;
+    for (size_t i = length; i < t[opcode].length; i++) {
+      fprintf(stderr, "%02X ", memory_read(address++));
+    }
+    for (size_t i = t[opcode].length; i < MAXARGS; i++) {
+      fprintf(stderr, "   ");
+    }
+
+    address = last_opcode_address;
+    for (int i = 0; i < MAXARGS; i++) {
+      const char* s = t[opcode].payload.instr[i];
+      if (s == NULL) {
+        break;
+      }
+      if (strcmp(s, "e") == 0) {
+        const s8_t offset = (s8_t) memory_read(address + 1);
+        fprintf(stderr, "$%04X", address + offset - 1);
+        address++;
+        continue;
+      }
+      if (strcmp(s, "d") == 0) {
+        fprintf(stderr, "$%02X", memory_read(address++));
+        continue;
+      }
+      if (strcmp(s, "n") == 0) {
+        fprintf(stderr, "$%02X", memory_read(address++));
+        continue;
+      }
+      if (strcmp(s, "nn") == 0) {
+        const u8_t lo = memory_read(address++);
+        const u8_t hi = memory_read(address++);
+        fprintf(stderr, "$%02X%02X", hi, lo);
+        continue;
+      }
+      if (strcmp(s, "value") == 0) {
+        fprintf(stderr, "$%02X", memory_read(address++));
+        continue;
+      }
+      if (strcmp(s, "reg") == 0) {
+        fprintf(stderr, "$%02X", memory_read(address++));
+        continue;
+      }
+
+      fprintf(stderr, "%s", s);
+    }
+
+    fprintf(stderr, "\n");
+
+    return address;
+}
+
+
 static void debug_show_registers(void) {
   const cpu_t* cpu = cpu_get();
 
-  fprintf(stderr, " PC   SP   AF   BC   DE   HL   IX   IY   AF'  BC'  DE'  HL' SZ?H?PNC IM  IR  IFF1 IFF2\n");
-  fprintf(stderr, "%04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %c%c%c%c%c%c%c%c %02x %04X %04X %04X\n",
+  fprintf(stderr, " PC   SP   AF   BC   DE   HL   IX   IY   AF'  BC'  DE'  HL' SZ?H?PNC IM  IR  IFF1 IFF2 __________ MMU ________ ROM MMC\n");
+  fprintf(stderr, "%04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %c%c%c%c%c%c%c%c %02x %04X %04X %04X %02X %02X %02X %02X %02X %02X %02X %02X %2X   %c\n",
     cpu->pc.w,
     cpu->sp.w,
     cpu->af.w,
@@ -160,7 +250,31 @@ static void debug_show_registers(void) {
     cpu->im,
     cpu->ir.w,
     cpu->iff1,
-    cpu->iff2);
+    cpu->iff2,
+    mmu_page_get(0), mmu_page_get(1), mmu_page_get(2), mmu_page_get(3),
+    mmu_page_get(4), mmu_page_get(5), mmu_page_get(6), mmu_page_get(7),
+    rom_selected(),
+    divmmc_is_active() ? 'Y' : 'N');
+}
+
+
+static void debug_show_next_registers(void) {
+  fprintf(stderr, "   x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 xA xB xC xD xE xF\n");
+  for (int i = 0; i < 256; i += 16) {
+    fprintf(stderr, "%0Xx ", i >> 4);
+    for (int j = 0; j < 16; j++) {
+      const u8_t reg = i + j;
+      fprintf(stderr, "%02X ", nextreg_read_internal(reg));
+    }
+    fprintf(stderr, "\n");
+  }
+}
+
+
+static void debug_step(void) {
+  cpu_step();
+  
+  (void) debug_disassemble(cpu_get()->pc.w);
 }
 
 
@@ -184,73 +298,8 @@ static void debug_show_memory(void) {
 
 
 static void debug_show_disassembly(void) {
-  int  i;
-  u8_t opcode;
-
-  for (i = 0; i < 16; i++) {
-    fprintf(stderr, "%04X  ", self.address);
-
-    table_entry_t* t      = table;
-    size_t         length = 0;
-
-    /* Print any prefix + the opcode. */
-    for (;;) {
-      opcode = memory_read(self.address++);
-      fprintf(stderr, "%02X ", opcode);
-      length++;
-
-      if (t[opcode].length > 0) {
-        break;
-      }
-
-      t = t[opcode].payload.table;
-    }
-
-    /* Print remaining bytes of instruction and padding. */
-    u16_t address = self.address;
-    for (size_t i = length; i < t[opcode].length; i++) {
-      fprintf(stderr, "%02X ", memory_read(address++));
-    }
-    for (size_t i = t[opcode].length; i < MAXARGS; i++) {
-      fprintf(stderr, "   ");
-    }
-
-    for (int i = 0; i < MAXARGS; i++) {
-      const char* s = t[opcode].payload.instr[i];
-      if (s == NULL) {
-        break;
-      }
-      if (strcmp(s, "e") == 0) {
-        fprintf(stderr, "$%04X", self.address + (s8_t) memory_read(self.address++) - 1);
-        continue;
-      }
-      if (strcmp(s, "d") == 0) {
-        fprintf(stderr, "$%02X", memory_read(self.address++));
-        continue;
-      }
-      if (strcmp(s, "n") == 0) {
-        fprintf(stderr, "$%02X", memory_read(self.address++));
-        continue;
-      }
-      if (strcmp(s, "nn") == 0) {
-        const u8_t lo = memory_read(self.address++);
-        const u8_t hi = memory_read(self.address++);
-        fprintf(stderr, "$%02X%02X", hi, lo);
-        continue;
-      }
-      if (strcmp(s, "value") == 0) {
-        fprintf(stderr, "$%02X", memory_read(self.address++));
-        continue;
-      }
-      if (strcmp(s, "reg") == 0) {
-        fprintf(stderr, "$%02X", memory_read(self.address++));
-        continue;
-      }
-
-      fprintf(stderr, "%s", s);
-    }
-
-    fprintf(stderr, "\n");
+  for (int i = 0; i < 16; i++) {
+    self.address = debug_disassemble(self.address);
   }
 }
 
@@ -259,9 +308,11 @@ static const struct {
   debug_cmd_t command;
   void (*handler)(void);
 } debug_commands[] = {
-  { E_DEBUG_CMD_SHOW_REGISTERS,   debug_show_registers   },
-  { E_DEBUG_CMD_SHOW_MEMORY,      debug_show_memory      },
-  { E_DEBUG_CMD_SHOW_DISASSEMBLY, debug_show_disassembly }
+  { E_DEBUG_CMD_SHOW_REGISTERS,      debug_show_registers      },
+  { E_DEBUG_CMD_SHOW_MEMORY,         debug_show_memory         },
+  { E_DEBUG_CMD_SHOW_DISASSEMBLY,    debug_show_disassembly    },
+  { E_DEBUG_CMD_SHOW_NEXT_REGISTERS, debug_show_next_registers },
+  { E_DEBUG_CMD_STEP,                debug_step                }
 };
 
 
@@ -287,24 +338,28 @@ int debug_enter(void) {
   char input[80 + 1];
 
   debug_show_registers();
-
+  (void) debug_disassemble(cpu_get()->pc.w);
+  
+  self.command = E_DEBUG_CMD_NONE;
+  
   for (;;) {
     debug_prompt();
 
-    if (fgets(input, sizeof(input), stdin)) {
-      if (debug_parse(input) == 0) {
-        switch (self.command) {
-          case E_DEBUG_CMD_CONTINUE:
-            return 0;
-          case E_DEBUG_CMD_QUIT:
-            return -1;
-          default:
-            debug_execute();
-            break;
-        }
-      } else {
-        fprintf(stderr, "Syntax error\n");
-      }
+    if (fgets(input, sizeof(input), stdin) == NULL) {
+      return -1;
     }
+
+    if (debug_parse(input) != 0) {
+      fprintf(stderr, "Syntax error\n");
+      continue;
+    }
+    if (self.command == E_DEBUG_CMD_QUIT) {
+      return -1;
+    }
+    if (self.command == E_DEBUG_CMD_CONTINUE) {
+      return 0;
+    }
+
+    debug_execute();
   }
 }

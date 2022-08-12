@@ -152,7 +152,7 @@ void divmmc_control_write(u16_t address, u8_t value) {
 
 
 int divmmc_is_automap_enabled(void) {
-  log_wrn("divmmc: returning automap being %s\n", self.is_automap_enabled ? "enabled" : "disabled");
+  // log_wrn("divmmc: returning automap being %s\n", self.is_automap_enabled ? "enabled" : "disabled");
   return self.is_automap_enabled;
 }
 

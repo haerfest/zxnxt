@@ -177,7 +177,7 @@ static u8_t nextreg_reset_read(void) {
       break;
   }
 
-  log_wrn("nextreg: returning reset status $%02X\n", result);
+  // log_wrn("nextreg: returning reset status $%02X\n", result);
   return result;
 }
 
@@ -555,6 +555,8 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
 
 void nextreg_write_internal(u8_t reg, u8_t value) {
+  log_wrn("nextreg: write $%02X to $%04X\n", value, reg);
+
   switch (reg) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
       nextreg_config_mapping_write(value);
@@ -1059,7 +1061,7 @@ u8_t nextreg_read_internal(u8_t reg) {
       return ula_offset_y_read();
 
     default:
-      log_wrn("nextreg: unimplemented read from register $%02X\n", reg);
+      // log_wrn("nextreg: unimplemented read from register $%02X\n", reg);
       break;
   }
 

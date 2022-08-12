@@ -349,8 +349,8 @@ static void cpu_nmi_pending(void) {
 }
 
 
-inline
-static void cpu_step(void) {
+void cpu_step(void) {
+  dma_run();
   cpu_execute_next_opcode();
 
   if (self.requests) {
@@ -372,7 +372,6 @@ static void cpu_step(void) {
 
 void cpu_run(int* do_stop) {
   while (*do_stop == 0) {
-    dma_run();
     cpu_step();
   }
 }
