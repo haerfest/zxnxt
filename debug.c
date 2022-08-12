@@ -27,7 +27,8 @@ typedef enum debug_cmd_t {
   E_DEBUG_CMD_OVER,
   E_DEBUG_CMD_BREAKPOINTS_LIST,
   E_DEBUG_CMD_BREAKPOINTS_ADD,
-  E_DEBUG_CMD_BREAKPOINTS_DELETE
+  E_DEBUG_CMD_BREAKPOINTS_DELETE,
+  E_DEBUG_CMD_ROM
 } debug_cmd_t;
 
 
@@ -177,6 +178,15 @@ static int debug_parse(char* s) {
     self.command = E_DEBUG_CMD_BREAKPOINTS_DELETE;
     self.nr_args = 0;
     while (self.nr_args < MAX_DEBUG_ARGS && debug_next_word(q + 1, &p, &q) == 0) {
+      self.args[self.nr_args++] = strtol(p, NULL, 16);
+    }
+    return 0;
+  }
+
+  if (strcmp("rom", p) == 0) {
+    self.command = E_DEBUG_CMD_ROM;
+    self.nr_args = 0;
+    if (debug_next_word(q + 1, &p, &q) == 0) {
       self.args[self.nr_args++] = strtol(p, NULL, 16);
     }
     return 0;
@@ -455,6 +465,20 @@ static int debug_breakpoints_delete(void) {
 }
 
 
+static int debug_rom(void) {
+  if (self.nr_args != 1) {
+    fprintf(stderr, "ROM %u\n", rom_selected());
+    return 0;
+  }
+  if (self.args[0] < E_ROM_FIRST || self.args[1] > E_ROM_LAST) {
+    fprintf(stderr, "Invalid ROM #\n");
+    return 0;
+  }
+  rom_select((rom_t) self.args[0]);
+  return 0;
+}
+
+
 int debug_is_breakpoint(u16_t address) {
   if (!self.has_breakpoints) {
     return 0;
@@ -483,7 +507,8 @@ static const struct {
   { E_DEBUG_CMD_OVER,                debug_over                },
   { E_DEBUG_CMD_BREAKPOINTS_LIST,    debug_breakpoints_list    },
   { E_DEBUG_CMD_BREAKPOINTS_ADD,     debug_breakpoints_add     },
-  { E_DEBUG_CMD_BREAKPOINTS_DELETE,  debug_breakpoints_delete  }
+  { E_DEBUG_CMD_BREAKPOINTS_DELETE,  debug_breakpoints_delete  },
+  { E_DEBUG_CMD_ROM,                 debug_rom                 }
 };
 
 
