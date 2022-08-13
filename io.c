@@ -56,9 +56,11 @@ typedef enum io_func_t {
 
 
 typedef struct io_t {
-  int  is_enabled[E_IO_FUNC_LAST - E_IO_FUNC_FIRST + 1];
-  u8_t mf_port_enable;
-  u8_t mf_port_disable;
+  int             is_enabled[E_IO_FUNC_LAST - E_IO_FUNC_FIRST + 1];
+  io_trap_cause_t io_trap_cause;
+  u8_t            io_trap_byte_written;
+  u8_t            mf_port_enable;
+  u8_t            mf_port_disable;
 } io_t;
 
 
@@ -77,9 +79,11 @@ void io_reset(reset_t reset) {
 
   /* Except these. */
   self.is_enabled[E_IO_FUNC_TRAPS] = 0;
-
-  self.mf_port_enable  = 0x3F;
-  self.mf_port_disable = 0xBF;
+  
+  self.io_trap_cause        = E_IO_TRAP_CAUSE_NONE;
+  self.io_trap_byte_written = 0x00;
+  self.mf_port_enable       = 0x3F;
+  self.mf_port_disable      = 0xBF;
 }
 
 
@@ -142,8 +146,10 @@ static u8_t read_internal(u16_t address) {
 
     case 0x2FFD:
     case 0x3FFD:
-      if (self.is_enabled[E_IO_FUNC_TRAPS]) {
-        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_TRAP);
+      if (self.is_enabled[E_IO_FUNC_TRAPS] && !mf_is_active() && !divmmc_is_active()) {
+        self.io_trap_cause = address == 0x2FFD ? E_IO_TRAP_CAUSE_PORT_2FFD_READ : E_IO_TRAP_CAUSE_PORT_3FFD_READ;
+        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_IO_TRAP);
+        return 0xFF;
       }
       break;
 
@@ -364,10 +370,12 @@ static void write_internal(u16_t address, u8_t value) {
       nextreg_data_write(address, value);
       return;
 
-    case 0x2FFD:
     case 0x3FFD:
-      if (self.is_enabled[E_IO_FUNC_TRAPS]) {
-        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_TRAP);
+      if (self.is_enabled[E_IO_FUNC_TRAPS] && !mf_is_active() && !divmmc_is_active()) {
+        self.io_trap_cause        = E_IO_TRAP_CAUSE_PORT_3FFD_WRITE;
+        self.io_trap_byte_written = value;
+        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_IO_TRAP);
+        return;
       }
       break;
 
@@ -649,4 +657,19 @@ void io_decoding_write(u8_t index, u8_t value) {
 
 void io_traps_enable(int enable) {
   self.is_enabled[E_IO_FUNC_TRAPS] = enable;
+}
+
+
+int io_are_traps_enabled(void) {
+  return self.is_enabled[E_IO_FUNC_TRAPS];
+}
+
+
+io_trap_cause_t io_trap_cause(void) {
+  return self.io_trap_cause;
+}
+
+
+u8_t io_trap_byte_written(void) {
+  return self.io_trap_byte_written;  
 }

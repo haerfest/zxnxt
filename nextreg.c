@@ -152,7 +152,7 @@ static u8_t nextreg_reset_read(void) {
   switch (cpu_nmi_get()) {
     case E_CPU_NMI_MF:
       switch (cpu_nmi_source()) {
-        case E_CPU_NMI_SOURCE_TRAP:
+        case E_CPU_NMI_SOURCE_IO_TRAP:
           result |= 0x10;
           break;
 
@@ -884,13 +884,15 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1:
+#if 0
       divmmc_automap_on_fetch_enable(0x3D00, value & 0x80);
-      //divmmc_automap_on_fetch_enable(0x1FF8, (value & 0x40) ^ 0x40); ???
+      divmmc_automap_on_fetch_enable(0x1FF8, (value & 0x40) ^ 0x40);
       divmmc_automap_on_fetch_enable(0x056A, value & 0x20);
       divmmc_automap_on_fetch_enable(0x04D7, value & 0x10);
       divmmc_automap_on_fetch_enable(0x0562, value & 0x08);
       divmmc_automap_on_fetch_enable(0x04C6, value & 0x04);
       divmmc_automap_on_fetch_enable(0x0066, value & 0x03);
+#endif
       break;
 
     case E_NEXTREG_REGISTER_IO_TRAPS:
@@ -1030,8 +1032,17 @@ u8_t nextreg_read_internal(u8_t reg) {
     case E_NEXTREG_REGISTER_ULA_Y_SCROLL:
       return ula_offset_y_read();
 
+    case E_NEXTREG_REGISTER_IO_TRAPS:
+      return io_are_traps_enabled() ? 0x01 : 0x00;
+
+    case E_NEXTREG_REGISTER_IO_TRAP_WRITE:
+      return io_trap_byte_written();
+
+    case E_NEXTREG_REGISTER_IO_TRAP_CAUSE:
+      return (u8_t) io_trap_cause();
+
     default:
-      // log_wrn("nextreg: unimplemented read from register $%02X\n", reg);
+      log_wrn("nextreg: unimplemented read from register $%02X\n", reg);
       break;
   }
 

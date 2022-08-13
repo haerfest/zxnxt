@@ -21,7 +21,7 @@ typedef enum {
 
 typedef enum {
   E_CPU_NMI_SOURCE_OTHER,
-  E_CPU_NMI_SOURCE_TRAP,
+  E_CPU_NMI_SOURCE_IO_TRAP,
   E_CPU_NMI_SOURCE_NEXTREG
 } cpu_nmi_source_t;
 

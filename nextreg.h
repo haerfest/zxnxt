@@ -109,7 +109,9 @@ typedef enum {
   E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1                  = 0xBB,
   E_NEXTREG_REGISTER_INTERRUPT_CONTROL                     = 0xC0,
   E_NEXTREG_REGISTER_INT_EN_0                              = 0xC4,
-  E_NEXTREG_REGISTER_IO_TRAPS                              = 0xD8
+  E_NEXTREG_REGISTER_IO_TRAPS                              = 0xD8,
+  E_NEXTREG_REGISTER_IO_TRAP_WRITE                         = 0xD9,
+  E_NEXTREG_REGISTER_IO_TRAP_CAUSE                         = 0xDA
 } nextreg_register_t;
 
 
