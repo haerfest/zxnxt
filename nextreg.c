@@ -38,6 +38,119 @@
 #define BOARD_ID              0x02
 
 
+#define DESCRIBE(reg) { reg, #reg }
+
+
+static const struct {
+  nextreg_register_t reg;
+  const char*        description;
+} next_register_description[] = {
+  DESCRIBE(E_NEXTREG_REGISTER_MACHINE_ID),
+  DESCRIBE(E_NEXTREG_REGISTER_CORE_VERSION),
+  DESCRIBE(E_NEXTREG_REGISTER_RESET),
+  DESCRIBE(E_NEXTREG_REGISTER_MACHINE_TYPE),
+  DESCRIBE(E_NEXTREG_REGISTER_CONFIG_MAPPING),
+  DESCRIBE(E_NEXTREG_REGISTER_PERIPHERAL_1_SETTING),
+  DESCRIBE(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING),
+  DESCRIBE(E_NEXTREG_REGISTER_CPU_SPEED),
+  DESCRIBE(E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING),
+  DESCRIBE(E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING),
+  DESCRIBE(E_NEXTREG_REGISTER_PERIPHERAL_5_SETTING),
+  DESCRIBE(E_NEXTREG_REGISTER_CORE_VERSION_SUB_MINOR),
+  DESCRIBE(E_NEXTREG_REGISTER_BOARD_ID),
+  DESCRIBE(E_NEXTREG_REGISTER_CORE_BOOT),
+  DESCRIBE(E_NEXTREG_REGISTER_VIDEO_TIMING),
+  DESCRIBE(E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK),
+  DESCRIBE(E_NEXTREG_REGISTER_LAYER2_SHADOW_RAM_BANK),
+  DESCRIBE(E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM),
+  DESCRIBE(E_NEXTREG_REGISTER_LAYER2_X_SCROLL_LSB),
+  DESCRIBE(E_NEXTREG_REGISTER_LAYER2_Y_SCROLL),
+  DESCRIBE(E_NEXTREG_REGISTER_CLIP_WINDOW_LAYER2),
+  DESCRIBE(E_NEXTREG_REGISTER_CLIP_WINDOW_SPRITES),
+  DESCRIBE(E_NEXTREG_REGISTER_CLIP_WINDOW_ULA),
+  DESCRIBE(E_NEXTREG_REGISTER_CLIP_WINDOW_TILEMAP),
+  DESCRIBE(E_NEXTREG_REGISTER_CLIP_WINDOW_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_MSB),
+  DESCRIBE(E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_LSB),
+  DESCRIBE(E_NEXTREG_REGISTER_LINE_INTERRUPT_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_LINE_INTERRUPT_VALUE_LSB),
+  DESCRIBE(E_NEXTREG_REGISTER_ULA_X_SCROLL),
+  DESCRIBE(E_NEXTREG_REGISTER_ULA_Y_SCROLL),
+  DESCRIBE(E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_MSB),
+  DESCRIBE(E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_LSB),
+  DESCRIBE(E_NEXTREG_REGISTER_DAC_B_MIRROR),
+  DESCRIBE(E_NEXTREG_REGISTER_DAC_A_D_MIRROR),
+  DESCRIBE(E_NEXTREG_REGISTER_DAC_C_MIRROR),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_MSB),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_X_SCROLL_LSB),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_Y_SCROLL),
+  DESCRIBE(E_NEXTREG_REGISTER_LO_RES_X_SCROLL),
+  DESCRIBE(E_NEXTREG_REGISTER_LO_RES_Y_SCROLL),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_NUMBER),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_1),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4),
+  DESCRIBE(E_NEXTREG_REGISTER_PALETTE_INDEX),
+  DESCRIBE(E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS),
+  DESCRIBE(E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT),
+  DESCRIBE(E_NEXTREG_REGISTER_PALETTE_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_PALETTE_VALUE_9BITS),
+  DESCRIBE(E_NEXTREG_REGISTER_FALLBACK_COLOUR),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITES_TRANSPARENCY_INDEX),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_TRANSPARENCY_INDEX),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT1_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT2_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT3_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT4_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT5_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT6_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_COPPER_DATA_8BIT),
+  DESCRIBE(E_NEXTREG_REGISTER_COPPER_ADDRESS),
+  DESCRIBE(E_NEXTREG_REGISTER_COPPER_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_COPPER_DATA_16BIT),
+  DESCRIBE(E_NEXTREG_REGISTER_ULA_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_DISPLAY_CONTROL_1),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_DEFAULT_TILEMAP_ATTRIBUTE),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_TILEMAP_BASE_ADDRESS),
+  DESCRIBE(E_NEXTREG_REGISTER_TILEMAP_TILE_DEFINITIONS_BASE_ADDRESS),
+  DESCRIBE(E_NEXTREG_REGISTER_LAYER2_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_LAYER2_X_SCROLL_MSB),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_0_POST_INCREMENT),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_1_POST_INCREMENT),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_2_POST_INCREMENT),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_3_POST_INCREMENT),
+  DESCRIBE(E_NEXTREG_REGISTER_SPRITE_ATTRIBUTE_4_POST_INCREMENT),
+  DESCRIBE(E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0),
+  DESCRIBE(E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1),
+  DESCRIBE(E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2),
+  DESCRIBE(E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3),
+  DESCRIBE(E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_0),
+  DESCRIBE(E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_1),
+  DESCRIBE(E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_2),
+  DESCRIBE(E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_3),
+  DESCRIBE(E_NEXTREG_REGISTER_ALTERNATE_ROM),
+  DESCRIBE(E_NEXTREG_REGISTER_SPECTRUM_MEMORY_MAPPING),
+  DESCRIBE(E_NEXTREG_REGISTER_MEMORY_MAPPING_MODE),
+  DESCRIBE(E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0),
+  DESCRIBE(E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_VALID),
+  DESCRIBE(E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_0_TIMING),
+  DESCRIBE(E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1),
+  DESCRIBE(E_NEXTREG_REGISTER_INTERRUPT_CONTROL),
+  DESCRIBE(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB),
+  DESCRIBE(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB),
+  DESCRIBE(E_NEXTREG_REGISTER_INT_EN_0),
+  DESCRIBE(E_NEXTREG_REGISTER_IO_TRAPS),
+  DESCRIBE(E_NEXTREG_REGISTER_IO_TRAP_WRITE),
+  DESCRIBE(E_NEXTREG_REGISTER_IO_TRAP_CAUSE)
+};
+
+
 typedef struct clip_t {
   u8_t index;
   u8_t values[4];  /* x1, x2, y1, y2. */
@@ -75,6 +188,17 @@ static nextreg_t self;
 
 
 static void nextreg_cpu_speed_write(u8_t value);
+
+
+static const char* nextreg_description(u8_t reg) {
+  for (size_t i = 0; i < sizeof(next_register_description) / sizeof(*next_register_description); i++) {
+    if (next_register_description[i].reg == reg) {
+      return next_register_description[i].description;
+    }
+  }
+
+  return "?";
+}
 
 
 static void nextreg_reset(reset_t reset) {
@@ -175,7 +299,7 @@ static u8_t nextreg_reset_read(void) {
       break;
   }
 
-  // log_wrn("nextreg: returning reset status $%02X\n", result);
+  log_wrn("nextreg: returning reset status $%02X\n", result);
   return result;
 }
 
@@ -324,25 +448,23 @@ static u8_t nextreg_peripheral_5_setting_read(void) {
 
 
 static void nextreg_peripheral_5_setting_write(u8_t value) {
-  if (!config_is_active()) {
-    return;
-  }
+  if (config_is_active()) {
+    switch ((value & 0xC0) >> 5) {
+      case 0:
+        /* Multiface +3. */
+        io_mf_ports_set(0x3F, 0xBF);
+        break;
 
-  switch (value >> 5) {
-    case 0:
-      /* Multiface +3. */
-      io_mf_ports_set(0x3F, 0xBF);
-      break;
+      case 1:
+        /* Multiface 128 v87.2. */
+        io_mf_ports_set(0xBF, 0x3F);
+        break;
 
-    case 1:
-      /* Multiface 128 v87.2. */
-      io_mf_ports_set(0xBF, 0x3F);
-      break;
-
-    default:
-      /* Multiface 128 v87.12 or Multiface 1. */
-      io_mf_ports_set(0x9F, 0x1F);
-      break;
+      default:
+        /* Multiface 128 v87.12 or Multiface 1. */
+        io_mf_ports_set(0x9F, 0x1F);
+        break;
+    }
   }
 
   divmmc_automap_enable(value & 0x10);
@@ -553,6 +675,10 @@ void nextreg_data_write(u16_t address, u8_t value) {
 
 
 void nextreg_write_internal(u8_t reg, u8_t value) {
+  if (reg != E_NEXTREG_REGISTER_CONFIG_MAPPING && reg != E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS) {
+    log_wrn("nextreg: write of $%02X to register $%02X (%s)\n", value, reg, nextreg_description(reg));
+  }
+
   switch (reg) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
       nextreg_config_mapping_write(value);
@@ -884,15 +1010,13 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     case E_NEXREG_REGISTER_DIVMMC_ENTRY_POINTS_1:
-#if 0
       divmmc_automap_on_fetch_enable(0x3D00, value & 0x80);
-      divmmc_automap_on_fetch_enable(0x1FF8, (value & 0x40) ^ 0x40);
+      divmmc_automap_on_fetch_enable(0x1FF8, value & 0x40);
       divmmc_automap_on_fetch_enable(0x056A, value & 0x20);
       divmmc_automap_on_fetch_enable(0x04D7, value & 0x10);
       divmmc_automap_on_fetch_enable(0x0562, value & 0x08);
       divmmc_automap_on_fetch_enable(0x04C6, value & 0x04);
       divmmc_automap_on_fetch_enable(0x0066, value & 0x03);
-#endif
       break;
 
     case E_NEXTREG_REGISTER_IO_TRAPS:
@@ -900,7 +1024,7 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     default:
-      log_wrn("nextreg: unimplemented write of $%02X to register $%02X from PC=$%04X\n", value, reg, cpu_pc_get());
+      log_wrn("nextreg: unimplemented write of $%02X to register $%02X (%s) from PC=$%04X\n", value, reg, nextreg_description(reg), cpu_pc_get());
       break;
   }
 
@@ -915,6 +1039,8 @@ u8_t nextreg_data_read(u16_t address) {
 
 
 u8_t nextreg_read_internal(u8_t reg) {
+  log_wrn("nextreg: read register $%02X (%s)\n", reg, nextreg_description(reg));
+
   switch (reg) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
       return MACHINE_ID;
@@ -1042,7 +1168,7 @@ u8_t nextreg_read_internal(u8_t reg) {
       return (u8_t) io_trap_cause();
 
     default:
-      log_wrn("nextreg: unimplemented read from register $%02X\n", reg);
+      log_wrn("nextreg: unimplemented read from register $%02X (%s)\n", reg, nextreg_description(reg));
       break;
   }
 

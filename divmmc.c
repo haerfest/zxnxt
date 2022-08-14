@@ -292,7 +292,12 @@ void divmmc_automap(u16_t address, int instant) {
   }
 
   /* Address 1FF8-1FFF switches automap off, the rest switches it on. */
-  self.is_active_via_automap = addr != E_DIVMMC_ADDR_1FF8_1FFF;
+  const int do_change = self.is_active_via_automap ^ (addr != E_DIVMMC_ADDR_1FF8_1FFF);
+  if (!do_change) {
+    return;
+  }
+
+  self.is_active_via_automap ^= 1;
   log_wrn("divmmc: %s via automap on $%04X (%s)\n", self.is_active_via_automap ? "activated" : "deactivated", address, instant ? "instant" : "delayed");
 
   if (self.is_active_via_automap) {
