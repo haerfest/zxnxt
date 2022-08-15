@@ -184,6 +184,7 @@ typedef struct nextreg_t {
   int                      is_sprites_lockstepped;
   u8_t                     nmi_return_address_lsb;
   u8_t                     nmi_return_address_msb;
+  u8_t                     user_register_0;
 } nextreg_t;
 
 
@@ -230,6 +231,7 @@ static void nextreg_reset(reset_t reset) {
   self.is_hotkey_cpu_speed_enabled       = 1;
   self.nmi_return_address_lsb            = 0x00;
   self.nmi_return_address_lsb            = 0x00;
+  self.user_register_0                   = 0xFF;
 
   cpu_reset(reset);
   ay_reset(reset);
@@ -240,6 +242,7 @@ static void nextreg_reset(reset_t reset) {
   i2c_reset(reset);
   io_reset(reset);
   layer2_reset(reset);
+  mf_reset(reset);
   mmu_reset(reset);
   paging_reset(reset);
   slu_reset(reset);
@@ -688,9 +691,9 @@ static void nextreg_int_en_0_write(u8_t value) {
 
 
  void nextreg_data_write(u16_t address, u8_t value) {
-  if (self.selected_register != E_NEXTREG_REGISTER_CONFIG_MAPPING && self.selected_register != E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS) {
-    log_wrn("nextreg: write of $%02X to register $%02X (%s) before PC=$%04X\n", value, self.selected_register, nextreg_description(self.selected_register), cpu_pc_get());
-  }
+  // if (self.selected_register != E_NEXTREG_REGISTER_CONFIG_MAPPING && self.selected_register != E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS) {
+  //   log_wrn("nextreg: write of $%02X to register $%02X (%s) before PC=$%04X\n", value, self.selected_register, nextreg_description(self.selected_register), cpu_pc_get());
+  // }
 
   if (!nextreg_write_internal(self.selected_register, value)) {
     log_wrn("nextreg: unimplemented write of $%02X to register $%02X (%s) from PC=$%04X\n", value, self.selected_register, nextreg_description(self.selected_register), cpu_pc_get());
@@ -830,6 +833,10 @@ int nextreg_write_internal(u8_t reg, u8_t value) {
       /* Ignored. */
       break;
 
+    case E_NEXTREG_REGISTER_USER_0:
+      self.user_register_0 = value;
+      break;
+  
     case E_NEXTREG_REGISTER_ALTERNATE_ROM:
       nextreg_alternate_rom_write(value);
       break;
@@ -1065,7 +1072,7 @@ int nextreg_write_internal(u8_t reg, u8_t value) {
 u8_t nextreg_data_read(u16_t address) {
   u8_t value = 0;
   
-  log_wrn("nextreg: read register $%02X (%s)\n", self.selected_register, nextreg_description(self.selected_register));
+  // log_wrn("nextreg: read register $%02X (%s)\n", self.selected_register, nextreg_description(self.selected_register));
   
   if (!nextreg_read_internal(self.selected_register, &value)) {
     log_wrn("nextreg: unimplemented read from register $%02X (%s)\n", self.selected_register, nextreg_description(self.selected_register));
@@ -1203,6 +1210,10 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
       *value = self.registers[reg];
       break;
 
+    case E_NEXTREG_REGISTER_USER_0:
+      *value = self.user_register_0;
+      break;
+  
     case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_MSB:
       *value = (slu_active_video_line_get() >> 8) & 0x01;
       break;

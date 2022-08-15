@@ -7,6 +7,7 @@
 
 int  mf_init(u8_t* sram);
 void mf_finit(void);
+void mf_reset(reset_t reset);
 void mf_activate(void);
 int  mf_is_active(void);
 u8_t mf_enable_read(u16_t address);

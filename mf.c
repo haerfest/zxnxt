@@ -34,6 +34,14 @@ void mf_finit(void) {
 }
 
 
+void mf_reset(reset_t reset) {
+  self.is_enabled = 0;
+  self.is_visible = 0;
+
+  memory_refresh_accessors(0, 2);
+}
+
+
 void mf_activate(void) {
   self.is_enabled = 1;
   self.is_visible = 1;

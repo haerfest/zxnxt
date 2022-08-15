@@ -149,8 +149,6 @@ u8_t divmmc_control_read(u16_t address) {
 
 
 void divmmc_control_write(u16_t address, u8_t value) {
-  //log_wrn("divmmc: control write $%02X (PC=$%04X)\n", value, cpu_pc_get());
-
   self.value                = value | self.is_mapram_enabled;
   self.is_mapram_enabled   |= value & 0x40;
   self.bank_number          = value & 0x0F;
@@ -167,8 +165,6 @@ int divmmc_is_automap_enabled(void) {
 
 
 void divmmc_automap_enable(int enable) {
-  log_wrn("divmmc: automap set to %s\n", enable ? "enabled" : "disabled");
-
   self.is_automap_enabled = enable;
 }
 
@@ -209,7 +205,6 @@ void divmmc_automap_on_fetch_enable(u16_t address, int enable) {
   const u16_t addr = map(address);
   if (addr != E_DIVMMC_ADDR_NONE) {
     self.automap[addr].enable = enable;
-    log_wrn("divmmc: automap on fetch $%04X %s\n", address, enable ? "enable" : "disable");
   }
 }
 
@@ -218,7 +213,6 @@ void divmmc_automap_on_fetch_always(u16_t address, int always) {
   const u16_t addr = map(address);
   if (addr >= E_DIVMMC_ADDR_0000 && addr <= E_DIVMMC_ADDR_0038) {
     self.automap[addr].always = always;
-    log_wrn("divmmc: automap on fetch $%04X %s\n", address, always ? "always" : "rom3");
   }
 }
 
@@ -227,7 +221,6 @@ void divmmc_automap_on_fetch_instant(u16_t address, int instant) {
   const u16_t addr = map(address);
   if (addr >= E_DIVMMC_ADDR_0000 && addr <= E_DIVMMC_ADDR_0038) {
     self.automap[addr].instant = instant;
-    log_wrn("divmmc: automap on fetch $%04X %s\n", address, instant ? "instant" : "delayed");
   }
 }
 
@@ -298,7 +291,6 @@ void divmmc_automap(u16_t address, int instant) {
   }
 
   self.is_active_via_automap ^= 1;
-  log_wrn("divmmc: %s via automap on $%04X (%s)\n", self.is_active_via_automap ? "activated" : "deactivated", address, instant ? "instant" : "delayed");
 
   if (self.is_active_via_automap) {
     divmmc_refresh_ptrs();
