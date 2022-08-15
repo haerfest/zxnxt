@@ -315,12 +315,15 @@ static int debug_show_registers(void) {
 
 
 static int debug_show_next_registers(void) {
+  u8_t value;
+
   fprintf(stderr, "   x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 xA xB xC xD xE xF\n");
   for (int i = 0; i < 256; i += 16) {
     fprintf(stderr, "%0Xx ", i >> 4);
     for (int j = 0; j < 16; j++) {
       const u8_t reg = i + j;
-      fprintf(stderr, "%02X ", nextreg_read_internal(reg));
+      (void) nextreg_read_internal(reg, &value);
+      fprintf(stderr, "%02X ", value);
     }
     fprintf(stderr, "\n");
   }

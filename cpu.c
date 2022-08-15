@@ -226,9 +226,7 @@ void cpu_irq(cpu_irq_t irq, int active) {
 
 
 void cpu_nmi(cpu_nmi_t nmi, cpu_nmi_source_t source) {
-  if (source == E_CPU_NMI_SOURCE_IO_TRAP) {
-    log_wrn("cpu: IO trap NMI\n");
-  }
+  log_wrn("cpu: NMI (source %d)\n", source);
 
   switch (nmi) {
     case E_CPU_NMI_NONE:

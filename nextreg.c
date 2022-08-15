@@ -299,7 +299,6 @@ static u8_t nextreg_reset_read(void) {
       break;
   }
 
-  log_wrn("nextreg: returning reset status $%02X\n", result);
   return result;
 }
 
@@ -669,15 +668,20 @@ static void nextreg_int_en_0_write(u8_t value) {
 }
 
 
-void nextreg_data_write(u16_t address, u8_t value) {
-  nextreg_write_internal(self.selected_register, value);
+ void nextreg_data_write(u16_t address, u8_t value) {
+  if (self.selected_register != E_NEXTREG_REGISTER_CONFIG_MAPPING && self.selected_register != E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS) {
+    log_wrn("nextreg: write of $%02X to register $%02X (%s) before PC=$%04X\n", value, self.selected_register, nextreg_description(self.selected_register), cpu_pc_get());
+  }
+
+  if (!nextreg_write_internal(self.selected_register, value)) {
+    log_wrn("nextreg: unimplemented write of $%02X to register $%02X (%s) from PC=$%04X\n", value, self.selected_register, nextreg_description(self.selected_register), cpu_pc_get());
+  }
 }
 
 
-void nextreg_write_internal(u8_t reg, u8_t value) {
-  if (reg != E_NEXTREG_REGISTER_CONFIG_MAPPING && reg != E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS) {
-    log_wrn("nextreg: write of $%02X to register $%02X (%s)\n", value, reg, nextreg_description(reg));
-  }
+int nextreg_write_internal(u8_t reg, u8_t value) {
+  /* Always remember the last value written. */
+  self.registers[reg] = value;
 
   switch (reg) {
     case E_NEXTREG_REGISTER_CONFIG_MAPPING:
@@ -1024,104 +1028,134 @@ void nextreg_write_internal(u8_t reg, u8_t value) {
       break;
 
     default:
-      log_wrn("nextreg: unimplemented write of $%02X to register $%02X (%s) from PC=$%04X\n", value, reg, nextreg_description(reg), cpu_pc_get());
-      break;
+      return 0;
   }
 
-  /* Always remember the last value written. */
-  self.registers[reg] = value;
+  return 1;
 }
 
 
 u8_t nextreg_data_read(u16_t address) {
-  return nextreg_read_internal(self.selected_register);
+  u8_t value = 0;
+  
+  log_wrn("nextreg: read register $%02X (%s)\n", self.selected_register, nextreg_description(self.selected_register));
+  
+  if (!nextreg_read_internal(self.selected_register, &value)) {
+    log_wrn("nextreg: unimplemented read from register $%02X (%s)\n", self.selected_register, nextreg_description(self.selected_register));
+  }
+  return value;
 }
 
 
-u8_t nextreg_read_internal(u8_t reg) {
-  log_wrn("nextreg: read register $%02X (%s)\n", reg, nextreg_description(reg));
-
+int nextreg_read_internal(u8_t reg, u8_t* value) {
   switch (reg) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
-      return MACHINE_ID;
+      *value = MACHINE_ID;
+      break;
 
     case E_NEXTREG_REGISTER_RESET:
-      return nextreg_reset_read();
+      *value = nextreg_reset_read();
+      break;
 
     case E_NEXTREG_REGISTER_CORE_VERSION:
-      return CORE_VERSION_MAJOR << 4 | CORE_VERSION_MINOR;
+      *value = CORE_VERSION_MAJOR << 4 | CORE_VERSION_MINOR;
+      break;
 
     case E_NEXTREG_REGISTER_CORE_VERSION_SUB_MINOR:
-      return CORE_VERSION_SUB_MINOR;
+      *value = CORE_VERSION_SUB_MINOR;
+      break;
 
     case E_NEXTREG_REGISTER_BOARD_ID:
-      return BOARD_ID;
+      *value = BOARD_ID;
+      break;
 
     case E_NEXTREG_REGISTER_CORE_BOOT:
-      return nextreg_core_boot_read();
+      *value = nextreg_core_boot_read();
+      break;
 
     case E_NEXTREG_REGISTER_CPU_SPEED:
-      return nextreg_cpu_speed_read();
+      *value = nextreg_cpu_speed_read();
+      break;
 
     case E_NEXTREG_REGISTER_PERIPHERAL_1_SETTING:
-      return nextreg_peripheral_1_setting_read();
+      *value = nextreg_peripheral_1_setting_read();
+      break;
       
     case E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING:
-      return nextreg_peripheral_2_setting_read();
+      *value = nextreg_peripheral_2_setting_read();
+      break;
 
     case E_NEXTREG_REGISTER_PERIPHERAL_3_SETTING:
-      return nextreg_peripheral_3_setting_read();
+      *value = nextreg_peripheral_3_setting_read();
+      break;
 
     case E_NEXTREG_REGISTER_PERIPHERAL_4_SETTING:
-      return nextreg_peripheral_4_setting_read();
+      *value = nextreg_peripheral_4_setting_read();
+      break;
 
     case E_NEXTREG_REGISTER_PERIPHERAL_5_SETTING:
-      return nextreg_peripheral_5_setting_read();
+      *value = nextreg_peripheral_5_setting_read();
+      break;
 
     case E_NEXTREG_REGISTER_VIDEO_TIMING:
-      return clock_timing_read();
+      *value = clock_timing_read();
+      break;
 
     case E_NEXTREG_REGISTER_LAYER2_ACTIVE_RAM_BANK:
-      return layer2_active_bank_read();
+      *value = layer2_active_bank_read();
+      break;
 
     case E_NEXTREG_REGISTER_LAYER2_SHADOW_RAM_BANK:
-      return layer2_shadow_bank_read();
+      *value = layer2_shadow_bank_read();
+      break;
 
     case E_NEXTREG_REGISTER_SPRITE_LAYERS_SYSTEM:
-      return nextreg_sprite_layers_system_read();
+      *value = nextreg_sprite_layers_system_read();
+      break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_ULA:
-      return self.ula_clip.values[self.ula_clip.index];
+      *value = self.ula_clip.values[self.ula_clip.index];
+      break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_TILEMAP:
-      return self.tilemap_clip.values[self.tilemap_clip.index];
+      *value = self.tilemap_clip.values[self.tilemap_clip.index];
+      break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_SPRITES:
-      return self.sprites_clip.values[self.sprites_clip.index];
+      *value = self.sprites_clip.values[self.sprites_clip.index];
+      break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_LAYER2:
-      return self.layer2_clip.values[self.layer2_clip.index];
+      *value = self.layer2_clip.values[self.layer2_clip.index];
+      break;
 
     case E_NEXTREG_REGISTER_CLIP_WINDOW_CONTROL:
-      return nextreg_clip_window_control_read();
+      *value = nextreg_clip_window_control_read();
+      break;
 
     case E_NEXTREG_REGISTER_PALETTE_INDEX:
-      return self.palette_index;
+      *value = self.palette_index;
+      break;
 
     case E_NEXTREG_REGISTER_PALETTE_CONTROL:
-      return nextreg_palette_control_read();
+      *value = nextreg_palette_control_read();
+      break;
 
     case E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS:
-      return nextreg_palette_value_8bits_read();
+      *value = nextreg_palette_value_8bits_read();
+      break;
 
     case E_NEXTREG_REGISTER_PALETTE_VALUE_9BITS:
-      return nextreg_palette_value_9bits_read();
+      *value = nextreg_palette_value_9bits_read();
+      break;
 
     case E_NEXTREG_REGISTER_GLOBAL_TRANSPARENCY_COLOUR:
-      return slu_transparent_get()->rgb8;
+      *value = slu_transparent_get()->rgb8;
+      break;
 
     case E_NEXTREG_REGISTER_ULANEXT_ATTRIBUTE_BYTE_FORMAT:
-      return ula_attribute_byte_format_read();
+      *value = ula_attribute_byte_format_read();
+      break;
 
     case E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT1_CONTROL:
@@ -1131,49 +1165,60 @@ u8_t nextreg_read_internal(u8_t reg) {
     case E_NEXTREG_REGISTER_MMU_SLOT5_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT6_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL:
-      return mmu_page_get(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL);
+      *value = mmu_page_get(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL);
+      break;
 
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1:
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
       /* Return cached value. */
+      *value = self.registers[reg];
       break;
 
     case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_MSB:
-      return (slu_active_video_line_get() >> 8) & 0x01;
+      *value = (slu_active_video_line_get() >> 8) & 0x01;
+      break;
 
     case E_NEXTREG_REGISTER_ACTIVE_VIDEO_LINE_LSB:
-      return slu_active_video_line_get() & 0xFF;
+      *value = slu_active_video_line_get() & 0xFF;
+      break;
 
     case E_NEXTREG_REGISTER_LINE_INTERRUPT_CONTROL:
-      return slu_line_interrupt_control_read();
+      *value = slu_line_interrupt_control_read();
+      break;
 
     case E_NEXTREG_REGISTER_LINE_INTERRUPT_VALUE_LSB:
-      return slu_line_interrupt_value_lsb_read();
+      *value = slu_line_interrupt_value_lsb_read();
+      break;
 
     case E_NEXTREG_REGISTER_ULA_X_SCROLL:
-      return ula_offset_x_read();
+      *value = ula_offset_x_read();
+      break;
 
     case E_NEXTREG_REGISTER_ULA_Y_SCROLL:
-      return ula_offset_y_read();
+      *value = ula_offset_y_read();
+      break;
 
     case E_NEXTREG_REGISTER_IO_TRAPS:
-      return io_are_traps_enabled() ? 0x01 : 0x00;
+      *value = io_are_traps_enabled() ? 0x01 : 0x00;
+      break;
 
     case E_NEXTREG_REGISTER_IO_TRAP_WRITE:
-      return io_trap_byte_written();
+      *value = io_trap_byte_written();
+      break;
 
     case E_NEXTREG_REGISTER_IO_TRAP_CAUSE:
-      return (u8_t) io_trap_cause();
+      *value = (u8_t) io_trap_cause();
+      break;
 
     default:
-      log_wrn("nextreg: unimplemented read from register $%02X (%s)\n", reg, nextreg_description(reg));
-      break;
+      /* By default, return the last value written. */
+      *value = self.registers[reg];
+      return 0;
   }
 
-  /* By default, return the last value written. */
-  return self.registers[reg];
+  return 1;
 }
 
 
