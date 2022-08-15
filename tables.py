@@ -816,8 +816,13 @@ def reti() -> C:
 
 def retn() -> C:
     return '''
-        PCL = memory_read(SP++); T(3);
-        PCH = memory_read(SP++); T(3);
+        if (self.is_stackless_nmi_enabled) {
+            PCL = nextreg_read_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB);
+            PCH = nextreg_read_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB);
+        } else {
+            PCL = memory_read(SP++); T(3);
+            PCH = memory_read(SP++); T(3);
+        }
         IFF1 = IFF2;
     '''
 
