@@ -93,10 +93,10 @@ static reader_t pick_reader(int page) {
       return config_read;
     }
     if (mf_is_active()) {
-      return (page == 0) ? mf_rom_read  : mf_ram_read;
+      return (page == 0) ? mf_rom_read : mf_ram_read;
     }
     if (divmmc_is_active()) {
-      return (page == 0) ? divmmc_rom_read  : divmmc_ram_read;
+      return (page == 0) ? divmmc_rom_read : divmmc_ram_read;
     }
     if (layer2_is_readable(page)) {
       return layer2_read;
@@ -105,7 +105,7 @@ static reader_t pick_reader(int page) {
       return mmu_read;
     }
 
-    return altrom_is_active_on_read() ? altrom_read  : rom_read;
+    return altrom_is_active_on_read() ? altrom_read : rom_read;
   }
 
   if (page < 6 && layer2_is_readable(page)) {
@@ -127,10 +127,10 @@ static writer_t pick_writer(int page) {
       return config_write;
     }
     if (mf_is_active()) {
-      return (page == 0) ? mf_rom_write  : mf_ram_write;
+      return (page == 0) ? mf_rom_write : mf_ram_write;
     }
     if (divmmc_is_active()) {
-      return (page == 0) ? divmmc_rom_write  : divmmc_ram_write;
+      return (page == 0) ? divmmc_rom_write : divmmc_ram_write;
     }
     if (layer2_is_writable(page)) {
       return layer2_write;
@@ -139,7 +139,7 @@ static writer_t pick_writer(int page) {
       return mmu_write;
     }
 
-    return altrom_is_active_on_write() ? altrom_write  : rom_write;
+    return altrom_is_active_on_write() ? altrom_write : rom_write;
   }
 
   if (page < 6 && layer2_is_writable(page)) {
@@ -153,6 +153,47 @@ static writer_t pick_writer(int page) {
 
 void memory_contend(u16_t address) {
   mmu_contend(address);
+}
+
+
+static const struct {
+  reader_t    reader;
+  writer_t    writer;
+  const char* description;
+} descriptions[] = {
+  { altrom_read,     altrom_write,     "alt ROM"    },
+  { bootrom_read,    bootrom_write,    "boot ROM"   },
+  { config_read,     config_write,     "config"     },
+  { divmmc_ram_read, divmmc_ram_write, "divMMC RAM" },
+  { divmmc_rom_read, divmmc_rom_write, "divMMC ROM" },
+  { layer2_read,     layer2_write,     "layer 2"    },
+  { mf_ram_read,     mf_ram_write,     "MF RAM"     },
+  { mf_rom_read,     mf_rom_write,     "MF ROM"     },
+  { mmu_read,        mmu_write,        "MMU"        },
+  { rom_read,        rom_write,        "ROM"        },
+};
+
+
+void memory_describe_accessor(int page, const char** reader, const char** writer) {
+  if (reader != NULL) {
+    *reader = "?";
+    for (size_t i = 0; i < sizeof(descriptions) / sizeof(*descriptions); i++) {
+      if (self.readers[page] == descriptions[i].reader) {
+        *reader = descriptions[i].description;
+        break;
+      }
+    }
+  }
+
+  if (writer != NULL) {
+    *writer = "?";
+    for (size_t i = 0; i < sizeof(descriptions) / sizeof(*descriptions); i++) {
+      if (self.writers[page] == descriptions[i].writer) {
+        *writer = descriptions[i].description;
+        break;
+      }
+    }
+  }
 }
 
 

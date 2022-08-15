@@ -24,6 +24,7 @@ u8_t  memory_read_opcode(u16_t address);
 void  memory_write(u16_t address, u8_t value);
 void  memory_contend(u16_t address);
 u8_t* memory_sram(void);
+void  memory_describe_accessor(int page, const char** reader, const char** writer);
 void  memory_refresh_accessors(int page, int n_pages);
 
 
