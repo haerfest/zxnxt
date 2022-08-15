@@ -17,6 +17,7 @@
 #include "layer2.h"
 #include "log.h"
 #include "memory.h"
+#include "mf.h"
 #include "mmu.h"
 #include "nextreg.h"
 #include "palette.h"
@@ -181,6 +182,8 @@ typedef struct nextreg_t {
   int                      is_hotkey_nmi_divmmc_enabled;
   u8_t                     sprite_number;
   int                      is_sprites_lockstepped;
+  u8_t                     nmi_return_address_lsb;
+  u8_t                     nmi_return_address_msb;
 } nextreg_t;
 
 
@@ -225,7 +228,10 @@ static void nextreg_reset(reset_t reset) {
   self.is_palette_ula_second             = 0;
   self.ula_next_mode                     = 0;
   self.is_hotkey_cpu_speed_enabled       = 1;
+  self.nmi_return_address_lsb            = 0x00;
+  self.nmi_return_address_lsb            = 0x00;
 
+  cpu_reset(reset);
   ay_reset(reset);
   copper_reset(reset);
   dac_reset(reset);
@@ -304,11 +310,17 @@ static u8_t nextreg_reset_read(void) {
 
 
 static void nextreg_reset_write(u8_t value) {
+  if ((value & 0x10) == 0x00) {
+    if (!mf_is_active() && !divmmc_is_active())
+    {
+      io_trap_clear();
+    }
+  }
+
   if (value & 0x03) {
     /* Hard or soft reset. */
     self.is_hard_reset = value & 0x02;
     nextreg_reset(self.is_hard_reset ? E_RESET_HARD : E_RESET_SOFT);
-    cpu_reset();
     return;
   }
 
@@ -657,8 +669,15 @@ static void nextreg_sprite_layers_system_write(u8_t value) {
 }
 
 
+static u8_t nextreg_interrupt_control_read(void) {
+  /* TODO Implement other bits of this register. */
+  return cpu_stackless_nmi_enabled() ? 0x08 : 0x00;
+}
+
+
 static void nextreg_interrupt_control_write(u8_t value) {
-  /* TODO */
+  cpu_stackless_nmi_enable(value & 0x08);
+  /* TODO Implement other bits of this register. */
 }
 
 
@@ -976,6 +995,14 @@ int nextreg_write_internal(u8_t reg, u8_t value) {
       nextreg_interrupt_control_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB:
+      self.nmi_return_address_lsb = value;
+      break;
+
+    case E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB:
+      self.nmi_return_address_msb = value;
+      break;
+
     case E_NEXTREG_REGISTER_INT_EN_0:
       nextreg_int_en_0_write(value);
       break;
@@ -1211,6 +1238,19 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
     case E_NEXTREG_REGISTER_IO_TRAP_CAUSE:
       *value = (u8_t) io_trap_cause();
       break;
+
+    case E_NEXTREG_REGISTER_INTERRUPT_CONTROL:
+      *value = nextreg_interrupt_control_read();
+      break;
+
+    case E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB:
+      *value = self.nmi_return_address_lsb;
+      break;
+
+    case E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB:
+      *value = self.nmi_return_address_msb;
+      break;
+
 
     default:
       /* By default, return the last value written. */

@@ -665,6 +665,11 @@ int io_are_traps_enabled(void) {
 }
 
 
+void io_trap_clear(void) {
+  self.io_trap_cause = E_IO_TRAP_CAUSE_NONE;
+}
+
+
 io_trap_cause_t io_trap_cause(void) {
   return self.io_trap_cause;
 }

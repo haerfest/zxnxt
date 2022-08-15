@@ -22,6 +22,7 @@ void            io_decoding_write(u8_t index, u8_t value);
 void            io_mf_ports_set(u8_t enable, u8_t disable);
 void            io_traps_enable(int enable);
 int             io_are_traps_enabled(void);
+void            io_trap_clear();
 io_trap_cause_t io_trap_cause(void);
 u8_t            io_trap_byte_written(void);
 

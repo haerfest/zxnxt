@@ -168,7 +168,8 @@ static void cpu_fill_tables(void) {
 
 
 static void cpu_reset_internal(void) {
-  self.requests = 0;
+  self.requests                 = 0;
+  self.is_stackless_nmi_enabled = 0;
 
   IFF1 = 0;
   IFF2 = 0;
@@ -181,7 +182,7 @@ static void cpu_reset_internal(void) {
 }
 
 
-void cpu_reset(void) {
+void cpu_reset(reset_t reset) {
   self.requests |= CPU_REQUEST_RESET;
 }
 
@@ -337,8 +338,13 @@ static void cpu_nmi_pending(void) {
   T(7);
 
   /* Save the program counter. */
-  memory_write(--SP, PCH); T(3);
-  memory_write(--SP, PCL); T(3);
+  if (self.is_stackless_nmi_enabled) {
+    nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB, PCL);
+    nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB, PCH);
+  } else {
+    memory_write(--SP, PCH); T(3);
+    memory_write(--SP, PCL); T(3);
+  }
 
   /* Jump to the NMI routine. */ 
   PC = 0x0066;
@@ -393,4 +399,14 @@ u16_t cpu_pc_get(void) {
 
 cpu_t* cpu_get(void) {
   return &self;
+}
+
+
+int cpu_stackless_nmi_enabled(void) {
+  return self.is_stackless_nmi_enabled;
+}
+
+
+void cpu_stackless_nmi_enable(int enable) {
+  self.is_stackless_nmi_enabled = enable;
 }

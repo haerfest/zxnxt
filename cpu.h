@@ -79,6 +79,9 @@ typedef struct cpu_t {
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
 
+  /* Whether stackless NMI return is enabled, and if so, whats its RETN address is. */
+  int     is_stackless_nmi_enabled;
+  reg16_t nmi_retn_address;
 } cpu_t;
 
 
@@ -86,13 +89,15 @@ int              cpu_init(void);
 void             cpu_finit(void);
 int              cpu_run(int* do_stop);
 int              cpu_step(void);
-void             cpu_reset(void);
+void             cpu_reset(reset_t reset);
 void             cpu_irq(cpu_irq_t irq, int active);
 void             cpu_nmi(cpu_nmi_t nmi, cpu_nmi_source_t source);
 cpu_nmi_t        cpu_nmi_get(void);
 cpu_nmi_source_t cpu_nmi_source(void);
 u16_t            cpu_pc_get(void);
 cpu_t*           cpu_get(void);
+int              cpu_stackless_nmi_enabled(void);
+void             cpu_stackless_nmi_enable(int enable);
 
 
 #endif  /* __CPU_H */
