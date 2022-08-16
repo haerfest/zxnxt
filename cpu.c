@@ -341,6 +341,7 @@ static void cpu_nmi_pending(void) {
   if (self.is_stackless_nmi_enabled) {
     nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB, PCL);
     nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB, PCH);
+    SP -= 2;
   } else {
     memory_write(--SP, PCH); T(3);
     memory_write(--SP, PCL); T(3);
