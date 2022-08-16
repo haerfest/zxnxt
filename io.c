@@ -656,6 +656,7 @@ void io_decoding_write(u8_t index, u8_t value) {
 
 
 void io_traps_enable(int enable) {
+  log_wrn("io: traps %s\n", enable ? "enabled" : "disabled");
   self.is_enabled[E_IO_FUNC_TRAPS] = enable;
 }
 

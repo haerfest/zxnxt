@@ -64,6 +64,7 @@ typedef struct divmmc_t {
 static divmmc_t self;
 
 
+inline
 static void divmmc_refresh_ptrs(void) {
   /* We subtract 0x2000 because RAM is paged in starting at 0x2000, so all
    * addresses are offset 0x2000. This saves us a subtraction on every
@@ -169,6 +170,7 @@ void divmmc_automap_enable(int enable) {
 }
 
 
+inline
 static divmmc_addr_t map(u16_t address) {
   switch (address) {
     case 0x0000: return E_DIVMMC_ADDR_0000; break;

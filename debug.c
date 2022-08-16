@@ -2,10 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "altrom.h"
 #include "cpu.h"
 #include "debug.h"
 #include "divmmc.h"
 #include "memory.h"
+#include "mf.h"
 #include "mmu.h"
 #include "nextreg.h"
 #include "rom.h"
@@ -21,6 +23,7 @@ typedef enum debug_cmd_t {
   E_DEBUG_CMD_QUIT,
   E_DEBUG_CMD_SHOW_REGISTERS,
   E_DEBUG_CMD_SHOW_MEMORY,
+  E_DEBUG_CMD_SHOW_INFO,
   E_DEBUG_CMD_SHOW_DISASSEMBLY,
   E_DEBUG_CMD_SHOW_NEXT_REGISTERS,
   E_DEBUG_CMD_STEP,
@@ -152,6 +155,11 @@ static int debug_parse(char* s) {
     return 0;
   }
 
+  if (strcmp("i", p) == 0) {
+    self.command = E_DEBUG_CMD_SHOW_INFO;
+    return 0;
+  }
+
   if (strcmp("d", p) == 0) {
     self.command = E_DEBUG_CMD_SHOW_DISASSEMBLY;
     if (debug_next_word(q + 1, &p, &q) == 0) {
@@ -277,8 +285,8 @@ static u16_t debug_disassemble(u16_t address) {
 static int debug_show_registers(void) {
   const cpu_t* cpu = cpu_get();
 
-  fprintf(stderr, " PC   SP   AF   BC   DE   HL   IX   IY   AF'  BC'  DE'  HL' SZ?H?PNC IM  IR  IFF1 IFF2 ROM MMC BNK MAP\n");
-  fprintf(stderr, "%04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %c%c%c%c%c%c%c%c %02x %04X %04X %04X %2X   %c   %1X   %c\n",
+  fprintf(stderr, " PC   SP   AF   BC   DE   HL   IX   IY   AF'  BC'  DE'  HL' SZ?H?PNC IM  IR  IFF1 IFF2\n");
+  fprintf(stderr, "%04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %04X %c%c%c%c%c%c%c%c %02x %04X %04X %04X\n",
     cpu->pc.w,
     cpu->sp.w,
     cpu->af.w,
@@ -302,23 +310,7 @@ static int debug_show_registers(void) {
     cpu->im,
     cpu->ir.w,
     cpu->iff1,
-    cpu->iff2,
-    rom_selected(),
-    divmmc_is_active() ? 'Y' : 'N',
-    divmmc_bank(),
-    divmmc_is_mapram_enabled() ? 'Y' : 'N');
-
-  const char* reader;
-  const char* writer;
-  u8_t        mmu_page;
-
-  fprintf(stderr, "          page %12s %12s\n", "read", "write");
-  for (int page = 0; page < 8; page++) {
-    memory_describe_accessor(page, &reader, &writer);
-    mmu_page = mmu_page_get(page);
-
-    fprintf(stderr, "%04X-%04X  %02X  %12s %12s\n", page * 8192, (page + 1) * 8192 - 1, mmu_page, reader, writer);
-  }
+    cpu->iff2);
 
   return 0;
 }
@@ -393,6 +385,33 @@ static int debug_over(void) {
 
   /* Continue running. */
   return 1;
+}
+
+
+static int debug_show_info(void) {
+  const char* reader;
+  const char* writer;
+  u8_t        mmu_page;
+
+  fprintf(stderr, "ROM Alt MF DivMMC Auto Bank MapRAM\n");
+  fprintf(stderr, "%2x   %c   %c   %c     %c   %2x     %c\n\n",
+    rom_selected(),
+    altrom_is_active_on_read() ? 'Y' : 'N',
+    mf_is_active() ? 'Y' : 'N',
+    divmmc_is_active() ? 'Y' : 'N',
+    divmmc_is_automap_enabled() ? 'Y' : 'N',
+    divmmc_bank(),
+    divmmc_is_mapram_enabled() ? 'Y' : 'N');
+
+  fprintf(stderr, "          page %12s %12s\n", "read", "write");
+  for (int page = 0; page < 8; page++) {
+    memory_describe_accessor(page, &reader, &writer);
+    mmu_page = mmu_page_get(page);
+
+    fprintf(stderr, "%04X-%04X  %02X  %12s %12s\n", page * 8192, (page + 1) * 8192 - 1, mmu_page, reader, writer);
+  }
+
+  return 0;
 }
 
 
@@ -513,17 +532,18 @@ static const struct {
   debug_cmd_t command;
   int (*handler)(void);
 } debug_commands[] = {
-  { E_DEBUG_CMD_SHOW_REGISTERS,      debug_show_registers      },
-  { E_DEBUG_CMD_SHOW_MEMORY,         debug_show_memory         },
-  { E_DEBUG_CMD_SHOW_DISASSEMBLY,    debug_show_disassembly    },
-  { E_DEBUG_CMD_SHOW_NEXT_REGISTERS, debug_show_next_registers },
-  { E_DEBUG_CMD_CONTINUE,            debug_continue            },
-  { E_DEBUG_CMD_STEP,                debug_step                },
-  { E_DEBUG_CMD_OVER,                debug_over                },
-  { E_DEBUG_CMD_BREAKPOINTS_LIST,    debug_breakpoints_list    },
   { E_DEBUG_CMD_BREAKPOINTS_ADD,     debug_breakpoints_add     },
   { E_DEBUG_CMD_BREAKPOINTS_DELETE,  debug_breakpoints_delete  },
-  { E_DEBUG_CMD_ROM,                 debug_rom                 }
+  { E_DEBUG_CMD_BREAKPOINTS_LIST,    debug_breakpoints_list    },
+  { E_DEBUG_CMD_CONTINUE,            debug_continue            },
+  { E_DEBUG_CMD_OVER,                debug_over                },
+  { E_DEBUG_CMD_ROM,                 debug_rom                 },
+  { E_DEBUG_CMD_SHOW_DISASSEMBLY,    debug_show_disassembly    },
+  { E_DEBUG_CMD_SHOW_INFO,           debug_show_info           },
+  { E_DEBUG_CMD_SHOW_MEMORY,         debug_show_memory         },
+  { E_DEBUG_CMD_SHOW_NEXT_REGISTERS, debug_show_next_registers },
+  { E_DEBUG_CMD_SHOW_REGISTERS,      debug_show_registers      },
+  { E_DEBUG_CMD_STEP,                debug_step                }
 };
 
 
