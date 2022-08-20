@@ -86,12 +86,17 @@ void rom_write(u16_t address, u8_t value) {
 }
 
 
-void rom_set_machine_type(machine_type_t machine_type) {
+machine_type_t rom_machine_type_get(void) {
+  return self.machine_type;
+}
+
+
+void rom_machine_type_set(machine_type_t machine_type) {
   if (machine_type != self.machine_type) {
     self.machine_type = machine_type;
     rom_refresh_ptr();
     
-    altrom_set_machine_type(machine_type);
+    altrom_machine_type_set(machine_type);
   }
 }
 

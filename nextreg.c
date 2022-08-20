@@ -226,6 +226,8 @@ static const char* nextreg_description(u8_t reg) {
 
 
 static void nextreg_reset(reset_t reset) {
+  log_wrn("nextreg: %s reset\n", reset == E_RESET_SOFT ? "soft" : "hard");
+
   if (reset == E_RESET_HARD) {
     memset(&self, 0, sizeof(self));
 
@@ -365,6 +367,49 @@ static void nextreg_config_mapping_write(u8_t value) {
 }
 
 
+static u8_t nextreg_machine_type_read(void) {
+  u8_t result = self.palette_index_9bit_is_first_write ? 0x00 : 0x80;
+
+  switch (ula_timing_get()) {
+    case E_MACHINE_TYPE_CONFIG_MODE:
+      break;
+    case E_MACHINE_TYPE_ZX_48K:
+      result |= 0x01 << 4;
+      break;
+    case E_MACHINE_TYPE_ZX_128K_PLUS2:
+      result |= 0x02 << 4;
+      break;
+    case E_MACHINE_TYPE_ZX_PLUS2A_PLUS2B_PLUS3:
+      result |= 0x03 << 4;
+      break;
+    case E_MACHINE_TYPE_PENTAGON:
+      result |= 0x04 << 4;
+      break;
+  }
+
+  switch (rom_machine_type_get()) {
+    case E_MACHINE_TYPE_CONFIG_MODE:
+      break;
+    case E_MACHINE_TYPE_ZX_48K:
+      result |= 0x01;
+      break;
+    case E_MACHINE_TYPE_ZX_128K_PLUS2:
+      result |= 0x02;
+      break;
+    case E_MACHINE_TYPE_ZX_PLUS2A_PLUS2B_PLUS3:
+      result |= 0x03;
+      break;
+    case E_MACHINE_TYPE_PENTAGON:
+      result |= 0x04;
+      break;
+  }
+
+  /* TODO Return display timing lock. */
+
+  return result;
+}
+
+
 static void nextreg_machine_type_write(u8_t value) {
   if (value & 0x80) {
     const u8_t machine_type = (value >> 4) & 0x03;
@@ -372,6 +417,8 @@ static void nextreg_machine_type_write(u8_t value) {
       ula_timing_set(machine_type);
     }
   }
+
+  /* TODO Handle display timing lock. */
 
   if (config_is_active()) {
     u8_t machine_type = value & 0x03;
@@ -388,7 +435,7 @@ static void nextreg_machine_type_write(u8_t value) {
       config_deactivate();
     }
 
-    rom_set_machine_type(machine_type);
+    rom_machine_type_set(machine_type);
   }
 }
 
@@ -535,6 +582,8 @@ static void nextreg_spectrum_memory_mapping_write(u8_t value) {
 
 
 static void nextreg_alternate_rom_write(u8_t value) {
+  log_wrn("nextreg: alternate ROM write $%02X before PC=$%04X\n", value, cpu_pc_get());
+
   const int  enable        = value & 0x80;
   const int  during_writes = value & 0x40;
   const u8_t rom           = (value & 0x30) >> 4;
@@ -1109,6 +1158,10 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
 
     case E_NEXTREG_REGISTER_RESET:
       *value = nextreg_reset_read();
+      break;
+
+    case E_NEXTREG_REGISTER_MACHINE_TYPE:
+      *value = nextreg_machine_type_read();
       break;
 
     case E_NEXTREG_REGISTER_CORE_VERSION:

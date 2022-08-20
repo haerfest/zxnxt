@@ -98,7 +98,7 @@ void altrom_activate(int active, int on_write) {
 }
 
 
-void altrom_set_machine_type(machine_type_t machine_type) {
+void altrom_machine_type_set(machine_type_t machine_type) {
   if (machine_type != self.machine_type) {
     self.machine_type = machine_type;
     altrom_refresh_ptr();
