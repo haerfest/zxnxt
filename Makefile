@@ -13,13 +13,13 @@ zxnxt: disassemble.c opcodes.c $(OBJECTS)
 cpu.o: cpu.c opcodes.c clock.c dma.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-opcodes.c: opcodes.py
+opcodes.c: opcodes.py tables.py
 	python3 opcodes.py
 
 debug.o: debug.c disassemble.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-disassemble.c: disassemble.py
+disassemble.c: disassemble.py tables.py
 	python3 disassemble.py
 
 slu.o: slu.c layer2.c palette.c sprites.c tilemap.c ula.c

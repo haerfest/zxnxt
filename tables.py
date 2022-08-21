@@ -817,8 +817,8 @@ def reti() -> C:
 def retn() -> C:
     return '''
         if (self.is_stackless_nmi_enabled) {
-            PCL = nextreg_read_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB);
-            PCH = nextreg_read_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB);
+            (void) nextreg_read_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB, &PCL);
+            (void) nextreg_read_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB, &PCH);
             SP += 2;
         } else {
             PCL = memory_read(SP++); T(3);

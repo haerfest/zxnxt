@@ -466,18 +466,22 @@ static void main_reset(int hard) {
 
 
 static void main_change_cpu_speed(void) {
-  u8_t speed;
+  u8_t value;
 
-  if (!(nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING) & 0x80)) {
+  (void) nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING, &value);
+  if ((value & 0x80) == 0x00) {
     return;
   }
 
-  speed = nextreg_read_internal(E_NEXTREG_REGISTER_CPU_SPEED);
-  nextreg_write_internal(E_NEXTREG_REGISTER_CPU_SPEED, (speed + 1) & 0x03);
+  (void) nextreg_read_internal(E_NEXTREG_REGISTER_CPU_SPEED, &value);
+  nextreg_write_internal(E_NEXTREG_REGISTER_CPU_SPEED, (value + 1) & 0x03);
 }
 
 static void main_nmi_divmmc(void) {
-  if (!(nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING) & 0x10)) {
+  u8_t value;
+
+  (void) nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING, &value);
+  if ((value & 0x10) == 0x00) {
     return;
   }
 
@@ -490,7 +494,10 @@ static void main_nmi_divmmc(void) {
 
 
 static void main_nmi_multiface(void) {
-  if (!(nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING) & 0x08)) {
+  u8_t value;
+
+  (void) nextreg_read_internal(E_NEXTREG_REGISTER_PERIPHERAL_2_SETTING, &value);
+  if ((value & 0x08) == 0x00) {
     return;
   }
 
