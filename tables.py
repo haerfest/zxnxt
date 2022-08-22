@@ -825,6 +825,10 @@ def retn() -> C:
             PCH = memory_read(SP++); T(3);
         }
         IFF1 = IFF2;
+
+        if (mf_is_active()) {
+            mf_deactivate();
+        }
     '''
 
 def rl_pss(xy: Optional[str] = None) -> C:

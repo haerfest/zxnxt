@@ -57,6 +57,7 @@ typedef enum io_func_t {
 
 typedef struct io_t {
   int             is_enabled[E_IO_FUNC_LAST - E_IO_FUNC_FIRST + 1];
+  u8_t            decoding_enables[4];
   io_trap_cause_t io_trap_cause;
   u8_t            io_trap_byte_written;
   u8_t            mf_port_enable;
@@ -76,6 +77,10 @@ int io_init(void) {
 void io_reset(reset_t reset) {
   /* Enable all ports. */
   memset(self.is_enabled, 0xFF, sizeof(self.is_enabled));
+  self.decoding_enables[0] = 0xFF;
+  self.decoding_enables[1] = 0xFF;
+  self.decoding_enables[2] = 0xFF;
+  self.decoding_enables[3] = 0x0F;
 
   /* Except these. */
   self.is_enabled[E_IO_FUNC_TRAPS] = 0;
@@ -88,12 +93,6 @@ void io_reset(reset_t reset) {
 
 
 void io_finit(void) {
-}
-
-
-void io_mf_ports_set(u8_t enable, u8_t disable) {
-  self.mf_port_enable  = enable;
-  self.mf_port_disable = disable;
 }
 
 
@@ -148,7 +147,7 @@ static u8_t read_internal(u16_t address) {
     case 0x3FFD:
       if (self.is_enabled[E_IO_FUNC_TRAPS] && !mf_is_active() && !divmmc_is_active()) {
         self.io_trap_cause = address == 0x2FFD ? E_IO_TRAP_CAUSE_PORT_2FFD_READ : E_IO_TRAP_CAUSE_PORT_3FFD_READ;
-        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_IO_TRAP);
+        cpu_nmi(CPU_NMI_MF_VIA_IO_TRAP);
         return 0xFF;
       }
       break;
@@ -374,7 +373,7 @@ static void write_internal(u16_t address, u8_t value) {
       if (self.is_enabled[E_IO_FUNC_TRAPS] && !mf_is_active() && !divmmc_is_active()) {
         self.io_trap_cause        = E_IO_TRAP_CAUSE_PORT_3FFD_WRITE;
         self.io_trap_byte_written = value;
-        cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_IO_TRAP);
+        cpu_nmi(CPU_NMI_MF_VIA_IO_TRAP);
         return;
       }
       break;
@@ -558,6 +557,8 @@ static void write_internal(u16_t address, u8_t value) {
  * Four cycles: T1 T2 Tw T3.  T2 is contended, write takes place at T2.
  */
 void io_write(u16_t address, u8_t value) {
+  //log_wrn("io: write port $%04X value $%02X\n", address, value);
+
   const u8_t high_byte = address >> 8;
   const u8_t A0        = address & 1;
 
@@ -607,7 +608,6 @@ void io_write(u16_t address, u8_t value) {
 
 
 void io_decoding_write(u8_t index, u8_t value) {
-  /* TODO: Reset when bits 0:30 are 1 (bit 31=0: soft, 1: hard). */
   switch (index) {
     case 0:
       self.is_enabled[E_IO_FUNC_TIMEX]               = value & 0x01;
@@ -652,6 +652,16 @@ void io_decoding_write(u8_t index, u8_t value) {
     default:
       break;
   }
+
+  if (index < 4) {
+    self.decoding_enables[index] = value;
+
+    /* When bits 0:30 are all one, a reset is requested. */
+    if (self.decoding_enables[0] == 0xFF && self.decoding_enables[1] == 0xFF && self.decoding_enables[2] == 0xFF && (self.decoding_enables[3] & 0x7F) == 0x7F) {
+      log_wrn("io: reset requested? $%02X%02X%02X%02X\n", self.decoding_enables[3], self.decoding_enables[2], self.decoding_enables[1], self.decoding_enables[0]);
+      //nextreg_reset(self.decoding_enables[3] & 0x80 ? E_RESET_SOFT : E_RESET_HARD);
+    }
+  }
 }
 
 
@@ -668,6 +678,7 @@ int io_are_traps_enabled(void) {
 
 void io_trap_clear(void) {
   self.io_trap_cause = E_IO_TRAP_CAUSE_NONE;
+  cpu_nmi_clear(CPU_NMI_MF_VIA_IO_TRAP);
 }
 
 
@@ -678,4 +689,10 @@ io_trap_cause_t io_trap_cause(void) {
 
 u8_t io_trap_byte_written(void) {
   return self.io_trap_byte_written;  
+}
+
+
+void io_mf_ports_set(u8_t enable, u8_t disable) {
+  self.mf_port_enable  = enable;
+  self.mf_port_disable = disable;
 }

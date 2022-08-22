@@ -225,7 +225,7 @@ static const char* nextreg_description(u8_t reg) {
 }
 
 
-static void nextreg_reset(reset_t reset) {
+void nextreg_reset(reset_t reset) {
   log_wrn("nextreg: %s reset\n", reset == E_RESET_SOFT ? "soft" : "hard");
 
   if (reset == E_RESET_HARD) {
@@ -303,31 +303,16 @@ u8_t nextreg_select_read(u16_t address) {
 
 static u8_t nextreg_reset_read(void) {
   u8_t result = self.is_hard_reset ? 0x02 : 0x01;
+  int  nmi_active = cpu_nmi_active();
 
-  switch (cpu_nmi_get()) {
-    case E_CPU_NMI_MF:
-      switch (cpu_nmi_source()) {
-        case E_CPU_NMI_SOURCE_IO_TRAP:
-          result |= 0x10;
-          break;
-
-        case E_CPU_NMI_SOURCE_NEXTREG:
-          result |= 0x08;
-          break;
-        
-        default:
-        break;
-      }
-      break;
-    
-    case E_CPU_NMI_DIVMMC:
-      if (cpu_nmi_source() == E_CPU_NMI_SOURCE_NEXTREG) {
-        result |= 0x04;
-      }
-      break;
-    
-    default:
-      break;
+  if (nmi_active & CPU_NMI_MF_VIA_IO_TRAP) {
+    result |= 0x10;
+  }
+  if (nmi_active & CPU_NMI_MF_VIA_NEXTREG) {
+    result |= 0x08;
+  }
+  if (nmi_active & CPU_NMI_DIVMMC_VIA_NEXTREG) {
+    result |= 0x04;
   }
 
   return result;
@@ -335,12 +320,7 @@ static u8_t nextreg_reset_read(void) {
 
 
 static void nextreg_reset_write(u8_t value) {
-  if ((value & 0x10) == 0x00) {
-    if (!mf_is_active() && !divmmc_is_active())
-    {
-      io_trap_clear();
-    }
-  }
+  log_wrn("nextreg: write reset state $%02X\n", value);
 
   if (value & 0x03) {
     /* Hard or soft reset. */
@@ -349,14 +329,22 @@ static void nextreg_reset_write(u8_t value) {
     return;
   }
 
-  if (value & 0x08) {
-    cpu_nmi(E_CPU_NMI_MF, E_CPU_NMI_SOURCE_NEXTREG);
-    return;
-  }
+  if (!mf_is_active() && !divmmc_is_active()) {
+    if ((value & 0x10) == 0x00) {
+      io_trap_clear();
+    }
 
-  if (value & 0x04) {
-    cpu_nmi(E_CPU_NMI_DIVMMC, E_CPU_NMI_SOURCE_NEXTREG);
-    return;
+    if (value & 0x08) {
+      cpu_nmi(CPU_NMI_MF_VIA_NEXTREG);
+    } else {
+      cpu_nmi_clear(CPU_NMI_MF_VIA_NEXTREG);
+    }
+
+    if (value & 0x04) {
+      cpu_nmi(CPU_NMI_DIVMMC_VIA_NEXTREG);
+    } else {
+      cpu_nmi_clear(CPU_NMI_DIVMMC_VIA_NEXTREG);
+    }
   }
 }
 
@@ -524,28 +512,13 @@ static void nextreg_peripheral_4_setting_write(u8_t value) {
 
 static u8_t nextreg_peripheral_5_setting_read(void) {
   /* TODO Return other bits. */
-  return divmmc_is_automap_enabled() ? 0x10 : 0x00;
+  return (mf_type_get() << 5) | (divmmc_is_automap_enabled() ? 0x10 : 0x00);
 }
 
 
 static void nextreg_peripheral_5_setting_write(u8_t value) {
   if (config_is_active()) {
-    switch ((value & 0xC0) >> 5) {
-      case 0:
-        /* Multiface +3. */
-        io_mf_ports_set(0x3F, 0xBF);
-        break;
-
-      case 1:
-        /* Multiface 128 v87.2. */
-        io_mf_ports_set(0xBF, 0x3F);
-        break;
-
-      default:
-        /* Multiface 128 v87.12 or Multiface 1. */
-        io_mf_ports_set(0x9F, 0x1F);
-        break;
-    }
+    mf_type_set((value & 0xC0) >> 5);
   }
 
   divmmc_automap_enable(value & 0x10);
@@ -750,6 +723,12 @@ static u8_t nextreg_interrupt_control_read(void) {
 static void nextreg_interrupt_control_write(u8_t value) {
   cpu_stackless_nmi_enable(value & 0x08);
   /* TODO Implement other bits of this register. */
+}
+
+
+static u8_t nextreg_int_en_0_read(void) {
+  /* TODO Implement other bits of this register. */
+  return ula_irq_enable_get() ? 0x01 : 0x00;
 }
 
 
@@ -1335,6 +1314,9 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
       *value = self.nmi_return_address_msb;
       break;
 
+    case E_NEXTREG_REGISTER_INT_EN_0:
+      *value = nextreg_int_en_0_read();
+      break;
 
     default:
       /* By default, return the last value written. */

@@ -145,6 +145,7 @@ void nextreg_select_write(u16_t address, u8_t value);
 u8_t nextreg_select_read(u16_t address);
 int  nextreg_write_internal(u8_t reg, u8_t value);
 int  nextreg_read_internal(u8_t reg, u8_t* value);
+void nextreg_reset(reset_t reset);
 
 
 #endif  /* __NEXTREG_H */

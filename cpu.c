@@ -226,41 +226,38 @@ void cpu_irq(cpu_irq_t irq, int active) {
 }
 
 
-void cpu_nmi(cpu_nmi_t nmi, cpu_nmi_source_t source) {
-  log_wrn("cpu: NMI (source %d)\n", source);
+void cpu_nmi(int nmi) {
+  log_wrn("cpu: NMI %d\n", nmi);
 
-  switch (nmi) {
-    case E_CPU_NMI_NONE:
-      break;
-
-    case E_CPU_NMI_MF:
+  if (nmi & (CPU_NMI_MF_VIA_IO_TRAP | CPU_NMI_MF_VIA_NEXTREG)) {
       self.requests |= CPU_REQUEST_NMI_MF;
-      self.nmi_source = source;
-      break;
-
-    case E_CPU_NMI_DIVMMC:
-      self.requests |= CPU_REQUEST_NMI_DIVMMC;
-      self.nmi_source = source;
-      break;
-  }
-}
-
-
-cpu_nmi_t cpu_nmi_get(void) {
-  if (self.requests & CPU_REQUEST_NMI_MF) {
-    return E_CPU_NMI_MF;
   }
   
-  if (self.requests & CPU_REQUEST_NMI_DIVMMC) {
-    return E_CPU_NMI_DIVMMC;
+  if (nmi & CPU_NMI_DIVMMC_VIA_NEXTREG) {
+      self.requests |= CPU_REQUEST_NMI_DIVMMC;
   }
 
-  return E_CPU_NMI_NONE;
+  self.nmi_active |= nmi;
 }
 
 
-cpu_nmi_source_t cpu_nmi_source(void) {
-  return self.nmi_source;
+void cpu_nmi_clear(int nmi) {
+  log_wrn("cpu: NMI clear %d\n", nmi);
+
+  if (nmi & (CPU_NMI_MF_VIA_IO_TRAP | CPU_NMI_MF_VIA_NEXTREG)) {
+      self.requests &= ~CPU_REQUEST_NMI_MF;
+  }
+  
+  if (nmi & CPU_NMI_DIVMMC_VIA_NEXTREG) {
+      self.requests &= ~CPU_REQUEST_NMI_DIVMMC;
+  }
+
+  self.nmi_active &= ~nmi;
+}
+
+
+int cpu_nmi_active(void) {
+  return self.nmi_active;
 }
 
 
@@ -338,10 +335,10 @@ static void cpu_nmi_pending(void) {
   T(7);
 
   /* Save the program counter. */
+  nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB, PCL);
+  nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB, PCH);
   if (self.is_stackless_nmi_enabled) {
-    nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_LSB, PCL);
-    nextreg_write_internal(E_NEXTREG_REGISTER_NMI_RETURN_ADDRESS_MSB, PCH);
-    SP -= 2;
+    PC -= 2;
   } else {
     memory_write(--SP, PCH); T(3);
     memory_write(--SP, PCL); T(3);

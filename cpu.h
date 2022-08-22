@@ -12,18 +12,9 @@ typedef enum {
 } cpu_irq_t;
 
 
-typedef enum {
-  E_CPU_NMI_NONE,
-  E_CPU_NMI_MF,
-  E_CPU_NMI_DIVMMC
-} cpu_nmi_t;
-
-
-typedef enum {
-  E_CPU_NMI_SOURCE_OTHER,
-  E_CPU_NMI_SOURCE_IO_TRAP,
-  E_CPU_NMI_SOURCE_NEXTREG
-} cpu_nmi_source_t;
+#define CPU_NMI_MF_VIA_IO_TRAP       (1 << 0)
+#define CPU_NMI_MF_VIA_NEXTREG       (1 << 1)
+#define CPU_NMI_DIVMMC_VIA_NEXTREG   (1 << 2)
 
 
 /* Simple way to combine two 8-bit registers into a 16-bit one.
@@ -69,19 +60,19 @@ typedef struct cpu_t {
   reg16_t ir;
 
   /* Requests from outside. */
-  int              requests;
-  cpu_nmi_source_t nmi_source;
+  int requests;
 
   /* IRQ. */
   u8_t im;                      /* Interrupt mode.                                      */
   int  irq_delay;               /* Number of instructions by which IRQ must be delayed. */
 
+  /* NMI. */
+  int  is_stackless_nmi_enabled;  /* Whether stackless NMI is enabled. */
+  u8_t nmi_active;                /* The active NMI(s).                */
+
   /* Eight-bit register to hold temporary values. */
   u8_t tmp;
 
-  /* Whether stackless NMI return is enabled, and if so, whats its RETN address is. */
-  int     is_stackless_nmi_enabled;
-  reg16_t nmi_retn_address;
 } cpu_t;
 
 
@@ -91,9 +82,9 @@ int              cpu_run(int* do_stop);
 int              cpu_step(void);
 void             cpu_reset(reset_t reset);
 void             cpu_irq(cpu_irq_t irq, int active);
-void             cpu_nmi(cpu_nmi_t nmi, cpu_nmi_source_t source);
-cpu_nmi_t        cpu_nmi_get(void);
-cpu_nmi_source_t cpu_nmi_source(void);
+void             cpu_nmi(int nmi);
+void             cpu_nmi_clear(int nmi);
+int              cpu_nmi_active(void);
 u16_t            cpu_pc_get(void);
 cpu_t*           cpu_get(void);
 int              cpu_stackless_nmi_enabled(void);
