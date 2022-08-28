@@ -437,6 +437,16 @@ exit:
 }
 
 
+static void main_redraw_screen(void) {
+  if (SDL_RenderCopy(self.renderer, self.texture, NULL, NULL) != 0) {
+    log_err("slu: SDL_RenderCopy error: %s\n", SDL_GetError());
+    return;
+  }
+
+  SDL_RenderPresent(self.renderer);
+}
+
+
 static void main_toggle_fullscreen(void) {
   const u32_t flags = self.is_windowed ? SDL_WINDOW_FULLSCREEN: 0;
   
@@ -457,6 +467,8 @@ static void main_toggle_fullscreen(void) {
       return;
     }
   }
+
+  main_redraw_screen();
 }
 
 
