@@ -638,6 +638,8 @@ static void ula_tick(u32_t row, u32_t column, int* is_enabled, int* is_border, i
     } else {
       *rgb = palette_read_inline(ula.palette, 128 + ula.border_colour);
     }
+  } else if (ula.display_mode == E_ULA_DISPLAY_MODE_HI_RES) {
+    *rgb = palette_read_inline(ula.palette, 16 + 8 + (~ula.hi_res_ink_colour & 0x07));
   } else {
     *rgb = palette_read_inline(ula.palette, 16 + ula.border_colour);
   }
