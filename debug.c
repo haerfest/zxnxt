@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "altrom.h"
+#include "copper.h"
 #include "cpu.h"
 #include "debug.h"
 #include "divmmc.h"
@@ -26,6 +27,7 @@ typedef enum debug_cmd_t {
   E_DEBUG_CMD_SHOW_INFO,
   E_DEBUG_CMD_SHOW_DISASSEMBLY,
   E_DEBUG_CMD_SHOW_NEXT_REGISTERS,
+  E_DEBUG_CMD_SHOW_COPPER,
   E_DEBUG_CMD_STEP,
   E_DEBUG_CMD_OVER,
   E_DEBUG_CMD_BREAKPOINTS_LIST,
@@ -200,6 +202,11 @@ static int debug_parse(char* s) {
     return 0;
   }
 
+  if (strcmp("cop", p) == 0) {
+    self.command = E_DEBUG_CMD_SHOW_COPPER;
+    return 0;
+  }
+
   return -1;
 }
 
@@ -328,6 +335,34 @@ static int debug_show_next_registers(void) {
       fprintf(stderr, "%02X ", value);
     }
     fprintf(stderr, "\n");
+  }
+
+  return 0;
+}
+
+
+static int debug_show_copper(void) {
+  u16_t address;
+
+  for (address = 0; address < 1024; address++) {
+    const u16_t instr = copper_program_get(address);
+
+    fprintf(stderr, "%03x: %04X ", address, instr);
+
+    if (instr == 0x0000) {
+      fprintf(stderr, "NOOP\n");
+    } else if (instr == 0xFFFF) {
+      fprintf(stderr, "HALT\n");
+      break;
+    } else if (instr & 0x8000) {
+      const u32_t row = instr & 0x01FF;
+      const u32_t col = (instr & 0x7E00) >> 6;
+      fprintf(stderr, "WAIT %03X,%03X\n", row, col);
+    } else {
+      const u8_t reg   = (instr & 0x7F00) >> 8;
+      const u8_t value = instr & 0x00FF;
+      fprintf(stderr, "MOVE %02X,%02X\n", reg, value);
+    }
   }
 
   return 0;
@@ -543,6 +578,7 @@ static const struct {
   { E_DEBUG_CMD_SHOW_MEMORY,         debug_show_memory         },
   { E_DEBUG_CMD_SHOW_NEXT_REGISTERS, debug_show_next_registers },
   { E_DEBUG_CMD_SHOW_REGISTERS,      debug_show_registers      },
+  { E_DEBUG_CMD_SHOW_COPPER,         debug_show_copper         },
   { E_DEBUG_CMD_STEP,                debug_step                }
 };
 

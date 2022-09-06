@@ -13,7 +13,6 @@
 
 /* Include these to let the compiler optimise better. */
 #include "palette.c"
-#include "copper.c"
 #include "layer2.c"
 #include "sprites.c"
 #include "tilemap.c"
