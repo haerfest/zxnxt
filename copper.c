@@ -137,7 +137,7 @@ void copper_tick(u32_t beam_row, u32_t beam_column, int ticks_28mhz) {
     } else if (instruction & 0x8000) {
       /* WAIT: 1 cycle. */
       const u32_t wait_row    = instruction & 0x01FF;
-      const u32_t wait_column = (instruction & 0x7E00) >> 6;
+      const u32_t wait_column = (instruction & 0x7E00) >> 5;  /* (>> 6) * 2 b/c sub-pixel beam */
       if (beam_row == wait_row && beam_column >= wait_column) {
         copper.cpc = (copper.cpc + 1) & 0x3FF;
       }
