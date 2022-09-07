@@ -737,10 +737,6 @@ static void nextreg_int_en_0_write(u8_t value) {
 
 
  void nextreg_data_write(u16_t address, u8_t value) {
-  // if (self.selected_register != E_NEXTREG_REGISTER_CONFIG_MAPPING && self.selected_register != E_NEXTREG_REGISTER_PALETTE_VALUE_8BITS) {
-  //   log_wrn("nextreg: write of $%02X to register $%02X (%s) before PC=$%04X\n", value, self.selected_register, nextreg_description(self.selected_register), cpu_pc_get());
-  // }
-
   if (!nextreg_write_internal(self.selected_register, value)) {
     log_wrn("nextreg: unimplemented write of $%02X to register $%02X (%s) from PC=$%04X\n", value, self.selected_register, nextreg_description(self.selected_register), cpu_pc_get());
   }
@@ -876,6 +872,11 @@ int nextreg_write_internal(u8_t reg, u8_t value) {
     case E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_1:
     case E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_2:
     case E_NEXTREG_REGISTER_EXTERNAL_PORT_DECODING_3:
+      /* Ignored. */
+      break;
+
+    case E_NEXTREG_REGISTER_EXPANSION_BUS_ENABLE:
+    case E_NEXTREG_REGISTER_EXPANSION_BUS_CONTROL:
       /* Ignored. */
       break;
 
@@ -1027,9 +1028,11 @@ int nextreg_write_internal(u8_t reg, u8_t value) {
       ula_offset_y_write(value);
       break;
 
+    case E_NEXTREG_REGISTER_PS2_KEYMAP_ADDRESS_MSB:
+    case E_NEXTREG_REGISTER_PS2_KEYMAP_ADDRESS_LSB:
     case E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_MSB:
     case E_NEXTREG_REGISTER_PS2_KEYMAP_DATA_LSB:
-      /* Ignore these. */
+      /* Ignored. */
       break;
       
     case E_NEXTREG_REGISTER_DAC_B_MIRROR:
@@ -1117,8 +1120,6 @@ int nextreg_write_internal(u8_t reg, u8_t value) {
 
 u8_t nextreg_data_read(u16_t address) {
   u8_t value = 0;
-  
-  // log_wrn("nextreg: read register $%02X (%s)\n", self.selected_register, nextreg_description(self.selected_register));
   
   if (!nextreg_read_internal(self.selected_register, &value)) {
     log_wrn("nextreg: unimplemented read from register $%02X (%s)\n", self.selected_register, nextreg_description(self.selected_register));
@@ -1241,6 +1242,9 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
       *value = ula_attribute_byte_format_read();
       break;
 
+    case E_NEXTREG_REGISTER_FALLBACK_COLOUR:
+      break;
+
     case E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT1_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT2_CONTROL:
@@ -1256,8 +1260,6 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1:
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
     case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
-      /* Return cached value. */
-      *value = self.registers[reg];
       break;
 
     case E_NEXTREG_REGISTER_USER_0:
