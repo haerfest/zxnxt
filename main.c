@@ -637,7 +637,6 @@ u32_t main_next_host_sync_get(u32_t freq_28mhz) {
 void main_sync(void) {
   /* Perform these housekeeping tasks in downtime. */
   joystick_refresh();
-  keyboard_refresh();
   mouse_refresh();
   main_handle_function_keys();
 

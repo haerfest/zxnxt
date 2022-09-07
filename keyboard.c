@@ -31,14 +31,6 @@ const static SDL_Scancode scancodes[N_KEYS] = {
 typedef struct self_t {
   const u8_t* state;
   int         pressed[N_KEYS];
-  u8_t        half_row_FE;
-  u8_t        half_row_FD;
-  u8_t        half_row_FB;
-  u8_t        half_row_F7;
-  u8_t        half_row_EF;
-  u8_t        half_row_DF;
-  u8_t        half_row_BF;
-  u8_t        half_row_7F;
 } self_t;
 
 
@@ -46,16 +38,7 @@ static self_t self;
 
 
 int keyboard_init(void) {
-  self.state       = SDL_GetKeyboardState(NULL);
-  self.half_row_FE = 0;
-  self.half_row_FD = 0;
-  self.half_row_FB = 0;
-  self.half_row_F7 = 0;
-  self.half_row_EF = 0;
-  self.half_row_DF = 0;
-  self.half_row_BF = 0;
-  self.half_row_7F = 0;
-
+  self.state = SDL_GetKeyboardState(NULL);
   return 0;
 }
 
@@ -92,7 +75,8 @@ int keyboard_is_special_key_pressed(keyboard_special_key_t key) {
 
 
 /* TODO: Use Caps Lock to trigger Caps Shift + 2. */
-void keyboard_refresh(void) {
+inline
+static void keyboard_refresh(void) {
   int i;
 
   /* First capture the state of the physical keys on a ZX Spectrum 48K. */
@@ -153,38 +137,31 @@ void keyboard_refresh(void) {
     /* Extend Mode. */
     self.pressed[E_KEY_CAPS_SHIFT] = self.pressed[E_KEY_SYMBOL_SHIFT] = 1;
   }
-
-  /**
-   *      Left half row    Right half row
-   * ------------------    ------------------------
-   *          1 2 3 4 5    6 7 8 9            0
-   *          Q W E R T    Y U I O            P
-   *          A S D F G    H J K L            ENTER
-   * CAPS_SHIFT Z X C V    B N M SYMBOL_SHIFT SPACE
-   */
-  self.half_row_F7 = HALF_ROW_L(E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4,            E_KEY_5);
-  self.half_row_EF = HALF_ROW_R(E_KEY_6,          E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0);
-  self.half_row_FB = HALF_ROW_L(E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R,            E_KEY_T);
-  self.half_row_DF = HALF_ROW_R(E_KEY_Y,          E_KEY_U, E_KEY_I, E_KEY_O,            E_KEY_P);  
-  self.half_row_FD = HALF_ROW_L(E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F,            E_KEY_G);
-  self.half_row_BF = HALF_ROW_R(E_KEY_H,          E_KEY_J, E_KEY_K, E_KEY_L,            E_KEY_ENTER);
-  self.half_row_FE = HALF_ROW_L(E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C,            E_KEY_V);
-  self.half_row_7F = HALF_ROW_R(E_KEY_B,          E_KEY_N, E_KEY_M, E_KEY_SYMBOL_SHIFT, E_KEY_SPACE);
 }
 
 
+/**
+ *      Left half row    Right half row
+ * ------------------    ------------------------
+ *          1 2 3 4 5    6 7 8 9            0
+ *          Q W E R T    Y U I O            P
+ *          A S D F G    H J K L            ENTER
+ * CAPS_SHIFT Z X C V    B N M SYMBOL_SHIFT SPACE
+ */
 u8_t keyboard_read(u16_t address) {
   const u8_t half_row = ~(address >> 8);
-  u8_t       pressed  = ~0x1F;  /* No key self.pressed. */
+  u8_t       pressed  = ~0x1F;  /* No key pressed. */
 
-  if (half_row & ~0xFE) pressed |= self.half_row_FE;  /* ~11111110 */
-  if (half_row & ~0xFD) pressed |= self.half_row_FD;  /* ~11111101 */
-  if (half_row & ~0xFB) pressed |= self.half_row_FB;  /* ~11111011 */
-  if (half_row & ~0xF7) pressed |= self.half_row_F7;  /* ~11110111 */
-  if (half_row & ~0xEF) pressed |= self.half_row_EF;  /* ~11101111 */
-  if (half_row & ~0xDF) pressed |= self.half_row_DF;  /* ~11011111 */
-  if (half_row & ~0xBF) pressed |= self.half_row_BF;  /* ~10111111 */
-  if (half_row & ~0x7F) pressed |= self.half_row_7F;  /* ~01111111 */
+  keyboard_refresh();
+
+  if (half_row & ~0xFE) pressed |= HALF_ROW_L(E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C,            E_KEY_V    );  /* ~11111110 */
+  if (half_row & ~0xFD) pressed |= HALF_ROW_L(E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F,            E_KEY_G    );  /* ~11111101 */
+  if (half_row & ~0xFB) pressed |= HALF_ROW_L(E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R,            E_KEY_T    );  /* ~11111011 */
+  if (half_row & ~0xF7) pressed |= HALF_ROW_L(E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4,            E_KEY_5    );  /* ~11110111 */
+  if (half_row & ~0xEF) pressed |= HALF_ROW_R(E_KEY_6,          E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0    );  /* ~11101111 */
+  if (half_row & ~0xDF) pressed |= HALF_ROW_R(E_KEY_Y,          E_KEY_U, E_KEY_I, E_KEY_O,            E_KEY_P    );  /* ~11011111 */
+  if (half_row & ~0xBF) pressed |= HALF_ROW_R(E_KEY_H,          E_KEY_J, E_KEY_K, E_KEY_L,            E_KEY_ENTER);  /* ~10111111 */
+  if (half_row & ~0x7F) pressed |= HALF_ROW_R(E_KEY_B,          E_KEY_N, E_KEY_M, E_KEY_SYMBOL_SHIFT, E_KEY_SPACE);  /* ~01111111 */
 
   return ~pressed;
 }

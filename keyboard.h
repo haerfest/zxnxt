@@ -19,7 +19,6 @@ typedef enum {
 int  keyboard_init(void);
 void keyboard_finit();
 u8_t keyboard_read(u16_t address);
-void keyboard_refresh(void);
 int  keyboard_is_special_key_pressed(keyboard_special_key_t key);
 
 
