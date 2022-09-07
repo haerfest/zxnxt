@@ -555,8 +555,6 @@ static void nextreg_spectrum_memory_mapping_write(u8_t value) {
 
 
 static void nextreg_alternate_rom_write(u8_t value) {
-  log_wrn("nextreg: alternate ROM write $%02X before PC=$%04X\n", value, cpu_pc_get());
-
   const int  enable        = value & 0x80;
   const int  during_writes = value & 0x40;
   const u8_t rom           = (value & 0x30) >> 4;

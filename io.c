@@ -656,11 +656,11 @@ void io_decoding_write(u8_t index, u8_t value) {
   if (index < 4) {
     self.decoding_enables[index] = value;
 
-    /* When bits 0:30 are all one, a reset is requested. */
+#if 0
+    /* When bits 0:30 are all one, the values should be reset (bit 31 determines soft/hard). */
     if (self.decoding_enables[0] == 0xFF && self.decoding_enables[1] == 0xFF && self.decoding_enables[2] == 0xFF && (self.decoding_enables[3] & 0x7F) == 0x7F) {
-      log_wrn("io: reset requested? $%02X%02X%02X%02X\n", self.decoding_enables[3], self.decoding_enables[2], self.decoding_enables[1], self.decoding_enables[0]);
-      //nextreg_reset(self.decoding_enables[3] & 0x80 ? E_RESET_SOFT : E_RESET_HARD);
     }
+#endif
   }
 }
 
