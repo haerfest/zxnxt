@@ -454,7 +454,8 @@ static void draw_hex2(u8_t number, u16_t rgb, int x, int y) {
 
 
 inline
-static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, int yf, u8_t sprite_number, u8_t pattern_number, u16_t dbg_rgb) {
+static void draw_pattern(const pattern_t pattern, int h, int p, int x, int y, int xf, int yf, u8_t sprite_number, u8_t pattern_number, u16_t dbg_rgb) {
+  const u8_t             mask = h ? 0x0F : 0xFF;
   const palette_entry_t* entry;
   int                    row;
   int                    col;
@@ -463,7 +464,7 @@ static void draw_pattern(const pattern_t pattern, int p, int x, int y, int xf, i
   for (row = 0; row < 16; row++) {
     for (col = 0; col < 16; col++) {
       index = pattern[row * 16 + col];
-      if (index != sprites.transparency_index) {
+      if (index != (sprites.transparency_index & mask)) {
         entry = palette_read_inline(sprites.palette, (p << 4) + index);
         draw_pixel(entry->rgb16, x + col * xf, y + row * yf, xf, yf);
       }
@@ -501,7 +502,7 @@ static void draw_anchor(sprite_t* sprite) {
   if (sprite->xm) mirror_x(pattern);
   if (sprite->ym) mirror_y(pattern);
 
-  draw_pattern(pattern, sprite->p, sprite->x80, sprite->y80, 1 << sprite->xx, 1 << sprite->yy, sprite->number, sprite->n60, 0xE000);
+  draw_pattern(pattern, sprite->h, sprite->p, sprite->x80, sprite->y80, 1 << sprite->xx, 1 << sprite->yy, sprite->number, sprite->n60, 0xE000);
 }
 
 
@@ -525,7 +526,7 @@ static void draw_composite(sprite_t* sprite, const sprite_t* anchor) {
   y = anchor->y80 + (s8_t) sprite->y70;
   p = sprite->x8_pr ? (anchor->p + sprite->p) : sprite->p;
 
-  draw_pattern(pattern, p, x, y, 1 << sprite->xx, 1 << sprite->yy, sprite->number, n, 0x0E00);
+  draw_pattern(pattern, anchor->h, p, x, y, 1 << sprite->xx, 1 << sprite->yy, sprite->number, n, 0x0E00);
 }
 
 
@@ -573,7 +574,7 @@ static void draw_unified(sprite_t* sprite, const sprite_t* anchor) {
   y = anchor->y80 + yd * yf;
   p = sprite->x8_pr ? (anchor->p + sprite->p) : sprite->p;
 
-  draw_pattern(pattern, p, x, y, xf, yf, sprite->number, n, 0x00E0);
+  draw_pattern(pattern, anchor->h, p, x, y, xf, yf, sprite->number, n, 0x00E0);
 }
 
 
