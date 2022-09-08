@@ -277,7 +277,8 @@ void nextreg_reset(reset_t reset) {
   rom_lock(self.altrom_soft_reset_lock);
   altrom_activate(self.altrom_soft_reset_enable, self.altrom_soft_reset_during_writes);
 
-  nextreg_cpu_speed_write(E_CPU_SPEED_3MHZ);
+  nextreg_write_internal(E_NEXTREG_REGISTER_CPU_SPEED, E_CPU_SPEED_3MHZ);
+  nextreg_write_internal(E_NEXTREG_REGISTER_TILEMAP_CONTROL, 0x00);
 }
 
 
@@ -1129,6 +1130,9 @@ u8_t nextreg_data_read(u16_t address) {
 
 
 int nextreg_read_internal(u8_t reg, u8_t* value) {
+  /* By default, return the last value written. */
+  *value = self.registers[reg];
+
   switch (reg) {
     case E_NEXTREG_REGISTER_MACHINE_ID:
       *value = MACHINE_ID;
@@ -1242,9 +1246,6 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
       *value = ula_attribute_byte_format_read();
       break;
 
-    case E_NEXTREG_REGISTER_FALLBACK_COLOUR:
-      break;
-
     case E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT1_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT2_CONTROL:
@@ -1254,12 +1255,6 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
     case E_NEXTREG_REGISTER_MMU_SLOT6_CONTROL:
     case E_NEXTREG_REGISTER_MMU_SLOT7_CONTROL:
       *value = mmu_page_get(self.selected_register - E_NEXTREG_REGISTER_MMU_SLOT0_CONTROL);
-      break;
-
-    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
-    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1:
-    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
-    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
       break;
 
     case E_NEXTREG_REGISTER_USER_0:
@@ -1318,9 +1313,17 @@ int nextreg_read_internal(u8_t reg, u8_t* value) {
       *value = nextreg_int_en_0_read();
       break;
 
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_0:
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_1:
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_2:
+    case E_NEXTREG_REGISTER_INTERNAL_PORT_DECODING_3:
+    case E_NEXTREG_REGISTER_TILEMAP_CONTROL:
+    case E_NEXTREG_REGISTER_FALLBACK_COLOUR:
+      /* Cached value is ok, don't issue a warning. */
+      break;
+
     default:
-      /* By default, return the last value written. */
-      *value = self.registers[reg];
+      /* Might be an unimplemented read, issue a warning. */
       return 0;
   }
 
