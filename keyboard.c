@@ -165,7 +165,7 @@ static void layout_handler_spectrum(void) {
 
 static void layout_handler_host(void) {
   /*
-    E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4, E_KEY_5, E_KEY_6, E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0,
+  E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4, E_KEY_5, E_KEY_6, E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0,
   E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R, E_KEY_T, E_KEY_Y, E_KEY_U, E_KEY_I, E_KEY_O,            E_KEY_P,
   E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F, E_KEY_G, E_KEY_H, E_KEY_J, E_KEY_K, E_KEY_L,            E_KEY_ENTER,
   E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C, E_KEY_V, E_KEY_B, E_KEY_N, E_KEY_M, E_KEY_SYMBOL_SHIFT, E_KEY_SPACE,
@@ -177,11 +177,122 @@ static void layout_handler_host(void) {
 */
 
   const u8_t shift = self.state[SDL_SCANCODE_LSHIFT] | self.state[SDL_SCANCODE_RSHIFT];
-  
-  self.pressed[E_KEY_CAPS_SHIFT] = self.state[SDL_SCANCODE_TAB]  /* Extended */
-                                 | self.state[SDL_SCANCODE_CAPSLOCK];
-  
-  self.pressed[E_KEY_SYMBOL_SHIFT] = self.state[SDL_SCANCODE_LALT]
+  const u8_t alt   = self.state[SDL_SCANCODE_LALT]   | self.state[SDL_SCANCODE_RALT];
+
+  /* 1 2 3 4 5 6 7 8 9 0 */
+  self.pressed[E_KEY_1] = self.state[SDL_SCANCODE_1]
+                        | (self.state[SDL_SCANCODE_GRAVE] & !shift);  /* Edit */
+  self.pressed[E_KEY_2] = self.state[SDL_SCANCODE_2]
+                        | self.state[SDL_SCANCODE_CAPSLOCK];
+  self.pressed[E_KEY_3] = self.state[SDL_SCANCODE_3];
+  self.pressed[E_KEY_4] = self.state[SDL_SCANCODE_4];
+  self.pressed[E_KEY_5] = self.state[SDL_SCANCODE_5]
+                        | ((!shift) & self.state[SDL_SCANCODE_LEFT]);
+  self.pressed[E_KEY_6] = ((!shift) & ( self.state[SDL_SCANCODE_6]
+                                      | self.state[SDL_SCANCODE_DOWN]))
+                        | (shift & self.state[SDL_SCANCODE_7]);  /* & */
+  self.pressed[E_KEY_7] = (!shift) & ( self.state[SDL_SCANCODE_7]
+                                     | self.state[SDL_SCANCODE_UP]
+                                     | self.state[SDL_SCANCODE_APOSTROPHE]);
+  self.pressed[E_KEY_8] = ((!shift) & ( self.state[SDL_SCANCODE_8]
+                                      | self.state[SDL_SCANCODE_RIGHT]))
+                        | (shift & self.state[SDL_SCANCODE_9]);       /* ( */
+  self.pressed[E_KEY_9] = ((!shift) & self.state[SDL_SCANCODE_9])
+                        | (shift & self.state[SDL_SCANCODE_0]);       /* ) */
+  self.pressed[E_KEY_0] = ((!shift) & ( self.state[SDL_SCANCODE_0]
+                                      | self.state[SDL_SCANCODE_BACKSPACE]))
+                        | (shift & self.state[SDL_SCANCODE_MINUS]);  /* _ */
+
+  /* Q W E R T Y U I O P */
+  self.pressed[E_KEY_Q] = self.state[SDL_SCANCODE_Q];
+  self.pressed[E_KEY_W] = self.state[SDL_SCANCODE_W];
+  self.pressed[E_KEY_E] = self.state[SDL_SCANCODE_E];
+  self.pressed[E_KEY_R] = self.state[SDL_SCANCODE_R]
+                        | (shift & self.state[SDL_SCANCODE_COMMA]);            /* < */
+  self.pressed[E_KEY_T] = self.state[SDL_SCANCODE_T]
+                        | (shift & self.state[SDL_SCANCODE_PERIOD]);           /* > */
+  self.pressed[E_KEY_Y] = self.state[SDL_SCANCODE_Y]
+                        | ((!shift) & self.state[SDL_SCANCODE_LEFTBRACKET]);   /* [ */
+  self.pressed[E_KEY_U] = self.state[SDL_SCANCODE_U]
+                        | ((!shift) & self.state[SDL_SCANCODE_RIGHTBRACKET]);  /* ] */
+  self.pressed[E_KEY_I] = self.state[SDL_SCANCODE_I];
+  self.pressed[E_KEY_O] = self.state[SDL_SCANCODE_O]
+                        | ((!shift) & self.state[SDL_SCANCODE_SEMICOLON]);     /* ; */
+  self.pressed[E_KEY_P] = self.state[SDL_SCANCODE_P]
+                        | (shift & self.state[SDL_SCANCODE_APOSTROPHE]);       /* " */
+
+  /* A S D F G H J K L ENTER */
+  self.pressed[E_KEY_A] = self.state[SDL_SCANCODE_A]
+                        | (shift & ( self.state[SDL_SCANCODE_GRAVE]         /* ~ */
+                                   | self.state[SDL_SCANCODE_NONUSBACKSLASH]));
+  self.pressed[E_KEY_S] = self.state[SDL_SCANCODE_S]
+                        | (shift & self.state[SDL_SCANCODE_BACKSLASH]);     /* | */
+  self.pressed[E_KEY_D] = self.state[SDL_SCANCODE_D]
+                        | ((!shift) & self.state[SDL_SCANCODE_BACKSLASH]);  /* \ */
+  self.pressed[E_KEY_F] = self.state[SDL_SCANCODE_F]
+                        | (shift & self.state[SDL_SCANCODE_LEFTBRACKET]);   /* { */
+  self.pressed[E_KEY_G] = self.state[SDL_SCANCODE_G]
+                        | (shift & self.state[SDL_SCANCODE_RIGHTBRACKET]);  /* } */
+  self.pressed[E_KEY_H] = self.state[SDL_SCANCODE_H]
+                        | (shift & self.state[SDL_SCANCODE_6]);             /* ^ */
+  self.pressed[E_KEY_J] = self.state[SDL_SCANCODE_J]
+                        | ((!shift) & self.state[SDL_SCANCODE_MINUS]);      /* - */
+  self.pressed[E_KEY_K] = self.state[SDL_SCANCODE_K]
+                        | (shift & self.state[SDL_SCANCODE_EQUALS]);        /* + */
+  self.pressed[E_KEY_L] = self.state[SDL_SCANCODE_L]
+                        | ((!shift) & self.state[SDL_SCANCODE_EQUALS]);     /* = */
+  self.pressed[E_KEY_ENTER] = self.state[SDL_SCANCODE_RETURN];
+
+  /* CAPS-SHIFT Z X C V B N M SYMBOL-SHIFT SPACE */
+  self.pressed[E_KEY_CAPS_SHIFT] = self.state[SDL_SCANCODE_TAB]            /* Extended */
+                                 | self.state[SDL_SCANCODE_CAPSLOCK]
+                                 | self.state[SDL_SCANCODE_BACKSPACE]
+                                 | self.state[SDL_SCANCODE_ESCAPE]
+                                 | self.state[SDL_SCANCODE_LEFT]
+                                 | self.state[SDL_SCANCODE_RIGHT]
+                                 | self.state[SDL_SCANCODE_UP]
+                                 | self.state[SDL_SCANCODE_DOWN]
+                                 | (shift & ( self.state[SDL_SCANCODE_Q]
+                                            | self.state[SDL_SCANCODE_W]
+                                            | self.state[SDL_SCANCODE_E]
+                                            | self.state[SDL_SCANCODE_R]
+                                            | self.state[SDL_SCANCODE_T]
+                                            | self.state[SDL_SCANCODE_Y]
+                                            | self.state[SDL_SCANCODE_U]
+                                            | self.state[SDL_SCANCODE_I]
+                                            | self.state[SDL_SCANCODE_O]
+                                            | self.state[SDL_SCANCODE_P]
+                                            | self.state[SDL_SCANCODE_A]
+                                            | self.state[SDL_SCANCODE_S]
+                                            | self.state[SDL_SCANCODE_D]
+                                            | self.state[SDL_SCANCODE_F]
+                                            | self.state[SDL_SCANCODE_G]
+                                            | self.state[SDL_SCANCODE_H]
+                                            | self.state[SDL_SCANCODE_J]
+                                            | self.state[SDL_SCANCODE_K]
+                                            | self.state[SDL_SCANCODE_L]
+                                            | self.state[SDL_SCANCODE_Z]
+                                            | self.state[SDL_SCANCODE_X]
+                                            | self.state[SDL_SCANCODE_C]
+                                            | self.state[SDL_SCANCODE_V]
+                                            | self.state[SDL_SCANCODE_B]
+                                            | self.state[SDL_SCANCODE_N]
+                                            | self.state[SDL_SCANCODE_M]));
+  self.pressed[E_KEY_Z] = self.state[SDL_SCANCODE_Z]
+                        | (shift & self.state[SDL_SCANCODE_SEMICOLON]);     /* : */
+  self.pressed[E_KEY_X] = self.state[SDL_SCANCODE_X]
+                        | ((!shift) & alt & self.state[SDL_SCANCODE_2]);    /* pound */
+  self.pressed[E_KEY_C] = self.state[SDL_SCANCODE_C]
+                        | (shift & self.state[SDL_SCANCODE_SLASH]);         /* ? */
+  self.pressed[E_KEY_V] = self.state[SDL_SCANCODE_V]
+                          | ((!shift) & self.state[SDL_SCANCODE_SLASH]);    /* / */
+  self.pressed[E_KEY_B] = self.state[SDL_SCANCODE_B]
+                        | (shift & self.state[SDL_SCANCODE_8]);             /* * */
+  self.pressed[E_KEY_N] = self.state[SDL_SCANCODE_N]
+                        | ((!shift) & self.state[SDL_SCANCODE_COMMA]);      /* , */
+  self.pressed[E_KEY_M] = self.state[SDL_SCANCODE_M]
+                        | ((!shift) & self.state[SDL_SCANCODE_PERIOD]);     /* . */
+  self.pressed[E_KEY_SYMBOL_SHIFT] = alt
                                    | self.state[SDL_SCANCODE_APOSTROPHE]
                                    | self.state[SDL_SCANCODE_SEMICOLON]
                                    | self.state[SDL_SCANCODE_MINUS]
@@ -203,33 +314,10 @@ static void layout_handler_host(void) {
                                               | self.state[SDL_SCANCODE_8]
                                               | self.state[SDL_SCANCODE_9]
                                               | self.state[SDL_SCANCODE_0]
-                                              | self.state[SDL_SCANCODE_GRAVE]));
-
-  self.pressed[E_KEY_1] = self.state[SDL_SCANCODE_1]
-                        | (self.state[SDL_SCANCODE_GRAVE] & !shift);  /* Edit */
-  self.pressed[E_KEY_2] = self.state[SDL_SCANCODE_2]
-                        | self.state[SDL_SCANCODE_CAPSLOCK];
-  self.pressed[E_KEY_3] = self.state[SDL_SCANCODE_3];
-  self.pressed[E_KEY_4] = self.state[SDL_SCANCODE_4];
-  self.pressed[E_KEY_5] = self.state[SDL_SCANCODE_5]
-                        | ((!shift) & self.state[SDL_SCANCODE_LEFT]);
-  self.pressed[E_KEY_6] = ((!shift) & ( self.state[SDL_SCANCODE_6]
-                                      | self.state[SDL_SCANCODE_DOWN]))
-                        | (shift & self.state[SDL_SCANCODE_7]);  /* & */
-  self.pressed[E_KEY_7] = (!shift) & ( self.state[SDL_SCANCODE_7]
-                                     | self.state[SDL_SCANCODE_UP]
-                                     | self.state[SDL_SCANCODE_APOSTROPHE]);
-  self.pressed[E_KEY_8] = ((!shift) & ( self.state[SDL_SCANCODE_8]
-                                      | self.state[SDL_SCANCODE_RIGHT]))
-                        | (shift & self.state[SDL_SCANCODE_9]);      /* ( */
-  self.pressed[E_KEY_9] = ((!shift) & self.state[SDL_SCANCODE_9])
-                        | (shift & self.state[SDL_SCANCODE_0]);      /* ) */
-  self.pressed[E_KEY_0] = ((!shift) & self.state[SDL_SCANCODE_0])
-                        | (shift & self.state[SDL_SCANCODE_MINUS]);  /* _ */
-
-  self.pressed[E_KEY_Q] = self.state[SDL_SCANCODE_Q];
-  
-  /* TO BE COMPLETED */
+                                              | self.state[SDL_SCANCODE_GRAVE]
+                                              | self.state[SDL_SCANCODE_NONUSBACKSLASH]));
+  self.pressed[E_KEY_SPACE] = self.state[SDL_SCANCODE_SPACE]
+                            | ((!shift) & self.state[SDL_SCANCODE_ESCAPE]);  /* break */
 }
 
 
