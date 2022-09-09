@@ -20,6 +20,7 @@ int  keyboard_init(void);
 void keyboard_finit();
 u8_t keyboard_read(u16_t address);
 int  keyboard_is_special_key_pressed(keyboard_special_key_t key);
+void keyboard_toggle_layout(void);
 
 
 #endif  /* __KEYBOARD_H */

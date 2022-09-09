@@ -4,17 +4,27 @@
 #include "log.h"
 
 
+#define N_LAYOUTS  2
+
+typedef enum layout_t {
+  E_LAYOUT_SPECTRUM,
+  E_LAYOUT_HOST
+} layout_t;
+
+typedef void (*layout_handler_t)(void);
+
+
 #define N_ROWS  8
 #define N_COLS  5
 
 
 /* All the physical keys on a ZX Spectrum 48K. */
-typedef enum keyboard_key_t {
+typedef enum spectrum_key_t {
   E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4, E_KEY_5, E_KEY_6, E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0,
   E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R, E_KEY_T, E_KEY_Y, E_KEY_U, E_KEY_I, E_KEY_O,            E_KEY_P,
   E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F, E_KEY_G, E_KEY_H, E_KEY_J, E_KEY_K, E_KEY_L,            E_KEY_ENTER,
   E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C, E_KEY_V, E_KEY_B, E_KEY_N, E_KEY_M, E_KEY_SYMBOL_SHIFT, E_KEY_SPACE,
-} keyboard_key_t;
+} spectrum_key_t;
 
 
 #define N_KEYS  (E_KEY_SPACE - E_KEY_1 + 1)
@@ -29,21 +39,35 @@ const static SDL_Scancode scancodes[N_KEYS] = {
 
 
 typedef struct self_t {
-  const u8_t* state;
-  int         pressed[N_KEYS];
+  const u8_t*      state;
+  layout_t         layout;
+  layout_handler_t layout_handler;
+  int              pressed[N_KEYS];
 } self_t;
 
 
 static self_t self;
 
 
+static void layout_handler_spectrum(void);
+static void layout_handler_host(void);
+
+
 int keyboard_init(void) {
-  self.state = SDL_GetKeyboardState(NULL);
+  self.layout         = E_LAYOUT_SPECTRUM;
+  self.layout_handler = layout_handler_spectrum;
+  self.state          = SDL_GetKeyboardState(NULL);
   return 0;
 }
 
 
 void keyboard_finit(void) {
+}
+
+
+void keyboard_toggle_layout(void) {
+  self.layout         = E_LAYOUT_HOST - self.layout;
+  self.layout_handler = (self.layout == E_LAYOUT_SPECTRUM) ? layout_handler_spectrum : layout_handler_host;
 }
 
 
@@ -75,8 +99,7 @@ int keyboard_is_special_key_pressed(keyboard_special_key_t key) {
 
 
 /* TODO: Use Caps Lock to trigger Caps Shift + 2. */
-inline
-static void keyboard_refresh(void) {
+static void layout_handler_spectrum(void) {
   int i;
 
   /* First capture the state of the physical keys on a ZX Spectrum 48K. */
@@ -140,6 +163,76 @@ static void keyboard_refresh(void) {
 }
 
 
+static void layout_handler_host(void) {
+  /*
+    E_KEY_1,          E_KEY_2, E_KEY_3, E_KEY_4, E_KEY_5, E_KEY_6, E_KEY_7, E_KEY_8, E_KEY_9,            E_KEY_0,
+  E_KEY_Q,          E_KEY_W, E_KEY_E, E_KEY_R, E_KEY_T, E_KEY_Y, E_KEY_U, E_KEY_I, E_KEY_O,            E_KEY_P,
+  E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F, E_KEY_G, E_KEY_H, E_KEY_J, E_KEY_K, E_KEY_L,            E_KEY_ENTER,
+  E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C, E_KEY_V, E_KEY_B, E_KEY_N, E_KEY_M, E_KEY_SYMBOL_SHIFT, E_KEY_SPACE,
+
+  SIN           SIN  Extended (Symbol Shift + Caps Shift, [Win/Alt] + [Shift], or [Tab])
+  Q  <=         q    Normal (L)     Q Caps Shift (L)    PLOT  Normal (K)
+   PLOT         <=   Symbol Shift [Win/Alt]
+  ASN           ASN  Extended then sole Symbol Shift or Caps Shift
+*/
+
+  const u8_t shift = self.state[SDL_SCANCODE_LSHIFT] | self.state[SDL_SCANCODE_RSHIFT];
+  
+  self.pressed[E_KEY_CAPS_SHIFT] = self.state[SDL_SCANCODE_TAB]  /* Extended */
+                                 | self.state[SDL_SCANCODE_CAPSLOCK];
+  
+  self.pressed[E_KEY_SYMBOL_SHIFT] = self.state[SDL_SCANCODE_LALT]
+                                   | self.state[SDL_SCANCODE_APOSTROPHE]
+                                   | self.state[SDL_SCANCODE_SEMICOLON]
+                                   | self.state[SDL_SCANCODE_MINUS]
+                                   | self.state[SDL_SCANCODE_EQUALS]
+                                   | self.state[SDL_SCANCODE_SLASH]
+                                   | self.state[SDL_SCANCODE_COMMA]
+                                   | self.state[SDL_SCANCODE_PERIOD]
+                                   | self.state[SDL_SCANCODE_LEFTBRACKET]
+                                   | self.state[SDL_SCANCODE_RIGHTBRACKET]
+                                   | self.state[SDL_SCANCODE_BACKSLASH]
+                                   | self.state[SDL_SCANCODE_TAB]  /* Extended. */
+                                   | (shift & ( self.state[SDL_SCANCODE_1]
+                                              | self.state[SDL_SCANCODE_2]
+                                              | self.state[SDL_SCANCODE_3]
+                                              | self.state[SDL_SCANCODE_4]
+                                              | self.state[SDL_SCANCODE_5]
+                                              | self.state[SDL_SCANCODE_6]
+                                              | self.state[SDL_SCANCODE_7]
+                                              | self.state[SDL_SCANCODE_8]
+                                              | self.state[SDL_SCANCODE_9]
+                                              | self.state[SDL_SCANCODE_0]
+                                              | self.state[SDL_SCANCODE_GRAVE]));
+
+  self.pressed[E_KEY_1] = self.state[SDL_SCANCODE_1]
+                        | (self.state[SDL_SCANCODE_GRAVE] & !shift);  /* Edit */
+  self.pressed[E_KEY_2] = self.state[SDL_SCANCODE_2]
+                        | self.state[SDL_SCANCODE_CAPSLOCK];
+  self.pressed[E_KEY_3] = self.state[SDL_SCANCODE_3];
+  self.pressed[E_KEY_4] = self.state[SDL_SCANCODE_4];
+  self.pressed[E_KEY_5] = self.state[SDL_SCANCODE_5]
+                        | ((!shift) & self.state[SDL_SCANCODE_LEFT]);
+  self.pressed[E_KEY_6] = ((!shift) & ( self.state[SDL_SCANCODE_6]
+                                      | self.state[SDL_SCANCODE_DOWN]))
+                        | (shift & self.state[SDL_SCANCODE_7]);  /* & */
+  self.pressed[E_KEY_7] = (!shift) & ( self.state[SDL_SCANCODE_7]
+                                     | self.state[SDL_SCANCODE_UP]
+                                     | self.state[SDL_SCANCODE_APOSTROPHE]);
+  self.pressed[E_KEY_8] = ((!shift) & ( self.state[SDL_SCANCODE_8]
+                                      | self.state[SDL_SCANCODE_RIGHT]))
+                        | (shift & self.state[SDL_SCANCODE_9]);      /* ( */
+  self.pressed[E_KEY_9] = ((!shift) & self.state[SDL_SCANCODE_9])
+                        | (shift & self.state[SDL_SCANCODE_0]);      /* ) */
+  self.pressed[E_KEY_0] = ((!shift) & self.state[SDL_SCANCODE_0])
+                        | (shift & self.state[SDL_SCANCODE_MINUS]);  /* _ */
+
+  self.pressed[E_KEY_Q] = self.state[SDL_SCANCODE_Q];
+  
+  /* TO BE COMPLETED */
+}
+
+
 /**
  *      Left half row    Right half row
  * ------------------    ------------------------
@@ -152,7 +245,7 @@ u8_t keyboard_read(u16_t address) {
   const u8_t half_row = ~(address >> 8);
   u8_t       pressed  = ~0x1F;  /* No key pressed. */
 
-  keyboard_refresh();
+  self.layout_handler();
 
   if (half_row & ~0xFE) pressed |= HALF_ROW_L(E_KEY_CAPS_SHIFT, E_KEY_Z, E_KEY_X, E_KEY_C,            E_KEY_V    );  /* ~11111110 */
   if (half_row & ~0xFD) pressed |= HALF_ROW_L(E_KEY_A,          E_KEY_S, E_KEY_D, E_KEY_F,            E_KEY_G    );  /* ~11111101 */

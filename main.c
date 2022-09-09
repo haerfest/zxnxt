@@ -541,6 +541,8 @@ static void main_handle_function_keys(void) {
       if (f12) {
         if (self.keyboard_state[SDL_SCANCODE_LSHIFT] || self.keyboard_state[SDL_SCANCODE_RSHIFT]) {
           self.task = E_MAIN_TASK_DEBUG;
+        } else if (self.keyboard_state[SDL_SCANCODE_LCTRL] || self.keyboard_state[SDL_SCANCODE_RCTRL]) {
+          keyboard_toggle_layout();
         } else {
           main_toggle_fullscreen();
         }
